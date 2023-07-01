@@ -4,21 +4,19 @@ version = "0.1.0"
 authors = ["Sxmourai", "Yasser"]
 autotests = true
 
-
 [dependencies]
 pc-keyboard = "0.5.0"
 pic8259 = "0.10.1"
-bootloader = "0.9.23"
+bootloader = { version = "0.9.23", features = ["map_physical_memory"]}
 volatile = "0.2.6"
 spin = "0.5.2"
 x86_64 = "0.14.2"
 uart_16550 = "0.2.0"
-
+linked_list_allocator = "0.9.0"
 
 [dependencies.lazy_static]
 version = "1.0"
 features = ["spin_no_std"]
-
 
 [package.metadata.bootimage]
 test-args = [
@@ -33,7 +31,6 @@ test-timeout = 300
 
 [profile.release]
 panic = "abort" # disable stack unwinding on panic
-
 
 [[test]]
 name = "stack_overflow"
