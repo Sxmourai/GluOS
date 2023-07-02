@@ -24,4 +24,4 @@ For instance, based on phil-opp blog: <https://os.phil-opp.com>
 
 - Our own bootloader
 - Graphical interface (Definitely not today)
-- 
+- File system
