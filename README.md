@@ -6,14 +6,15 @@ For instance, based on phil-opp blog: <https://os.phil-opp.com>
 ## Features
 
 - Full rust (with wrappers in assembly), least unsafe blocks
-- Keyboard input (no usb support, ps emulation)
+- Keyboard input (no usb support, ps emulation) // Hardware interrupts
 - (some) CPU exceptions
+- Paging, heap allocation and multitasking
 
 ## Dev requirements
 
 - Linux system (wsl2 works)
 - Nightly rust (should be by default, if not : `rustup override set nightly`)
-- qemu (arch: pacman -S qemu (qemu-full for app) )
+- qemu (arch: qemu (qemu-full for gui app), debian: qemu-system-x86 (apt))
 - rust-src toolchain on nightly rust (`rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu`)
 - bootimage (`cargo install bootimage`)
 - llvm tools (`rustup component add llvm-tools-preview`)
@@ -22,4 +23,5 @@ For instance, based on phil-opp blog: <https://os.phil-opp.com>
 ## Additional work
 
 - Our own bootloader
-- GUI (will take some time... Maybe in 99+ years)
+- Graphical interface (Definitely not today)
+- 

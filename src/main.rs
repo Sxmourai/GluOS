@@ -4,21 +4,23 @@
 #![test_runner(kernel::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
-use core::panic::PanicInfo;
-extern crate kernel;extern crate bootloader;extern crate x86_64;
+extern crate kernel;
+extern crate bootloader;
+extern crate x86_64;
 extern crate alloc;
+
+use core::panic::PanicInfo;
 use kernel::println;
 use bootloader::{BootInfo, entry_point};
 use alloc::{boxed::Box, rc::Rc, vec::Vec};
 use kernel::task::keyboard;
 use kernel::task::executor::Executor;
+use kernel::{memory::{self, BootInfoFrameAllocator}, allocator};
+use x86_64::VirtAddr;use alloc::vec;
+use kernel::task::Task;
 
 entry_point!(kernel_main);
-
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
-    use kernel::{memory::{self, BootInfoFrameAllocator}, allocator};
-    use x86_64::VirtAddr;use alloc::vec;
-    use kernel::task::Task;
     kernel::init();
 
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
@@ -30,7 +32,6 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
         .expect("heap initialization failed");
 
     let mut executor = Executor::new();
-    executor.spawn(Task::new(example_task()));
     executor.spawn(Task::new(keyboard::print_keypresses()));
     executor.run();
 
