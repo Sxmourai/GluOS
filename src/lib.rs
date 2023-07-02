@@ -16,7 +16,7 @@ pub mod allocator;
 pub mod task;
 use core::panic::PanicInfo;
 
-
+extern crate crossbeam_queue;extern crate futures_util;extern crate conquer_once;
 extern crate x86_64;extern crate alloc;extern crate lazy_static;extern crate spin;
 extern crate volatile;extern crate uart_16550;extern crate pic8259;
 extern crate pc_keyboard;extern crate bootloader;extern crate linked_list_allocator;
