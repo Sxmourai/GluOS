@@ -13,23 +13,12 @@ use alloc::vec::Vec;
 use kernel::allocator::HEAP_SIZE;
 
 entry_point!(main);
-
 fn main(boot_info: &'static BootInfo) -> ! {
-    use kernel::allocator;
-    use kernel::memory::{self, BootInfoFrameAllocator};
-    use x86_64::VirtAddr;
-
-    kernel::init();
-    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
-    let mut mapper = unsafe { memory::init(phys_mem_offset) };
-    let mut frame_allocator = unsafe {
-        BootInfoFrameAllocator::init(&boot_info.memory_map)
-    };
-    allocator::init_heap(&mut mapper, &mut frame_allocator)
-        .expect("heap initialization failed");
+    kernel::init(boot_info);
 
     test_main();
-    loop {}}
+    loop {}
+}
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
