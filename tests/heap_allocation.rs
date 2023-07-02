@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 #![feature(custom_test_frameworks)]
-#![test_runner(kernel::test_runner)]
+#![test_runner(kernel::test::runner)]
 #![reexport_test_harness_main = "test_main"]
 
 extern crate alloc;extern crate bootloader;extern crate kernel;extern crate x86_64;
@@ -15,6 +15,7 @@ use kernel::allocator::HEAP_SIZE;
 entry_point!(main);
 fn main(boot_info: &'static BootInfo) -> ! {
     kernel::init(boot_info);
+    kernel::println!("Heap allocation tests !");
 
     test_main();
     loop {}
@@ -59,4 +60,10 @@ fn many_boxes_long_lived() {
         assert_eq!(*x, i);
     }
     assert_eq!(*long_lived, 1); // new
+}
+
+#[test_case]
+fn test_breakpoint_exception() {
+    // invoke a breakpoint exception
+    x86_64::instructions::interrupts::int3();
 }
