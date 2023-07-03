@@ -1,6 +1,6 @@
 
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
-use crate::{println, gdt, serial_println};
+use crate::{println, gdt, serial_println, task::keyboard::Input};
 use lazy_static::lazy_static;
 use pic8259::ChainedPics;
 
@@ -43,6 +43,10 @@ pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
 
 pub static PICS: spin::Mutex<ChainedPics> =
     spin::Mutex::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
+lazy_static!{
+    static ref INPUT: spin::Mutex<Input> = spin::Mutex::new(Input::new());
+}
+
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
@@ -63,14 +67,14 @@ impl InterruptIndex {
 
 extern "x86-interrupt" fn timer_interrupt_handler(
     _stack_frame: InterruptStackFrame) {
-    let keys = crate::task::keyboard::PRESSED_KEYS.lock();
-    serial_println!("Keys2: {:?}", *keys);
-    drop(keys);
+    // println!("Keys2: {:?}", INPUT.lock());
+    INPUT.lock().blink();
     unsafe {
         PICS.lock()
             .notify_end_of_interrupt(InterruptIndex::Timer.as_u8());
     }
 }
+
 
 extern "x86-interrupt" fn keyboard_interrupt_handler(
     _stack_frame: InterruptStackFrame
@@ -79,7 +83,9 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(
 
     let mut port = Port::new(0x60);
     let scancode: u8 = unsafe { port.read() };
-    crate::task::keyboard::add_scancode(scancode); // new
+    // crate::task::keyboard::add_scancode(scancode);
+    INPUT.lock().press_key(scancode);
+
 
     unsafe {
         PICS.lock()

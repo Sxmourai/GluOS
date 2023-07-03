@@ -28,10 +28,10 @@ pub enum Color {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
-struct ColorCode(u8);
+pub struct ColorCode(u8);
 
 impl ColorCode {
-    fn new(foreground: Color, background: Color) -> ColorCode {
+    pub fn new(foreground: Color, background: Color) -> ColorCode {
         ColorCode((background as u8) << 4 | (foreground as u8))
     }
 }
@@ -39,9 +39,17 @@ impl ColorCode {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(C)]
-struct ScreenChar {
+pub struct ScreenChar {
     ascii_character: u8,
     color_code: ColorCode,
+}
+impl ScreenChar {
+    pub fn new(ascii_character: u8, color_code: ColorCode) -> ScreenChar {
+        ScreenChar { ascii_character, color_code }
+    }
+    pub fn from(ascii_character: u8) -> ScreenChar {
+        ScreenChar { ascii_character, color_code: ColorCode::new(Color::White, Color::Black) }
+    }
 }
 
 pub const BUFFER_HEIGHT: usize = 25;
@@ -66,7 +74,7 @@ impl Writer {
                     self.new_line();
                 }
 
-                let row = BUFFER_HEIGHT - 1;
+                let row = BUFFER_HEIGHT - 1; // Easier to print from bottom to top, TODO: Make it top to bottom
                 let col = self.column_position;
 
                 let color_code = self.color_code;
@@ -110,6 +118,17 @@ impl Writer {
             self.buffer.chars[row][col].write(blank);
         }
     }
+    pub fn clear(&mut self) {
+        for row in 0..BUFFER_HEIGHT {
+            self.clear_row(row);
+        }
+    }
+    pub fn write_at(&mut self, row:usize, column:usize, character:ScreenChar) {
+        self.buffer.chars[row][column].write(character)
+    }
+    pub fn get_at(&mut self, row:usize, column:usize) -> ScreenChar {
+        self.buffer.chars[row][column].read()
+    }
 }
 
 impl fmt::Write for Writer {
@@ -125,6 +144,9 @@ lazy_static! {
         color_code: ColorCode::new(Color::Yellow, Color::Black),
         buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
+}
+pub fn clear_screen() {
+    WRITER.lock().clear()
 }
 
 #[macro_export]

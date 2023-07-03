@@ -26,7 +26,7 @@ pub fn init(boot_info: &'static BootInfo) {
 
 pub fn end() -> ! {
     let mut executor = Executor::new();
-    executor.spawn(Task::new(keyboard::print_keypresses()));
+    // executor.spawn(Task::new(keyboard::print_keypresses()));
     executor.run() // Replaces halt loop
 }
 
