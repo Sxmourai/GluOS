@@ -1,6 +1,9 @@
 use crate::println;
+use alloc::vec::Vec;
+use alloc::vec;
 use conquer_once::spin::OnceCell;
 use crossbeam_queue::ArrayQueue;
+use spin::Mutex;
 use core::{pin::Pin, task::{Poll, Context}};
 use futures_util::stream::Stream;
 use futures_util::task::AtomicWaker;
@@ -10,6 +13,7 @@ use crate::print;
 
 static WAKER: AtomicWaker = AtomicWaker::new();
 static SCANCODE_QUEUE: OnceCell<ArrayQueue<u8>> = OnceCell::uninit();
+pub static PRESSED_KEYS: Mutex<Vec<char>> = Mutex::new(vec![]);
 
 /// Called by the keyboard interrupt handler
 ///
@@ -70,11 +74,15 @@ pub async fn print_keypresses() {
     while let Some(scancode) = scancodes.next().await {
         if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
             if let Some(key) = keyboard.process_keyevent(key_event) {
-                match key {
-                    DecodedKey::Unicode(character) => print!("{}", character),
-                    DecodedKey::RawKey(key) => print!("{:?}", key),
-                }
+                press_key(key);
             }
         }
+    }
+}
+
+fn press_key(key:DecodedKey) {
+    match key {
+        DecodedKey::Unicode(character) => {print!("{}", character); PRESSED_KEYS.lock().push(character)},
+        DecodedKey::RawKey(key) => print!("{:?}", key),
     }
 }

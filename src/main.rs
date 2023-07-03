@@ -16,9 +16,9 @@ use bootloader::{BootInfo, entry_point};
 entry_point!(kernel_main);
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     kernel::init(boot_info);
-
     #[cfg(test)]
     test_main();
+    
 
     kernel::end();
 }

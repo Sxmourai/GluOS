@@ -1,5 +1,4 @@
 {
     "rust-analyzer.check.allTargets": false,
     "rust-analyzer.check.targets": "x86_64.json",
-    "rust-analyzer.check.overrideCommand": ["cargo check --workspace --message-format=json --all-targets", "."]
 }

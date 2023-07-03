@@ -16,15 +16,10 @@ pub mod task;
 pub mod test;
 pub mod boot;
 
-extern crate crossbeam_queue;extern crate futures_util;extern crate conquer_once;
-extern crate x86_64;extern crate alloc;extern crate lazy_static;extern crate spin;
-extern crate volatile;extern crate uart_16550;extern crate pic8259;
-extern crate pc_keyboard;extern crate bootloader;extern crate linked_list_allocator;
 
 pub use boot::{init,end, hlt_loop};
 pub use test::{exit_qemu, QemuExitCode, test_panic_handler};
-// pub use serial::{serial_println, serial_print};
-// pub use vga_buffer::{println, print};
+
 
 //-----------TESTS HANDLING-----------
 #[cfg(test)]
@@ -43,3 +38,19 @@ fn test_kernel_main(boot_info: &'static BootInfo) -> ! {
     test_main();
     hlt_loop()
 }
+
+//TODO: Adding extern crates... Needs to be removed but idk how
+
+extern crate crossbeam_queue;
+extern crate futures_util;
+extern crate conquer_once;
+extern crate x86_64;
+extern crate alloc;
+extern crate lazy_static;
+extern crate spin;
+extern crate volatile;
+extern crate uart_16550;
+extern crate pic8259;
+extern crate pc_keyboard;
+extern crate bootloader;
+extern crate linked_list_allocator;

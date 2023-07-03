@@ -1,6 +1,6 @@
 
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
-use crate::{println, gdt};
+use crate::{println, gdt, serial_println};
 use lazy_static::lazy_static;
 use pic8259::ChainedPics;
 
@@ -37,7 +37,6 @@ extern "x86-interrupt" fn double_fault_handler(
 
 // HARDWARE INTERRUPTS
 use spin;
-use crate::print;
 
 pub const PIC_1_OFFSET: u8 = 32;
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
@@ -64,7 +63,9 @@ impl InterruptIndex {
 
 extern "x86-interrupt" fn timer_interrupt_handler(
     _stack_frame: InterruptStackFrame) {
-    print!(".");
+    let keys = crate::task::keyboard::PRESSED_KEYS.lock();
+    serial_println!("Keys2: {:?}", *keys);
+    drop(keys);
     unsafe {
         PICS.lock()
             .notify_end_of_interrupt(InterruptIndex::Timer.as_u8());
@@ -101,3 +102,5 @@ extern "x86-interrupt" fn page_fault_handler(
     println!("{:#?}", stack_frame);
     hlt_loop();
 }
+
+// qemu-system-x86_64 -drive format=raw,file=target/x86_64/debug/bootimage-kernel.bin -no-reboot -device isa-debug-exit,iobase=0xf4,iosize=0x04 -serial stdio -display none
