@@ -1,9 +1,9 @@
-
 use core::borrow::BorrowMut;
 
-use alloc::vec::Vec;
+use alloc::{vec::Vec, boxed::Box};
+use pc_keyboard::{ScancodeSet1, Keyboard, layouts::Us104Key, HandleControl};
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
-use crate::{println, gdt, serial_println, prompt::{Prompt, Cursor}};
+use crate::{println, gdt, serial_println, prompt::{Prompt, Cursor, KbInput}};
 use lazy_static::lazy_static;
 use pic8259::ChainedPics;
 
@@ -46,10 +46,13 @@ pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
 
 pub static PICS: spin::Mutex<ChainedPics> =
     spin::Mutex::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
-// lazy_static!{pub static ref PROMPT: spin::Mutex<Prompt> = spin::Mutex::new(Prompt::new());}
-static PROMPTS: Mutex<Vec<Prompt>> = Mutex::new(Vec::new());
-pub fn add_prompt(prompt:Prompt) {
-    serial_println!("Added prompt: {:?}", prompt);PROMPTS.lock().push(prompt)}
+
+lazy_static!{static ref PROMPTS: Vec<dyn KbInput> = Mutex::new(Vec::new());}
+
+pub fn add_input(input:dyn KbInput) {
+    serial_println!("Added input: {:?}", input);PROMPTS.lock().push(input)}
+    
+static KEYBOARD: Mutex<Keyboard<Us104Key, ScancodeSet1>> = Mutex::new(Keyboard::new(Us104Key, ScancodeSet1, HandleControl::Ignore));
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
@@ -92,8 +95,14 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(
     let mut port = Port::new(0x60);
     let scancode: u8 = unsafe { port.read() };
     // crate::task::keyboard::add_scancode(scancode);
-    for prompt in PROMPTS.lock().iter_mut() {
-        prompt.press_key(scancode);
+    let mut keyboard = KEYBOARD.lock();
+    if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
+        if let Some(key) = keyboard.process_keyevent(key_event) {
+            drop(keyboard);
+            for prompt in PROMPTS.lock().iter_mut() {
+                prompt.handle_key(key);
+            }
+        }
     }
     
 

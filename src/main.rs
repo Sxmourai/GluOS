@@ -11,6 +11,7 @@ extern crate x86_64;
 extern crate alloc;
 
 use core::panic::PanicInfo;
+use alloc::string::ToString;
 use kernel::{serial_println, prompt::Prompt};
 use bootloader::{BootInfo, entry_point};
 
@@ -19,7 +20,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     kernel::init(boot_info);
     #[cfg(test)]
     test_main();
-    BlockingPrompt::new().run();
+    kernel::prompt::BlockingPrompt::new(">".to_string()).run();
     kernel::end();
 }
 
