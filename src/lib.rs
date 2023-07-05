@@ -15,6 +15,8 @@ pub mod allocator;
 pub mod task;
 pub mod test;
 pub mod boot;
+pub mod timer;
+pub mod prompt;
 
 
 pub use boot::{init,end, hlt_loop};
@@ -54,3 +56,4 @@ extern crate pic8259;
 extern crate pc_keyboard;
 extern crate bootloader;
 extern crate linked_list_allocator;
+extern crate hashbrown;

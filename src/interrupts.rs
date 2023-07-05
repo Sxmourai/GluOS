@@ -1,6 +1,9 @@
 
+use core::borrow::BorrowMut;
+
+use alloc::vec::Vec;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
-use crate::{println, gdt, serial_println, task::keyboard::Input};
+use crate::{println, gdt, serial_println, prompt::{Prompt, Cursor}};
 use lazy_static::lazy_static;
 use pic8259::ChainedPics;
 
@@ -36,17 +39,17 @@ extern "x86-interrupt" fn double_fault_handler(
 
 
 // HARDWARE INTERRUPTS
-use spin;
+use spin::{self, Mutex};
 
 pub const PIC_1_OFFSET: u8 = 32;
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
 
 pub static PICS: spin::Mutex<ChainedPics> =
     spin::Mutex::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
-lazy_static!{
-    static ref INPUT: spin::Mutex<Input> = spin::Mutex::new(Input::new());
-}
-
+// lazy_static!{pub static ref PROMPT: spin::Mutex<Prompt> = spin::Mutex::new(Prompt::new());}
+static PROMPTS: Mutex<Vec<Prompt>> = Mutex::new(Vec::new());
+pub fn add_prompt(prompt:Prompt) {
+    serial_println!("Added prompt: {:?}", prompt);PROMPTS.lock().push(prompt)}
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
@@ -67,8 +70,13 @@ impl InterruptIndex {
 
 extern "x86-interrupt" fn timer_interrupt_handler(
     _stack_frame: InterruptStackFrame) {
-    // println!("Keys2: {:?}", INPUT.lock());
-    INPUT.lock().blink();
+    crate::timer::tick();
+    
+    if crate::timer::get_ticks()%14==0 {
+        for prompt in PROMPTS.lock().iter_mut() { 
+            prompt.cursor_blink();
+        }
+    }
     unsafe {
         PICS.lock()
             .notify_end_of_interrupt(InterruptIndex::Timer.as_u8());
@@ -84,7 +92,10 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(
     let mut port = Port::new(0x60);
     let scancode: u8 = unsafe { port.read() };
     // crate::task::keyboard::add_scancode(scancode);
-    INPUT.lock().press_key(scancode);
+    for prompt in PROMPTS.lock().iter_mut() {
+        prompt.press_key(scancode);
+    }
+    
 
 
     unsafe {
