@@ -17,17 +17,17 @@ lazy_static!{static ref DEFAULT_KEYBOARD: Keyboard<layouts::Us104Key, ScancodeSe
 /// Called by the keyboard interrupt handler
 ///
 /// Must not block or allocate.
-pub(crate) fn add_scancode(scancode: u8) {
-    if let Ok(queue) = SCANCODE_QUEUE.try_get() {
-        if let Err(_) = queue.push(scancode) {
-            println!("WARNING: scancode queue full; dropping keyboard input");
-        } else {
-            WAKER.wake();
-        }
-    } else {
-        println!("WARNING: scancode queue uninitialized");
-    }
-}
+// pub(crate) fn add_scancode(scancode: u8) {
+//     if let Ok(queue) = SCANCODE_QUEUE.try_get() {
+//         if let Err(_) = queue.push(scancode) {
+//             println!("WARNING: scancode queue full; dropping keyboard input");
+//         } else {
+//             WAKER.wake();
+//         }
+//     } else {
+//         println!("WARNING: scancode queue uninitialized");
+//     }
+// }
 
 pub struct ScancodeStream {
     _private: (),

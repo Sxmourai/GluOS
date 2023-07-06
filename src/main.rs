@@ -12,7 +12,7 @@ extern crate alloc;
 
 use core::panic::PanicInfo;
 use alloc::string::ToString;
-use kernel::{serial_println, prompt::Prompt};
+use kernel::{serial_println, prompt::{input}, hlt_loop, println};
 use bootloader::{BootInfo, entry_point};
 
 entry_point!(kernel_main);
@@ -20,8 +20,9 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     kernel::init(boot_info);
     #[cfg(test)]
     test_main();
-    kernel::prompt::BlockingPrompt::new(">".to_string()).run();
-    kernel::end();
+    let cmd = input("Type a command: ");
+    // crate::multi::threads::spawn(|| {kernel::end()});
+    hlt_loop()
 }
 
 #[panic_handler]

@@ -1,9 +1,8 @@
-use core::borrow::BorrowMut;
-
-use alloc::{vec::Vec, boxed::Box};
+use crate::{alloc::{vec::Vec, boxed::Box}, serial_println};
+use alloc::string::String;
 use pc_keyboard::{ScancodeSet1, Keyboard, layouts::Us104Key, HandleControl};
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
-use crate::{println, gdt, serial_println, prompt::{Prompt, Cursor, KbInput}};
+use crate::{println, gdt, prompt::{Cursor, KbInput}};
 use lazy_static::lazy_static;
 use pic8259::ChainedPics;
 
@@ -47,12 +46,29 @@ pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
 pub static PICS: spin::Mutex<ChainedPics> =
     spin::Mutex::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
 
-lazy_static!{static ref PROMPTS: Vec<dyn KbInput> = Mutex::new(Vec::new());}
+#[derive(Debug)]
+struct SendSyncWrapper<T: ?Sized>(T);
+unsafe impl<T: ?Sized> Sync for SendSyncWrapper<T> {}
+unsafe impl<T: ?Sized> Send for SendSyncWrapper<T> {}
 
-pub fn add_input(input:dyn KbInput) {
-    serial_println!("Added input: {:?}", input);PROMPTS.lock().push(input)}
+static KB_INPUTS: Mutex<Vec<Box<SendSyncWrapper<dyn KbInput>>>> = Mutex::new(Vec::new());
+
+// Adds prompt to list and returns its index
+pub fn add_input(input:impl KbInput + 'static) -> usize {
+    KB_INPUTS.lock().push(Box::new(SendSyncWrapper(input)));
+    KB_INPUTS.lock().len()-1
+}
+pub fn get_input_msg(idx:usize) -> Option<String> {
+    if let Some(input) = KB_INPUTS.lock().get(idx) {
+        return Some(input.0.get_return_message())
+    } 
+    None
+}
+
+lazy_static!{
+    static ref KEYBOARD: Mutex<Keyboard<Us104Key, ScancodeSet1>> = Mutex::new(Keyboard::new(Us104Key, ScancodeSet1, HandleControl::Ignore));
+} 
     
-static KEYBOARD: Mutex<Keyboard<Us104Key, ScancodeSet1>> = Mutex::new(Keyboard::new(Us104Key, ScancodeSet1, HandleControl::Ignore));
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
@@ -76,8 +92,8 @@ extern "x86-interrupt" fn timer_interrupt_handler(
     crate::timer::tick();
     
     if crate::timer::get_ticks()%14==0 {
-        for prompt in PROMPTS.lock().iter_mut() { 
-            prompt.cursor_blink();
+        for prompt in KB_INPUTS.lock().iter_mut() { 
+            prompt.0.cursor_blink();
         }
     }
     unsafe {
@@ -99,8 +115,8 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(
     if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
         if let Some(key) = keyboard.process_keyevent(key_event) {
             drop(keyboard);
-            for prompt in PROMPTS.lock().iter_mut() {
-                prompt.handle_key(key);
+            for input in KB_INPUTS.lock().iter_mut() {
+                input.0.handle_key(key);
             }
         }
     }

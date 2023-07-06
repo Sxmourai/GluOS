@@ -5,6 +5,10 @@
 #![reexport_test_harness_main = "test_main"]
 #![feature(abi_x86_interrupt)]
 #![feature(const_mut_refs)]
+#![feature(linkage)]
+// #![feature(llvm_asm)]
+#![feature(naked_functions)]
+
 
 pub mod serial;
 pub mod vga_buffer;
@@ -17,6 +21,7 @@ pub mod test;
 pub mod boot;
 pub mod timer;
 pub mod prompt;
+pub mod cpu;
 
 
 pub use boot::{init,end, hlt_loop};

@@ -91,11 +91,8 @@ impl Writer {
                     self.new_line();
                 }
 
-                let row = BUFFER_HEIGHT - 1; // Easier to print from bottom to top, TODO: Make it top to bottom
-                let col = self.cursor_pos.1;
-
                 let color_code = self.color_code;
-                self.buffer.chars[row][col].write(ScreenChar {
+                self.write_char_at(self.cursor_pos.0, self.cursor_pos.1, &ScreenChar {
                     ascii_character: byte,
                     color_code,
                 });
@@ -142,13 +139,16 @@ impl Writer {
     }
 
     pub fn new_line(&mut self) {
-        for row in 1..BUFFER_HEIGHT {
-            for col in 0..BUFFER_WIDTH {
-                let character = self.buffer.chars[row][col].read();
-                self.buffer.chars[row - 1][col].write(character);
+        if self.cursor_pos.0+1 < BUFFER_HEIGHT {self.cursor_pos.0 += 1;}
+        else {
+            for row in 1..BUFFER_HEIGHT {
+                for col in 0..BUFFER_WIDTH {
+                    let character = self.buffer.chars[row][col].read();
+                    self.buffer.chars[row - 1][col].write(character);
+                }
             }
+            self.clear_row(BUFFER_HEIGHT - 1);
         }
-        self.clear_row(BUFFER_HEIGHT - 1);
         self.cursor_pos.1 = 0;
     }
     fn clear_row(&mut self, row: usize) {
@@ -166,6 +166,7 @@ impl Writer {
         }
     }
     pub fn write_char_at(&mut self, row:usize, column:usize, character:&ScreenChar) {
+        // serial_println!("Printing {} at r:{} c:{}", character.ascii_character as char, row, column);
         self.buffer.chars[row][column].write(*character)
     }
     pub fn write_byte_at(&mut self, row:usize, column:usize, byte:u8) {
@@ -189,7 +190,7 @@ impl fmt::Write for Writer {
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         cursor_pos: ScreenPos(0, 0),
-        color_code: ColorCode::new(Color::Yellow, Color::Black),
+        color_code: ColorCode::new(Color::White, Color::Green),
         buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
 }
