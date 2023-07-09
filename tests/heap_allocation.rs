@@ -18,7 +18,7 @@ fn main(boot_info: &'static BootInfo) -> ! {
     kernel::println!("Heap allocation tests !");
 
     test_main();
-    loop {}
+    kernel::end()
 }
 
 #[panic_handler]

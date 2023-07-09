@@ -6,5 +6,5 @@ pub fn tick() {
     *ELAPSED_TICKS.lock() += 1;
 }
 pub fn get_ticks() -> usize {
-    ELAPSED_TICKS.lock().clone()
+    *ELAPSED_TICKS.lock()
 }

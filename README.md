@@ -2,6 +2,7 @@
 
 This is a minimal, modular and lightweight kernel in rust
 For instance, based on phil-opp blog: <https://os.phil-opp.com>
+https://github.com/thepowersgang/rust_os
 
 ## Features
 

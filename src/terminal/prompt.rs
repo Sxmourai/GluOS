@@ -1,10 +1,11 @@
-use alloc::{vec::Vec, format, string::{String, ToString}, boxed::Box};
-use futures_util::{Future, future::BoxFuture, task::FutureObj};
+use alloc::{vec::Vec, format, string::{String, ToString}};
 use hashbrown::HashMap;
-use pc_keyboard::{Keyboard, layouts::Us104Key, ScancodeSet1, HandleControl, DecodedKey};
+use pc_keyboard::DecodedKey;
 
-use crate::{vga_buffer::{ScreenChar, ScreenPos, ColorCode, Color, BUFFER_WIDTH, print_screenchar_at, print_screenchar_atp, print_byte_at, print_char_at, print_byte_atp, print_atp, print_at, calculate_end}, serial_println, println, print};
+use crate::{writer::{ScreenPos, ColorCode, Color, print_screenchar_at, print_screenchar_atp, print_byte_at, print_atp, print_at}, println, print};
+use crate::terminal::console::ScreenChar;
 
+use super::console::BUFFER_WIDTH;
 
 #[derive(Debug)]
 pub struct Cursor {
@@ -17,7 +18,7 @@ impl Cursor {
     pub fn new() -> Cursor {
         Cursor { 
             blink_state: false, 
-            chr: ScreenChar::new(' ' as u8, ColorCode::new(Color::White, Color::White)), 
+            chr: ScreenChar::new(b' ', ColorCode::new(Color::White, Color::White)), 
             previous: HashMap::new(),
             pos: 0
         }
@@ -41,22 +42,22 @@ pub trait KbInput: Send + Sync {
         let origin = self.get_origin();
         ScreenPos(origin.0+(idx/BUFFER_WIDTH-origin.1/BUFFER_WIDTH), (origin.1+idx)%BUFFER_WIDTH)
     }
-    fn get_char_at_cursor(&self) -> ScreenChar {crate::vga_buffer::WRITER.lock().get_atp(self.get_cursor_pos())}
+    fn get_char_at_cursor(&self) -> ScreenChar {crate::writer::WRITER.lock().get_at(self.get_cursor_pos())}
     fn store_previous_cursor(&mut self) {
         let c = self.get_char_at_cursor();
         if c != self.get_cursor_chr() {
             self.insert_blink(self.get_cursor_pos(), c);
         }
     }
-    fn appear_blink(&self) {print_screenchar_atp(&self.get_cursor_pos(), &self.get_cursor_chr());}
+    fn appear_blink(&self) {print_screenchar_atp(&self.get_cursor_pos(), self.get_cursor_chr());}
     fn restore_blinked(&mut self) {
         for (pos, key) in self.get_blinked_chrs() {
-            print_screenchar_atp(pos, key);
+            print_screenchar_atp(pos, *key);
         }
         self.clear_blinked_chrs();
     }
     fn cursor_blink(&mut self) {
-        if self.get_blink_state() == false {
+        if !self.get_blink_state() {
             self.store_previous_cursor();
             self.appear_blink(); // Make cursor appear
             self.set_blink(true); // Set state to on
@@ -66,16 +67,14 @@ pub trait KbInput: Send + Sync {
             self.set_blink(false);
         }
     }
-    fn remove(&mut self, idx:usize) -> ScreenChar {
-        self.remove(idx)
-    }
+    fn remove(&mut self, idx:usize) -> ScreenChar;
     
     fn rmove_curs_idx(&mut self, relative_idx:isize) { // Neg for left, + for right, 0 none
         if (relative_idx < 0 && (self.get_cursor_idx() as isize)+relative_idx < 0) ||
            (relative_idx+self.get_cursor_idx() as isize > self.get_pressed_keys_len() as isize) 
            {return}
         if relative_idx < 0 {
-            self.move_cursor(self.get_cursor_idx() - relative_idx.abs() as usize);
+            self.move_cursor(self.get_cursor_idx() - relative_idx.unsigned_abs());
         } else {
             self.move_cursor(self.get_cursor_idx() + relative_idx as usize);
         }
@@ -198,15 +197,15 @@ impl BlockingPrompt {
     }
 }
 impl KbInput for BlockingPrompt {
+
     fn get_message(&self) -> String {self.message.to_string()}
     fn run(mut self) -> String {
-        self.origin = crate::vga_buffer::calculate_end(&crate::vga_buffer::WRITER.lock().cursor_pos.clone(), &self.message); // Clone to be sure to not lock it during the function
+        self.origin = crate::writer::calculate_end(&crate::writer::WRITER.lock().cursor_pos.clone(), &self.message); // Clone to be sure to not lock it during the function
         print!("{}", self.message);
-        serial_println!("{:?}", self.origin);
         let idx = crate::interrupts::add_input(self);
         loop {
             if let Some(msg) = crate::interrupts::get_input_msg(idx) {
-                if msg.is_empty() == false{
+                if !msg.is_empty(){
                     return msg;
                 }
             } else {panic!("Trying to get an input that doesn't exist, index isn't right:{}",idx)}
@@ -230,7 +229,9 @@ impl KbInput for BlockingPrompt {
             DecodedKey::Unicode(character) => match character {
                 '\u{8}' => x86_64::instructions::interrupts::without_interrupts(|| {
                     if self.cursor.pos > 0 {
+                        // print_at(self.origin.0, self.origin.1, format!("{}",0x00 as char).repeat(self.pressed_keys.len()).as_str() ).unwrap();
                         print_at(self.origin.0, self.origin.1, format!("{}",0x00 as char).repeat(self.pressed_keys.len()).as_str() ).unwrap();
+                        
                         self.rmove_curs_idx(-1);
                         self.remove(self.cursor.pos); //TODO: FIX HORRIBLE CODE
                         print_atp(&self.origin, &self.pressed_keys);
@@ -245,20 +246,20 @@ impl KbInput for BlockingPrompt {
                 }), // Delete
                 '\t' => {}, // Tab
                 '\n' => self.handle_end(), 
-                '\u{1b}' => {crate::vga_buffer::clear_screen(); print_byte_at(5, 5, 0x48)}, // Escape
+                '\u{1b}' => {crate::terminal::clear(); print_byte_at(5, 5, 0x48)}, // Escape
                 _ => {
                     let c = ScreenChar::from(character as u8);
-                    print_screenchar_atp(&self.get_cursor_pos(), &c);
+                    print_screenchar_atp(&self.get_cursor_pos(), c);
                     self.store_previous_cursor();
                     self.pressed_keys.insert(self.cursor.pos, c);
                     if self.cursor.pos != self.pressed_keys.len()-1 { // Push elements
                         for (i, chr) in &mut self.pressed_keys[self.cursor.pos..].iter().enumerate() {
-                            print_screenchar_at(self.get_cursor_pos().0+i/BUFFER_WIDTH, self.cursor.pos+i%BUFFER_WIDTH, chr);
+                            print_screenchar_at(self.get_cursor_pos().0+i/BUFFER_WIDTH, self.cursor.pos+i%BUFFER_WIDTH, *chr);
                         }
                     }
                     self.rmove_curs_idx(1);
-                    if self.cursor.blink_state == true {self.appear_blink();}
-                    else {print_screenchar_atp(&self.get_cursor_pos(), &ScreenChar::from(0x00));}
+                    if self.cursor.blink_state {self.appear_blink();}
+                    else {print_screenchar_atp(&self.get_cursor_pos(), ScreenChar::from(0x00));}
                 },
             },
             DecodedKey::RawKey(key) => match key {
@@ -268,6 +269,8 @@ impl KbInput for BlockingPrompt {
             }
         }
     }
+
+    fn remove(&mut self, idx:usize) -> ScreenChar {self.pressed_keys.remove(idx)}
 }
 
 pub fn input(message:&str) -> String {

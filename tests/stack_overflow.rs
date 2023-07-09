@@ -49,7 +49,8 @@ lazy_static! {
 ) -> ! {
     serial_println!("[ok]");
     exit_qemu(QemuExitCode::Success);
-    loop {}
+
+    kernel::end()
 }
 
 pub fn init_test_idt() {

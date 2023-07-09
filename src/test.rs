@@ -3,7 +3,7 @@ use x86_64::instructions::port::Port;
 use core::panic::PanicInfo;
 
 pub trait Testable {
-    fn run(&self) -> ();
+    fn run(&self);
 }
 
 impl<T> Testable for T where T: Fn() {

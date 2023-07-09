@@ -19,7 +19,7 @@ pub extern "C" fn _start() -> ! {
     kernel::println!("Basic booting & vga printing tests !");
     test_main();
 
-    loop {}
+    kernel::end()
 }
 
 

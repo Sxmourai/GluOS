@@ -11,7 +11,7 @@
 
 
 pub mod serial;
-pub mod vga_buffer;
+pub mod terminal;
 pub mod interrupts;
 pub mod gdt;
 pub mod memory;
@@ -20,13 +20,14 @@ pub mod task;
 pub mod test;
 pub mod boot;
 pub mod timer;
-pub mod prompt;
 pub mod cpu;
+pub mod pci;
+pub mod apic;
 
 
 pub use boot::{init,end, hlt_loop};
 pub use test::{exit_qemu, QemuExitCode, test_panic_handler};
-
+pub use terminal::writer;pub use terminal::prompt;
 
 //-----------TESTS HANDLING-----------
 #[cfg(test)]

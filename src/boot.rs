@@ -1,27 +1,26 @@
 use crate::{
     gdt, interrupts, allocator,
-    memory::{self, BootInfoFrameAllocator},
-    task::{Task, keyboard, executor::Executor},
+    memory::{self, BootInfoFrameAllocator, MemoryHandler},
+    task::executor::Executor,
 };
 
-use x86_64::VirtAddr;
+use x86_64::{VirtAddr, structures::paging::OffsetPageTable};
 use bootloader::BootInfo;
 // Supress compiler warning about unused imports, but if removed, error
 #[allow(unused_imports)]
 use crate::println;
 
-pub fn init(boot_info: &'static BootInfo) {
+pub fn init(boot_info: &'static BootInfo) -> () {
     gdt::init();
     interrupts::init_idt(); // Init the interrupt descriptor table
     unsafe { interrupts::PICS.lock().initialize() };
     x86_64::instructions::interrupts::enable(); // Enable hardware interrupts
+
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset); // Get the physical memory offset
-    let mut mapper = unsafe { memory::init(phys_mem_offset) }; // Initialize the memory mapper
-    let mut frame_allocator = unsafe {
-        BootInfoFrameAllocator::init(&boot_info.memory_map) // Initialize the frame allocator
-    };
-    allocator::init_heap(&mut mapper, &mut frame_allocator)// Initialize the heap allocator
-        .expect("heap initialization failed");
+    #[allow(const_item_mutation)]
+    crate::memory::HANDLER.init(phys_mem_offset, &boot_info.memory_map);
+
+    allocator::init_heap().expect("heap initialization failed"); // Initialize the heap allocator
 }
 
 pub fn end() -> ! {

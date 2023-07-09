@@ -1,8 +1,8 @@
-use crate::{alloc::{vec::Vec, boxed::Box}, serial_println};
+use crate::{alloc::{vec::Vec, boxed::Box}};
 use alloc::string::String;
 use pc_keyboard::{ScancodeSet1, Keyboard, layouts::Us104Key, HandleControl};
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
-use crate::{println, gdt, prompt::{Cursor, KbInput}};
+use crate::{println, gdt, prompt::KbInput};
 use lazy_static::lazy_static;
 use pic8259::ChainedPics;
 

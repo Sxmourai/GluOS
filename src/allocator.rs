@@ -31,8 +31,6 @@ unsafe impl GlobalAlloc for Dummy {
 }
 
 pub fn init_heap(
-    mapper: &mut impl Mapper<Size4KiB>,
-    frame_allocator: &mut impl FrameAllocator<Size4KiB>,
 ) -> Result<(), MapToError<Size4KiB>> {
     let page_range = {
         let heap_start = VirtAddr::new(HEAP_START as u64);
@@ -41,14 +39,16 @@ pub fn init_heap(
         let heap_end_page = Page::containing_address(heap_end);
         Page::range_inclusive(heap_start_page, heap_end_page)
     };
-
+    let mut frame_allocator = crate::memory::HANDLER.frame_allocator();
+    let binding = crate::memory::HANDLER;
+    let mut mapper = binding.mapper();
     for page in page_range {
         let frame = frame_allocator
             .allocate_frame()
             .ok_or(MapToError::FrameAllocationFailed)?;
         let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
         unsafe {
-            mapper.map_to(page, frame, flags, frame_allocator)?.flush()
+            mapper.map_to(page, frame, flags, frame_allocator.as_mut())?.flush()
         };
     }
 

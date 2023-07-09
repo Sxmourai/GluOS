@@ -1,13 +1,10 @@
-use crate::{println, vga_buffer::{ScreenChar, print_char_at, print_byte_at, print_screenchar_at, ColorCode, Color, Buffer, BUFFER_WIDTH, BUFFER_HEIGHT}, serial_println};
-use alloc::vec::Vec;
 use conquer_once::spin::OnceCell;
 use crossbeam_queue::ArrayQueue;
 use lazy_static::lazy_static;
 use core::{pin::Pin, task::{Poll, Context}};
 use futures_util::stream::Stream;
 use futures_util::task::AtomicWaker;
-use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
-use crate::vga_buffer::ScreenPos;
+use pc_keyboard::{layouts, HandleControl, Keyboard, ScancodeSet1};
 
 static WAKER: AtomicWaker = AtomicWaker::new();
 static SCANCODE_QUEUE: OnceCell<ArrayQueue<u8>> = OnceCell::uninit();
@@ -54,7 +51,7 @@ impl Stream for ScancodeStream {
             return Poll::Ready(Some(scancode));
         }
 
-        WAKER.register(&cx.waker());
+        WAKER.register(cx.waker());
         match queue.pop() {
             Ok(scancode) => {
                 WAKER.take();
