@@ -1,53 +1,43 @@
-use core::{ptr::NonNull, ops::Range};
-
-use alloc::{boxed::Box, vec::Vec};
-use rsdp::handler::PhysicalMapping;
-use spin::Mutex;
-use x86_64::{
-    PhysAddr,VirtAddr,
-    structures::paging::{Page, PageTable, PhysFrame, Mapper, Size4KiB, FrameAllocator, OffsetPageTable}
-};
+use core::ops::Range;
+use alloc::boxed::Box;
 use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
+use x86_64::structures::paging::PageTableFlags as Flags;
+use x86_64::{
+    structures::paging::{
+        FrameAllocator, Mapper, OffsetPageTable, Page, PageTable, PhysFrame, Size4KiB,
+    },
+    PhysAddr, VirtAddr,
+};
+use crate::serial_println;
+use crate::state::{get_frame_allocator, get_mapper};
 
-
-pub const HANDLER: MemoryHandler = MemoryHandler::new();
-pub static HANDLER_INITIALIZED: Mutex<bool> = Mutex::new(false); // Make sure only one handler is running 
-
+#[derive(Debug)]
 pub struct MemoryHandler {
     mapper: Option<OffsetPageTable<'static>>,
     frame_allocator: Option<Box<BootInfoFrameAllocator>>,
 }
 impl MemoryHandler {
-    pub const fn new() -> Self {
-        Self {
-            mapper: None,
-            frame_allocator: None 
-        }
-    }
-    /// Initialize a new MemoryHandler.
-    ///
-    /// This function is unsafe because the caller must guarantee that the
-    /// complete physical memory is mapped to virtual memory at the passed
-    /// `physical_memory_offset`. Also, this function must be only called once
-    /// to avoid aliasing `&mut` references (which is undefined behavior).
-    pub fn init(&mut self, physical_memory_offset: VirtAddr, memory_map: &'static MemoryMap) -> bool { //TODO: Use Result instead of bool (false = error)
-        if HANDLER_INITIALIZED.lock().eq(&true) {return false;} // If a handler has already been initialized
+    pub fn new(physical_memory_offset: VirtAddr, memory_map: &'static MemoryMap) -> Self {
+            
         let level_4_table = unsafe { active_level_4_table(physical_memory_offset) };
-
-        let mapper = unsafe { OffsetPageTable::new(level_4_table, physical_memory_offset) };
-        let frame_allocator = unsafe {
+        
+        let mut mapper = unsafe { OffsetPageTable::new(level_4_table, physical_memory_offset) };
+        let mut frame_allocator = unsafe {
             BootInfoFrameAllocator::init(memory_map) // Initialize the frame allocator
         };
-        self.mapper = Some(mapper);
-        self.frame_allocator = Some(Box::new(frame_allocator));
-        *HANDLER_INITIALIZED.lock() = true;
-        return true;
+        crate::allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed"); // Initialize the heap allocator
+        Self {
+            mapper: Some(mapper),
+            frame_allocator: Some(Box::new(frame_allocator)),
+        }
     }
-    pub fn frame_allocator(self) -> Box<BootInfoFrameAllocator> {
-        self.frame_allocator.unwrap()
+
+    pub fn frame_allocator(&mut self) -> &mut Box<BootInfoFrameAllocator> {
+        serial_println!("{:?}",self.frame_allocator);
+        self.frame_allocator.as_mut().unwrap()
     }
-    pub fn mapper(self) -> OffsetPageTable<'static> {
-        self.mapper.unwrap()
+    pub fn mapper(&'static mut self) -> &'static mut OffsetPageTable<'static> {
+        self.mapper.as_mut().unwrap()
     }
 }
 
@@ -57,7 +47,6 @@ pub fn create_example_mapping(
     mapper: &mut OffsetPageTable,
     frame_allocator: &mut impl FrameAllocator<Size4KiB>,
 ) {
-
     let frame = PhysFrame::containing_address(PhysAddr::new(0xb8000));
     let flags = Flags::PRESENT | Flags::WRITABLE;
 
@@ -68,16 +57,13 @@ pub fn create_example_mapping(
     map_to_result.expect("map_to failed").flush();
 }
 
-
-
 /// Returns a mutable reference to the active level 4 table.
 ///
 /// This function is unsafe because the caller must guarantee that the
 /// complete physical memory is mapped to virtual memory at the passed
 /// `physical_memory_offset`. Also, this function must be only called once
 /// to avoid aliasing `&mut` references (which is undefined behavior).
-unsafe fn active_level_4_table(physical_memory_offset: VirtAddr)
-    -> &'static mut PageTable {
+unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut PageTable {
     use x86_64::registers::control::Cr3;
 
     let (level_4_table_frame, _) = Cr3::read();
@@ -152,9 +138,8 @@ pub unsafe fn init(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static>
     OffsetPageTable::new(level_4_table, physical_memory_offset)
 }
 
-
 /// A FrameAllocator that returns usable frames from the bootloader's memory map.
-#[derive(Clone)]
+#[derive(Debug)]
 pub struct BootInfoFrameAllocator {
     memory_map: &'static MemoryMap,
     next: usize,
@@ -176,38 +161,39 @@ impl BootInfoFrameAllocator {
     fn usable_frames(&self) -> impl Iterator<Item = PhysFrame> {
         // get usable regions from memory map
         let regions = self.memory_map.iter();
-        let usable_regions = regions
-            .filter(|r| r.region_type == MemoryRegionType::Usable);
+        let usable_regions = regions.filter(|r| r.region_type == MemoryRegionType::Usable);
         // map each region to its address range
-        let addr_ranges = usable_regions
-            .map(|r| r.range.start_addr()..r.range.end_addr());
+        let addr_ranges = usable_regions.map(|r| r.range.start_addr()..r.range.end_addr());
         // transform to an iterator of frame start addresses
         let frame_addresses = addr_ranges.flat_map(|r| r.step_by(4096));
         // create `PhysFrame` types from the start addresses
         frame_addresses.map(|addr| PhysFrame::containing_address(PhysAddr::new(addr)))
     }
-    
-    unsafe fn map_physical_region(&self, physical_address: usize) -> x86_64::structures::paging::Page {
-        let frame = PhysFrame::containing_address(PhysAddr::new(physical_address.try_into().unwrap()));
+
+    unsafe fn map_physical_region(
+        &self,
+        physical_address: usize,
+    ) -> x86_64::structures::paging::Page {
+        let frame =
+            PhysFrame::containing_address(PhysAddr::new(physical_address.try_into().unwrap()));
         let flags = Flags::PRESENT | Flags::WRITABLE;
-        
-        let binding = HANDLER;
-        let mut mapper = binding.mapper();
-        let binding = HANDLER;
-        let mut frame_allocator = binding.frame_allocator();
-        frame_allocator.all
-        let page = Page::from_start_address(VirtAddr::new(physical_address.try_into().unwrap())).unwrap();
+
+        serial_println!("Get lock");
+        let mut mapper = get_mapper();
+        let mut frame_allocator = get_frame_allocator();
+        serial_println!("Drop lock");
+
+        let page =
+            Page::containing_address(VirtAddr::new(0xfffffff9));
 
         let map_to_result = unsafe {
             // FIXME: this is not safe, we do it only for testing
-            mapper.map_to(page, frame, flags, frame_allocator.as_mut())
+            mapper.map_to(page, frame, flags, frame_allocator)
         };
         map_to_result.expect("map_to failed").flush();
         page
     }
 }
-
-use x86_64::structures::paging::PageTableFlags as Flags;
 
 unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
     fn allocate_frame(&mut self) -> Option<PhysFrame> {
@@ -226,14 +212,13 @@ pub fn find_search_areas(frame_allocator: &BootInfoFrameAllocator) -> [Range<usi
      * Read the base address of the EBDA from its location in the BDA (BIOS Data Area). Not all BIOSs fill this out
      * unfortunately, so we might not get a sensible result. We shift it left 4, as it's a segment address.
      */
-    let ebda_start_mapping =
-        unsafe { frame_allocator.map_physical_region(EBDA_START_SEGMENT_PTR) };
+    panic!();
+    let ebda_start_mapping = unsafe { frame_allocator.map_physical_region(EBDA_START_SEGMENT_PTR) };
     let ebda_start = (unsafe { *ebda_start_mapping.start_address().as_ptr::<u16>() } as usize) << 4;
-
     [
         /*
          * The main BIOS area below 1MiB. In practice, from my [Restioson's] testing, the RSDP is more often here
-         * than the EBDA. We also don't want to search the entire possibele EBDA range, if we've failed to find it
+         * than the EBDA. We also don't want to search the entire possible EBDA range, if we've failed to find it
          * from the BDA.
          */
         RSDP_BIOS_AREA_START..(RSDP_BIOS_AREA_END + 1),
@@ -247,7 +232,6 @@ pub fn find_search_areas(frame_allocator: &BootInfoFrameAllocator) -> [Range<usi
         },
     ]
 }
-
 
 /// This (usually!) contains the base address of the EBDA (Extended Bios Data Area), shifted right by 4
 const EBDA_START_SEGMENT_PTR: usize = 0x40e;

@@ -10,24 +10,28 @@
 #![feature(naked_functions)]
 
 
-pub mod serial;
-pub mod terminal;
-pub mod interrupts;
-pub mod gdt;
-pub mod memory;
-pub mod allocator;
-pub mod task;
-pub mod test;
-pub mod boot;
-pub mod timer;
-pub mod cpu;
-pub mod pci;
-pub mod apic;
+pub mod state;      pub use state::Kernel;
+pub mod serial;     
+pub mod terminal;   pub use terminal::writer;pub use terminal::prompt;
+pub mod interrupts; 
+pub mod gdt;        
+pub mod memory;     
+pub mod allocator;  
+pub mod task;       
+pub mod test;       pub use test::{exit_qemu, QemuExitCode, test_panic_handler};
+pub mod boot;       pub use boot::hlt_loop;
+pub mod timer;      
+pub mod cpu;        
+pub mod pci;        
+pub mod apic;       
 
 
-pub use boot::{init,end, hlt_loop};
-pub use test::{exit_qemu, QemuExitCode, test_panic_handler};
-pub use terminal::writer;pub use terminal::prompt;
+pub fn init(boot_info: &'static bootloader::BootInfo) { state::state.lock().init(boot_info) }
+
+
+
+
+
 
 //-----------TESTS HANDLING-----------
 #[cfg(test)]

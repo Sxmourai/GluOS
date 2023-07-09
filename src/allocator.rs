@@ -5,10 +5,12 @@ use alloc::alloc::{GlobalAlloc, Layout};
 use core::ptr::null_mut;
 use x86_64::{
     structures::paging::{
-        mapper::MapToError, FrameAllocator, Mapper, Page, PageTableFlags, Size4KiB,
+        mapper::MapToError, FrameAllocator, Mapper, Page, PageTableFlags, Size4KiB, OffsetPageTable,
     },
     VirtAddr,
 };
+use crate::{memory::BootInfoFrameAllocator};
+
 use self::fixed_size_block::FixedSizeBlockAllocator;
 
 
@@ -30,8 +32,7 @@ unsafe impl GlobalAlloc for Dummy {
     }
 }
 
-pub fn init_heap(
-) -> Result<(), MapToError<Size4KiB>> {
+pub fn init_heap(mapper: &mut OffsetPageTable, frame_allocator:&mut BootInfoFrameAllocator) -> Result<(), MapToError<Size4KiB>> {
     let page_range = {
         let heap_start = VirtAddr::new(HEAP_START as u64);
         let heap_end = heap_start + HEAP_SIZE - 1u64;
@@ -39,16 +40,13 @@ pub fn init_heap(
         let heap_end_page = Page::containing_address(heap_end);
         Page::range_inclusive(heap_start_page, heap_end_page)
     };
-    let mut frame_allocator = crate::memory::HANDLER.frame_allocator();
-    let binding = crate::memory::HANDLER;
-    let mut mapper = binding.mapper();
     for page in page_range {
         let frame = frame_allocator
             .allocate_frame()
             .ok_or(MapToError::FrameAllocationFailed)?;
         let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
         unsafe {
-            mapper.map_to(page, frame, flags, frame_allocator.as_mut())?.flush()
+            mapper.map_to(page, frame, flags, frame_allocator)?.flush()
         };
     }
 
