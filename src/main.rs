@@ -18,7 +18,7 @@ use bootloader::{BootInfo, entry_point};
 entry_point!(kernel_main);
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     kernel::init(boot_info);
-    let to_print = memory::find_search_areas(&Arc::try_unwrap(kernel::state::STATE.lock().get_mem_handler().frame_allocator()).unwrap());
+    let to_print = memory::find_search_areas(&mut kernel::state::get_mem_handler().frame_allocator);
     crate::serial_println!("{:?}", to_print);
 
     // x86_64::PhysAddr::new(0x40E)

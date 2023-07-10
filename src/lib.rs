@@ -10,7 +10,8 @@
 #![feature(naked_functions)]
 
 
-pub mod state;      pub use state::Kernel;
+pub mod state;      use memory::MemoryHandler;
+pub use state::Kernel;
 pub mod serial;     
 pub mod terminal;   pub use terminal::writer;pub use terminal::prompt;
 pub mod interrupts; 
@@ -20,13 +21,19 @@ pub mod allocator;
 pub mod task;       
 pub mod test;       pub use test::{exit_qemu, QemuExitCode, test_panic_handler};
 pub mod boot;       pub use boot::hlt_loop;
+use x86_64::VirtAddr;
 pub mod timer;      
 pub mod cpu;        
 pub mod pci;        
 pub mod apic;       
 
 
-pub fn init(boot_info: &'static bootloader::BootInfo) { state::STATE.lock().init(boot_info) }
+pub fn init(boot_info: &'static bootloader::BootInfo) { 
+    crate::boot::init();
+    let memory_handler = MemoryHandler::new(VirtAddr::new(boot_info.physical_memory_offset), &boot_info.memory_map);
+    state::STATE.get_mut().mem_handler = Some(memory_handler);
+    state::STATE.get_mut().boot_info = Some(boot_info);
+ }
 
 
 
