@@ -26,7 +26,7 @@ pub mod pci;
 pub mod apic;       
 
 
-pub fn init(boot_info: &'static bootloader::BootInfo) { state::state.lock().init(boot_info) }
+pub fn init(boot_info: &'static bootloader::BootInfo) { state::STATE.lock().init(boot_info) }
 
 
 

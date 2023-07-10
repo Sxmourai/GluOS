@@ -1,6 +1,9 @@
+use core::borrow::BorrowMut;
 use core::ops::Range;
 use alloc::boxed::Box;
+use alloc::sync::Arc;
 use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
+use spin::Mutex;
 use x86_64::structures::paging::PageTableFlags as Flags;
 use x86_64::{
     structures::paging::{
@@ -9,12 +12,12 @@ use x86_64::{
     PhysAddr, VirtAddr,
 };
 use crate::serial_println;
-use crate::state::{get_frame_allocator, get_mapper};
+// use crate::state::get_mem_handler;
 
 #[derive(Debug)]
 pub struct MemoryHandler {
-    mapper: Option<OffsetPageTable<'static>>,
-    frame_allocator: Option<Box<BootInfoFrameAllocator>>,
+    pub mapper: OffsetPageTable<'static>,
+    pub frame_allocator: BootInfoFrameAllocator,
 }
 impl MemoryHandler {
     pub fn new(physical_memory_offset: VirtAddr, memory_map: &'static MemoryMap) -> Self {
@@ -27,18 +30,18 @@ impl MemoryHandler {
         };
         crate::allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed"); // Initialize the heap allocator
         Self {
-            mapper: Some(mapper),
-            frame_allocator: Some(Box::new(frame_allocator)),
+            mapper,
+            frame_allocator
         }
     }
 
-    pub fn frame_allocator(&mut self) -> &mut Box<BootInfoFrameAllocator> {
-        serial_println!("{:?}",self.frame_allocator);
-        self.frame_allocator.as_mut().unwrap()
-    }
-    pub fn mapper(&'static mut self) -> &'static mut OffsetPageTable<'static> {
-        self.mapper.as_mut().unwrap()
-    }
+    // pub fn frame_allocator(&mut self) -> &mut BootInfoFrameAllocator {
+    //     serial_println!("{:?}",self.frame_allocator);
+    //     Arc::clone(self.frame_allocator.as_mut().unwrap())
+    // }
+    // pub fn mapper(&mut self) -> Arc<Mutex<OffsetPageTable<'static>>> {
+    //     Arc::clone(self.mapper.as_mut().unwrap())
+    // }
 }
 
 /// Creates an example mapping for the given page to frame `0xb8000`.
@@ -179,8 +182,7 @@ impl BootInfoFrameAllocator {
         let flags = Flags::PRESENT | Flags::WRITABLE;
 
         serial_println!("Get lock");
-        let mut mapper = get_mapper();
-        let mut frame_allocator = get_frame_allocator();
+        let mut mem_handler = crate::state::get_mem_handler();
         serial_println!("Drop lock");
 
         let page =
@@ -188,7 +190,7 @@ impl BootInfoFrameAllocator {
 
         let map_to_result = unsafe {
             // FIXME: this is not safe, we do it only for testing
-            mapper.map_to(page, frame, flags, frame_allocator)
+            mem_handler.mapper.map_to(page, frame, flags, &mut mem_handler.frame_allocator)
         };
         map_to_result.expect("map_to failed").flush();
         page
