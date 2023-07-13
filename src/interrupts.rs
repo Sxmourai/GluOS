@@ -1,4 +1,4 @@
-use crate::{alloc::{vec::Vec, boxed::Box}};
+use crate::alloc::{vec::Vec, boxed::Box};
 use alloc::string::String;
 use pc_keyboard::{ScancodeSet1, Keyboard, layouts::Us104Key, HandleControl};
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
@@ -10,6 +10,15 @@ lazy_static! {
     static ref IDT: InterruptDescriptorTable = {
         let mut idt = InterruptDescriptorTable::new();
         idt.breakpoint.set_handler_fn(breakpoint_handler);
+        idt.device_not_available.set_handler_fn(device_not_available);
+        idt.bound_range_exceeded.set_handler_fn(bound_range_exceeded);
+        idt.invalid_opcode.set_handler_fn(invalid_opcode);
+        idt.overflow.set_handler_fn(overflow);
+        idt.segment_not_present.set_handler_fn(segment_not_present);
+        idt.security_exception.set_handler_fn(security_exception);
+        idt.invalid_tss.set_handler_fn(invalid_tss);
+        idt.alignment_check.set_handler_fn(alignment_check);
+        idt.general_protection_fault.set_handler_fn(general_protection_fault);
         unsafe {
             idt.double_fault.set_handler_fn(double_fault_handler)
                 .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX);
@@ -26,14 +35,40 @@ pub fn init_idt() {
     IDT.load();
 }
 
-extern "x86-interrupt" fn breakpoint_handler(
-    stack_frame: InterruptStackFrame) {
+extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
     println!("EXCEPTION: BREAKPOINT\n{:#?}", stack_frame);
 }
+extern "x86-interrupt" fn device_not_available(stack_frame: InterruptStackFrame) {
+    println!("EXCEPTION: device_not_available\n{:#?}", stack_frame);
+}
+extern "x86-interrupt" fn bound_range_exceeded(stack_frame: InterruptStackFrame) {
+    println!("EXCEPTION: bound_range_exceeded\n{:#?}", stack_frame);
+}
+extern "x86-interrupt" fn invalid_opcode(stack_frame: InterruptStackFrame) {
+    println!("EXCEPTION: invalid_opcode\n{:#?}", stack_frame);
+}
+extern "x86-interrupt" fn overflow(stack_frame: InterruptStackFrame) {
+    println!("EXCEPTION: overflow\n{:#?}", stack_frame);
+}
 
-extern "x86-interrupt" fn double_fault_handler(
-    stack_frame: InterruptStackFrame, _error_code: u64) -> ! {
-    panic!("EXCEPTION: DOUBLE FAULT\n{:#?}", stack_frame);
+
+extern "x86-interrupt" fn double_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) -> ! {
+    panic!("EXCEPTION: DOUBLE FAULT\n{:#?}\nError code: {}", stack_frame, error_code);
+}
+extern "x86-interrupt" fn general_protection_fault(stack_frame: InterruptStackFrame, error_code: u64) {
+    panic!("EXCEPTION: general_protection_fault\n{:#?}\nError code: {}", stack_frame, error_code);
+}
+extern "x86-interrupt" fn alignment_check(stack_frame: InterruptStackFrame, error_code: u64) {
+    panic!("EXCEPTION: alignment_check\n{:#?}\nError code: {}", stack_frame, error_code);
+}
+extern "x86-interrupt" fn invalid_tss(stack_frame: InterruptStackFrame, error_code: u64) {
+    panic!("EXCEPTION: invalid_tss\n{:#?}\nError code: {}", stack_frame, error_code);
+}
+extern "x86-interrupt" fn security_exception(stack_frame: InterruptStackFrame, error_code: u64) {
+    panic!("EXCEPTION: security_exception\n{:#?}\nError code: {}", stack_frame, error_code);
+}
+extern "x86-interrupt" fn segment_not_present(stack_frame: InterruptStackFrame, error_code: u64) {
+    panic!("EXCEPTION: segment_not_present\n{:#?}\nError code: {}", stack_frame, error_code);
 }
 
 

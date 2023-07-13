@@ -31,22 +31,10 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     
     #[cfg(test)]
     test_main();
-
-    for class in pci_ids::Classes::iter() {
-        for subclass in class.subclasses() {
-            if class.id() == 1 {
-                println!("class: {}, subclass: {}", class.name(), subclass.name());
-            }
-        }
-    }
     for device in kernel::pci::pci_device_iter() {
+        
         if device.class == 1 {
-            let d = pci_ids::Device::from_vid_pid(device.vendor_id, device.device_id).unwrap();
-            let subs: Vec<&'static SubSystem> = d.subsystems().collect();
-            let vendor = d.vendor().name();
-            serial_println!("Device {} - Vendor {:?} - Class {:?}",d.name(), vendor, subs);
-            device.pci_read_32(0)
-            serial_println!("{:?}", device.pci_get_interrupt_info().unwrap());
+            serial_println!("{:#b} - {:?} - {} - {}", device.prog_if, device.status, device.int_line, device.int_pin);
         }
     }
 

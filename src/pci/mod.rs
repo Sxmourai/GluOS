@@ -4,7 +4,7 @@
 // Usefull links: all of classes: https://pci-ids.ucw.cz/read/PD/
 // Intel devices : https://pci-ids.ucw.cz/read/PC/8086
 pub mod ata;
-
+pub mod port;
 
 use core::fmt;
 use core::ops::{Deref, DerefMut};
@@ -660,3 +660,14 @@ pub enum PciConfigSpaceAccessMechanism {
 // const MSIX_ADDRESS_BITS:        u32 = 0xFFFF_FFF0;
 // /// Clear the vector control field to unmask the interrupt
 // const MSIX_UNMASK_INT:          u32 = 0;
+
+
+pub fn print_all_pci_devices() {
+    for device in crate::pci::pci_device_iter() {
+        let d = pci_ids::Device::from_vid_pid(device.vendor_id, device.device_id).expect(&alloc::format!("Not found, {:?}", device));
+        let subs: Vec<&'static pci_ids::SubSystem> = d.subsystems().collect();
+        
+        let vendor = d.vendor().name();
+        serial_println!("Device {} - Vendor {:?} - Class {:?} sub:{} - Subsystems {:?} - ON BUS: {}",d.name(), vendor, device.class, device.subclass, subs, device.bus());
+    }
+}
