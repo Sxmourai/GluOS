@@ -3,7 +3,7 @@
 
 // Usefull links: all of classes: https://pci-ids.ucw.cz/read/PD/
 // Intel devices : https://pci-ids.ucw.cz/read/PC/8086
-
+pub mod ata;
 
 
 use core::fmt;
@@ -230,7 +230,7 @@ impl PciLocation {
     }
 
     /// read 32-bit data at the specified `offset` from the PCI device specified by the given `bus`, `slot`, `func` set.
-    fn pci_read_32(&self, offset: u8) -> u32 {
+    pub fn pci_read_32(&self, offset: u8) -> u32 {
         unsafe { 
             PCI_CONFIG_ADDRESS_PORT.lock().write(self.pci_address(offset)); 
         }
@@ -261,7 +261,7 @@ impl PciLocation {
         }
     }
 
-    fn read_data_port() -> u32 {
+    pub fn read_data_port() -> u32 {
         unsafe { PCI_CONFIG_DATA_PORT.lock().read() }
     }
 

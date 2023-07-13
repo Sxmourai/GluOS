@@ -3,7 +3,7 @@
 #![feature(custom_test_frameworks)] // Required for ´cargo test´ because it searches in main.rs even if no tests
 #![test_runner(kernel::test::runner)]
 #![reexport_test_harness_main = "test_main"]
-
+#![allow(unused)]
 
 extern crate kernel;
 extern crate bootloader;
@@ -11,8 +11,11 @@ extern crate x86_64;
 extern crate alloc;
 
 use core::panic::PanicInfo;
-use crate::kernel::{serial_println, hlt_loop, memory};
+use crate::kernel::{serial_println, hlt_loop};
+use alloc::vec::Vec;
 use bootloader::{BootInfo, entry_point};
+use kernel::{serial_print, println};
+use pci_ids::SubSystem;
 
 entry_point!(kernel_main);
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
@@ -28,9 +31,24 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     
     #[cfg(test)]
     test_main();
-    // for b in kernel::pci::pci_device_iter() {
-    //     serial_println!("Device {:X} - Vendor {:X} - Class {}",b.device_id, b.vendor_id, b.class);
-    // }
+
+    for class in pci_ids::Classes::iter() {
+        for subclass in class.subclasses() {
+            if class.id() == 1 {
+                println!("class: {}, subclass: {}", class.name(), subclass.name());
+            }
+        }
+    }
+    for device in kernel::pci::pci_device_iter() {
+        if device.class == 1 {
+            let d = pci_ids::Device::from_vid_pid(device.vendor_id, device.device_id).unwrap();
+            let subs: Vec<&'static SubSystem> = d.subsystems().collect();
+            let vendor = d.vendor().name();
+            serial_println!("Device {} - Vendor {:?} - Class {:?}",d.name(), vendor, subs);
+            device.pci_read_32(0)
+            serial_println!("{:?}", device.pci_get_interrupt_info().unwrap());
+        }
+    }
 
     hlt_loop()
 }
