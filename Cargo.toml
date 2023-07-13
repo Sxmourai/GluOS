@@ -17,6 +17,7 @@ linked_list_allocator = "0.9.0"
 hashbrown = "0.14.0"
 bit_field = "0.10.2"
 rsdp = "2.0.0"
+defmt = "0.3.5"
 
 [dependencies.lazy_static]
 version = "1.0"

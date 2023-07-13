@@ -12,14 +12,13 @@ extern crate alloc;
 
 use core::panic::PanicInfo;
 use crate::kernel::{serial_println, hlt_loop, memory};
-use alloc::sync::Arc;
 use bootloader::{BootInfo, entry_point};
 
 entry_point!(kernel_main);
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     kernel::init(boot_info);
-    let to_print = memory::find_search_areas(&mut kernel::state::get_mem_handler().frame_allocator);
-    crate::serial_println!("{:?}", to_print);
+    // let to_print = memory::search_for_on_bios(&mut kernel::state::get_mem_handler().get_mut().frame_allocator);
+    // crate::serial_println!("{:?}", to_print);
 
     // x86_64::PhysAddr::new(0x40E)
     // unsafe { & *(x86_64::PhysAddr::new(0x40E).as_u64() as *const u16) }

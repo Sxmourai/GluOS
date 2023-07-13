@@ -3,6 +3,7 @@ use core::ops::Range;
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
+use rsdp::Rsdp;
 use spin::Mutex;
 use x86_64::structures::paging::PageTableFlags as Flags;
 use x86_64::{
@@ -78,58 +79,6 @@ unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut
     &mut *page_table_ptr // unsafe
 }
 
-/*
-/// Translates the given virtual address to the mapped physical address, or
-/// `None` if the address is not mapped.
-///
-/// This function is unsafe because the caller must guarantee that the
-/// complete physical memory is mapped to virtual memory at the passed
-/// `physical_memory_offset`.
-pub unsafe fn translate_addr(addr: VirtAddr, physical_memory_offset: VirtAddr)
-    -> Option<PhysAddr> {
-    translate_addr_inner(addr, physical_memory_offset)
-}
-
-
-/// Private function that is called by `translate_addr`.
-///
-/// This function is safe to limit the scope of `unsafe` because Rust treats
-/// the whole body of unsafe functions as an unsafe block. This function must
-/// only be reachable through `unsafe fn` from outside of this module.
-fn translate_addr_inner(addr: VirtAddr, physical_memory_offset: VirtAddr)
-    -> Option<PhysAddr>
-{
-    use x86_64::structures::paging::page_table::FrameError;
-    use x86_64::registers::control::Cr3;
-
-    // read the active level 4 frame from the CR3 register
-    let (level_4_table_frame, _) = Cr3::read();
-
-    let table_indexes = [
-        addr.p4_index(), addr.p3_index(), addr.p2_index(), addr.p1_index()
-    ];
-    let mut frame = level_4_table_frame;
-
-    // traverse the multi-level page table
-    for &index in &table_indexes {
-        // convert the frame into a page table reference
-        let virt = physical_memory_offset + frame.start_address().as_u64();
-        let table_ptr: *const PageTable = virt.as_ptr();
-        let table = unsafe {&*table_ptr};
-
-        // read the page table entry and update `frame`
-        let entry = &table[index];
-        frame = match entry.frame() {
-            Ok(frame) => frame,
-            Err(FrameError::FrameNotPresent) => return None,
-            Err(FrameError::HugeFrame) => panic!("huge pages not supported"),
-        };
-    }
-
-    // calculate the physical address by adding the page offset
-    Some(frame.start_address() + u64::from(addr.page_offset()))
-}
-*/
 /// Initialize a new OffsetPageTable.
 ///
 /// This function is unsafe because the caller must guarantee that the
@@ -178,12 +127,11 @@ impl BootInfoFrameAllocator {
         physical_address: usize,
     ) -> x86_64::structures::paging::Page {
         let frame =
-            PhysFrame::containing_address(PhysAddr::new(physical_address.try_into().unwrap()));
+            PhysFrame::from_start_address(PhysAddr::new(physical_address.try_into().unwrap())).unwrap();
         let flags = Flags::PRESENT | Flags::WRITABLE;
 
-        serial_println!("Get lock");
-        let mut mem_handler = crate::state::get_mem_handler();
-        serial_println!("Drop lock");
+        let mut binding = crate::state::get_mem_handler();
+        let mem_handler = binding.get_mut();
 
         let page =
             Page::containing_address(VirtAddr::new(0xfffffff9));
@@ -214,7 +162,7 @@ pub fn find_search_areas(frame_allocator: &BootInfoFrameAllocator) -> [Range<usi
      * Read the base address of the EBDA from its location in the BDA (BIOS Data Area). Not all BIOSs fill this out
      * unfortunately, so we might not get a sensible result. We shift it left 4, as it's a segment address.
      */
-    panic!();
+    serial_println!("{:x}", unsafe { frame_allocator.map_physical_region(RSDP_BIOS_AREA_START) }.start_address());
     let ebda_start_mapping = unsafe { frame_allocator.map_physical_region(EBDA_START_SEGMENT_PTR) };
     let ebda_start = (unsafe { *ebda_start_mapping.start_address().as_ptr::<u16>() } as usize) << 4;
     [
@@ -247,3 +195,30 @@ const RSDP_BIOS_AREA_START: usize = 0xe0000;
 const RSDP_BIOS_AREA_END: usize = 0xfffff;
 /// The RSDP (Root System Description Pointer)'s signature, "RSD PTR " (note trailing space)
 pub const RSDP_SIGNATURE: &'static [u8; 8] = b"RSD PTR ";
+
+pub fn search_for_on_bios(handler: &BootInfoFrameAllocator) -> Option<usize> {
+    let mut rsdp_address = None;
+    let areas = find_search_areas(handler);
+    'areas: for area in areas.iter() {
+        serial_println!("{:?}", area);
+        // let mapping = unsafe { handler.map_physical_region(area.start) };
+
+        for address in area.clone().step_by(16) {
+            serial_println!("{:x}", address);
+            let ptr_in_mapping = unsafe { *(address as *const isize) };
+                // unsafe { area.start.as_ptr::<u8>().offset((address - area.start) as isize) };
+            let signature = unsafe { *(ptr_in_mapping as *const [u8; 8]) };
+
+            if signature == *RSDP_SIGNATURE {
+                match unsafe { *(ptr_in_mapping as *const Rsdp) }.validate() {
+                    Ok(()) => {
+                        rsdp_address = Some(address);
+                        break 'areas;
+                    }
+                    Err(err) => serial_println!("Invalid RSDP found at {:#x}: {:?}", address, err),
+                }
+            }
+        }
+    }
+    rsdp_address
+}

@@ -8,8 +8,26 @@ use x86_64::{VirtAddr, structures::paging::OffsetPageTable};
 
 use crate::memory::{MemoryHandler, BootInfoFrameAllocator};
 
-pub const STATE: Cell<Kernel> = Cell::new(Kernel::new());
+// const MEM_HANDLER
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+pub static mut STATE: Kernel = Kernel::new();
 pub struct Kernel {
     pub mem_handler: Option<MemoryHandler>,
     pub boot_info: Option<&'static BootInfo>
@@ -20,16 +38,16 @@ impl Kernel {
             mem_handler:None,boot_info:None
         }
     }
-    pub fn get_mem_handler(self) -> MemoryHandler {
-        self.mem_handler.unwrap()
+    pub fn get_mem_handler(&mut self) -> Cell<&mut MemoryHandler> {
+        Cell::new(self.mem_handler.as_mut().unwrap())
     }
     pub fn boot_info(&self) -> &'static BootInfo {
         self.boot_info.unwrap()
     }
 }
 // NOT USE BEFORE KERNEL INIT !!!
-pub fn get_mem_handler() -> &'static mut MemoryHandler {
-    &mut STATE.get_mut().get_mem_handler()
+pub fn get_mem_handler() -> Cell<&'static mut MemoryHandler> {
+    unsafe { STATE.get_mem_handler() }
 }
 // pub fn get_mapper() -> Arc<Mutex<OffsetPageTable<'static>>> {
 //     get_mem_handler().mapper()
@@ -38,7 +56,7 @@ pub fn get_mem_handler() -> &'static mut MemoryHandler {
 //     get_mem_handler().frame_allocator()
 // }
 pub fn get_boot_info() -> &'static BootInfo {
-    STATE.get_mut().boot_info()
+    unsafe { STATE.boot_info() }
 }
 
 trait InKernel : Send {
