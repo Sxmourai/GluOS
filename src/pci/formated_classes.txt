@@ -1,0 +1,185 @@
+/// Regex to find specific class: Class: (.*) \(id: NUMBER\)
+
+
+Class: Serial bus controller (id: 12)
+Subclasses: 
+- FireWire (IEEE 1394) (id: 0)
+- ACCESS Bus (id: 1)
+- SSA (id: 2)
+- USB controller (id: 3)
+- Fibre Channel (id: 4)
+- SMBus (id: 5)
+- InfiniBand (id: 6)
+- IPMI Interface (id: 7)
+- SERCOS interface (id: 8)
+- CANBUS (id: 9)
+- Serial bus controller (id: 128)
+----------------------------------
+Class: Docking station (id: 10)
+Subclasses: 
+- Generic Docking Station (id: 0)
+- Docking Station (id: 128)
+----------------------------------
+Class: Bridge (id: 6)
+Subclasses: 
+- Host bridge (id: 0)
+- ISA bridge (id: 1)
+- EISA bridge (id: 2)
+- MicroChannel bridge (id: 3)
+- PCI bridge (id: 4)
+- PCMCIA bridge (id: 5)
+- NuBus bridge (id: 6)
+- CardBus bridge (id: 7)
+- RACEway bridge (id: 8)
+- Semi-transparent PCI-to-PCI bridge (id: 9)
+- InfiniBand to PCI host bridge (id: 10)
+- Bridge (id: 128)
+----------------------------------
+Class: Unclassified device (id: 0)
+Subclasses: 
+- Non-VGA unclassified device (id: 0)
+- VGA compatible unclassified device (id: 1)
+- Image coprocessor (id: 5)
+----------------------------------
+Class: Non-Essential Instrumentation (id: 19)
+Subclasses: 
+
+----------------------------------
+Class: Unassigned class (id: 255)
+Subclasses: 
+
+----------------------------------
+Class: Display controller (id: 3)
+Subclasses: 
+- VGA compatible controller (id: 0)
+- XGA compatible controller (id: 1)
+- 3D controller (id: 2)
+- Display controller (id: 128)
+----------------------------------
+Class: Memory controller (id: 5)
+Subclasses: 
+- RAM memory (id: 0)
+- FLASH memory (id: 1)
+- CXL (id: 2)
+- Memory controller (id: 128)
+----------------------------------
+Class: Mass storage controller (id: 1)
+Subclasses: 
+- SCSI storage controller (id: 0)
+- IDE interface (id: 1)
+- Floppy disk controller (id: 2)
+- IPI bus controller (id: 3)
+- RAID bus controller (id: 4)
+- ATA controller (id: 5)
+- SATA controller (id: 6)
+- Serial Attached SCSI controller (id: 7)
+- Non-Volatile memory controller (id: 8)
+- Mass storage controller (id: 128)
+----------------------------------
+Class: Wireless controller (id: 13)
+Subclasses: 
+- IRDA controller (id: 0)
+- Consumer IR controller (id: 1)
+- RF controller (id: 16)
+- Bluetooth (id: 17)
+- Broadband (id: 18)
+- 802.1a controller (id: 32)
+- 802.1b controller (id: 33)
+- Wireless controller (id: 128)
+----------------------------------
+Class: Satellite communications controller (id: 15)
+Subclasses: 
+- Satellite TV controller (id: 1)
+- Satellite audio communication controller (id: 2)
+- Satellite voice communication controller (id: 3)
+- Satellite data communication controller (id: 4)
+----------------------------------
+Class: Intelligent controller (id: 14)
+Subclasses: 
+- I2O (id: 0)
+----------------------------------
+Class: Encryption controller (id: 16)
+Subclasses: 
+- Network and computing encryption device (id: 0)
+- Entertainment encryption device (id: 16)
+- Encryption controller (id: 128)
+----------------------------------
+Class: Coprocessor (id: 64)
+Subclasses: 
+
+----------------------------------
+Class: Multimedia controller (id: 4)
+Subclasses: 
+- Multimedia video controller (id: 0)
+- Multimedia audio controller (id: 1)
+- Computer telephony device (id: 2)
+- Audio device (id: 3)
+- Multimedia controller (id: 128)
+----------------------------------
+Class: Network controller (id: 2)
+Subclasses: 
+- Ethernet controller (id: 0)
+- Token ring network controller (id: 1)
+- FDDI network controller (id: 2)
+- ATM network controller (id: 3)
+- ISDN controller (id: 4)
+- WorldFip controller (id: 5)
+- PICMG controller (id: 6)
+- Infiniband controller (id: 7)
+- Fabric controller (id: 8)
+- Network controller (id: 128)
+----------------------------------
+Class: Communication controller (id: 7)
+Subclasses: 
+- Serial controller (id: 0)
+- Parallel controller (id: 1)
+- Multiport serial controller (id: 2)
+- Modem (id: 3)
+- GPIB controller (id: 4)
+- Smard Card controller (id: 5)
+- Communication controller (id: 128)
+----------------------------------
+Class: Processor (id: 11)
+Subclasses: 
+- 386 (id: 0)
+- 486 (id: 1)
+- Pentium (id: 2)
+- Alpha (id: 16)
+- Power PC (id: 32)
+- MIPS (id: 48)
+- Co-processor (id: 64)
+----------------------------------
+Class: Signal processing controller (id: 17)
+Subclasses: 
+- DPIO module (id: 0)
+- Performance counters (id: 1)
+- Communication synchronizer (id: 16)
+- Signal processing management (id: 32)
+- Signal processing controller (id: 128)
+----------------------------------
+Class: Processing accelerators (id: 18)
+Subclasses: 
+- Processing accelerators (id: 0)
+- SNIA Smart Data Accelerator Interface (SDXI) controller (id: 1)
+----------------------------------
+Class: Input device controller (id: 9)
+Subclasses: 
+- Keyboard controller (id: 0)
+- Digitizer Pen (id: 1)
+- Mouse controller (id: 2)
+- Scanner controller (id: 3)
+- Gameport controller (id: 4)
+- Input device controller (id: 128)
+----------------------------------
+Class: Generic system peripheral (id: 8)
+Subclasses: 
+- PIC (id: 0)
+- DMA controller (id: 1)
+- Timer (id: 2)
+- RTC (id: 3)
+- PCI Hot-plug controller (id: 4)
+- SD Host controller (id: 5)
+- IOMMU (id: 6)
+- System peripheral (id: 128)
+- Timing Card (id: 153)
+----------------------------------

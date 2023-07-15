@@ -3,12 +3,17 @@
 
 // Usefull links: all of classes: https://pci-ids.ucw.cz/read/PD/
 // Intel devices : https://pci-ids.ucw.cz/read/PC/8086
+
+
 pub mod ata;
 pub mod port;
+pub mod pci_data;
 
 use core::fmt;
 use core::ops::{Deref, DerefMut};
+use alloc::string::String;
 use alloc::vec::Vec;
+use pci_ids::{Class, FromId};
 use spin::{Once, Mutex};
 use x86_64::PhysAddr;
 use x86_64::instructions::port::Port;
@@ -662,12 +667,97 @@ pub enum PciConfigSpaceAccessMechanism {
 // const MSIX_UNMASK_INT:          u32 = 0;
 
 
-pub fn print_all_pci_devices() {
-    for device in crate::pci::pci_device_iter() {
-        let d = pci_ids::Device::from_vid_pid(device.vendor_id, device.device_id).expect(&alloc::format!("Not found, {:?}", device));
-        let subs: Vec<&'static pci_ids::SubSystem> = d.subsystems().collect();
-        
-        let vendor = d.vendor().name();
-        serial_println!("Device {} - Vendor {:?} - Class {:?} sub:{} - Subsystems {:?} - ON BUS: {}",d.name(), vendor, device.class, device.subclass, subs, device.bus());
-    }
+// Basically the crates 'pci' and 'pci_ids' are kinda bad, so I'm making a wrapper around both
+// Maybe make it a entire new library named 'pci_no_std' that we publish on crates.io ?
+// We'll see
+struct Device {
+    class: &'static Class,
+    device: &'static pci_ids::Device,
+    bus_device: PciDevice
 }
+
+impl Device {
+    //     //TODO: Make a function to create a pci device from only vendor and product ids
+    // Make sure vendor and product ids are valid
+    // pub fn new(vendor_id:u16, product_id:u16) -> Self {
+    //     // let class_id = 1;
+    //     Self {
+    //         class: Class::from_id(class_id).unwrap(),
+    //         device: pci_ids::Device::from_vid_pid(vendor_id, product_id).unwrap(),
+    //         bus_device: PciDevice { location: (), class: (), subclass: (), prog_if: (), bars: (), vendor_id: (), device_id: (), command: (), status: (), revision_id: (), cache_line_size: (), latency_timer: (), header_type: (), bist: (), int_pin: (), int_line: () }
+    //     }
+    // }
+    pub fn at_bus(bus:u8) -> Vec<Self> {
+        let mut devices: Vec<Self> = Vec::new();
+        for slot in 0..MAX_SLOTS_PER_BUS {
+            let loc_zero = PciLocation { bus, slot, func: 0 };
+            // skip the whole slot if the vendor ID is 0xFFFF
+            if 0xFFFF == loc_zero.pci_read_16(PCI_VENDOR_ID) {
+                continue;
+            }
+        
+            // If the header's MSB is set, then there are multiple functions for this device,
+            // and we should check all 8 of them to be sure.
+            // Otherwise, we only need to check the first function, because it's a single-function device.
+            let header_type = loc_zero.pci_read_8(PCI_HEADER_TYPE);
+            let functions_to_check = if header_type & 0x80 == 0x80 {
+                0..MAX_FUNCTIONS_PER_SLOT // Were is c func ?
+            } else {
+                0..1
+            };
+        
+            for f in functions_to_check {
+                let location = PciLocation { bus, slot, func: f };
+                let vendor_id = location.pci_read_16(PCI_VENDOR_ID);
+                if vendor_id == 0xFFFF {
+                    continue;
+                }
+        
+                let device = PciDevice {
+                    vendor_id,
+                    device_id:        location.pci_read_16(PCI_DEVICE_ID), 
+                    command:          location.pci_read_16(PCI_COMMAND),
+                    status:           location.pci_read_16(PCI_STATUS),
+                    revision_id:      location.pci_read_8( PCI_REVISION_ID),
+                    prog_if:          location.pci_read_8( PCI_PROG_IF),
+                    subclass:         location.pci_read_8( PCI_SUBCLASS),
+                    class:            location.pci_read_8( PCI_CLASS),
+                    cache_line_size:  location.pci_read_8( PCI_CACHE_LINE_SIZE),
+                    latency_timer:    location.pci_read_8( PCI_LATENCY_TIMER),
+                    header_type:      location.pci_read_8( PCI_HEADER_TYPE),
+                    bist:             location.pci_read_8( PCI_BIST),
+                    bars:             [
+                                          location.pci_read_32(PCI_BAR0),
+                                          location.pci_read_32(PCI_BAR1), 
+                                          location.pci_read_32(PCI_BAR2), 
+                                          location.pci_read_32(PCI_BAR3), 
+                                          location.pci_read_32(PCI_BAR4), 
+                                          location.pci_read_32(PCI_BAR5), 
+                                      ],
+                    int_pin:          location.pci_read_8(PCI_INTERRUPT_PIN),
+                    int_line:         location.pci_read_8(PCI_INTERRUPT_LINE),
+                    location,
+                };
+                
+                let device = Self {
+                    class: pci_ids::Class::from_id(device.class).unwrap(),
+                    device: pci_ids::Device::from_vid_pid(device.vendor_id, device.device_id).unwrap(),
+                    bus_device: device,
+                };
+
+                devices.push(device);
+            }
+        }
+        devices
+    }
+    pub fn product_name(&self) -> &str {self.device.name()}
+    pub fn product_id(&self) -> u16 {self.device.id()}
+    pub fn vendor_name(&self) -> &str {self.device.vendor().name()}
+    pub fn vendor_id(&self) -> u16 {self.device.vendor().id()}
+    pub fn class_id(&self) -> u8 {self.class.id()}
+    pub fn class_name(&self) -> &str {self.class.name()}
+}
+
+
+
+

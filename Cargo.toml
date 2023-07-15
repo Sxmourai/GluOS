@@ -19,6 +19,9 @@ bit_field = "0.10.2"
 rsdp = "2.0.0"
 defmt = "0.3.5"
 pci-ids = "0.2.5"
+libc = { version = "0.2.147", features = ["std"]}
+
+
 
 [dependencies.lazy_static]
 version = "1.0"

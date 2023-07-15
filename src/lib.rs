@@ -80,3 +80,4 @@ extern crate pc_keyboard;
 extern crate bootloader;
 extern crate linked_list_allocator;
 extern crate hashbrown;
+extern crate libc;

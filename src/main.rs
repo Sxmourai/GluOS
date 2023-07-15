@@ -16,10 +16,15 @@ use alloc::vec::Vec;
 use bootloader::{BootInfo, entry_point};
 use kernel::{serial_print, println};
 use pci_ids::SubSystem;
+use x86_64::VirtAddr;
+
 
 entry_point!(kernel_main);
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     kernel::init(boot_info);
+
+
+
     // let to_print = memory::search_for_on_bios(&mut kernel::state::get_mem_handler().get_mut().frame_allocator);
     // crate::serial_println!("{:?}", to_print);
 
@@ -31,15 +36,17 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     
     #[cfg(test)]
     test_main();
-    for device in kernel::pci::pci_device_iter() {
-        
-        if device.class == 1 {
-            serial_println!("{:#b} - {:?} - {} - {}", device.prog_if, device.status, device.int_line, device.int_pin);
-        }
-    }
+
+    // print_all_pci_devices();
+    // for device in kernel::pci::pci_device_iter() {
+    //     if device.class == 1 {
+    //         serial_println!("{:#b} - {:?} - {} - {}", device.prog_if, device.status, device.int_line, device.int_pin);
+    //     }
+    // }
 
     hlt_loop()
 }
+
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {

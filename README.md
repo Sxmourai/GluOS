@@ -26,3 +26,10 @@ https://github.com/thepowersgang/rust_os
 - Our own bootloader
 - Graphical interface (Definitely not today)
 - File system
+
+## TODO LIST
+- Multiprocessor, get rsdp https://docs.rs/rsdp/latest/src/rsdp/lib.rs.html#47-61, mapping
+
+## Cool ressources
+- Phil opp blog
+- https://pages.cs.wisc.edu/~remzi/OSTEP/
