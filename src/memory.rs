@@ -1,11 +1,16 @@
+//TODO: Implement proper paging & all
+//TODO: Make a "simple" function to map ANY frame to a new page. Need this to access rsdp pointer
+// https://os.phil-opp.com/paging-implementation/#using-offsetpagetable
 use core::borrow::BorrowMut;
 use core::ops::Range;
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
 use rsdp::Rsdp;
+use rsdp::handler::AcpiHandler;
 use spin::Mutex;
 use x86_64::structures::paging::PageTableFlags as Flags;
+use x86_64::structures::paging::mapper::PageTableFrameMapping;
 use x86_64::{
     structures::paging::{
         FrameAllocator, Mapper, OffsetPageTable, Page, PageTable, PhysFrame, Size4KiB,
@@ -14,6 +19,12 @@ use x86_64::{
 };
 use crate::serial_println;
 // use crate::state::get_mem_handler;
+// struct MyPageTableFrameMapping{next:usize}
+// unsafe impl PageTableFrameMapping for MyPageTableFrameMapping {
+//     fn frame_to_pointer(&self, frame: PhysFrame) -> *mut PageTable {
+//         PageTable::new()
+//     }
+// }
 
 #[derive(Debug)]
 pub struct MemoryHandler {
@@ -25,6 +36,7 @@ impl MemoryHandler {
             
         let level_4_table = unsafe { active_level_4_table(physical_memory_offset) };
         
+        // let mut mapper = unsafe { x86_64::structures::paging::MappedPageTable::new(level_4_table, MyPageTableFrameMapping{next:0}) };
         let mut mapper = unsafe { OffsetPageTable::new(level_4_table, physical_memory_offset) };
         let mut frame_allocator = unsafe {
             BootInfoFrameAllocator::init(memory_map) // Initialize the frame allocator
@@ -91,7 +103,7 @@ pub unsafe fn init(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static>
 }
 
 /// A FrameAllocator that returns usable frames from the bootloader's memory map.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BootInfoFrameAllocator {
     memory_map: &'static MemoryMap,
     next: usize,
@@ -121,11 +133,8 @@ impl BootInfoFrameAllocator {
         // create `PhysFrame` types from the start addresses
         frame_addresses.map(|addr| PhysFrame::containing_address(PhysAddr::new(addr)))
     }
-
-    unsafe fn map_physical_region(
-        &self,
-        physical_address: usize,
-    ) -> x86_64::structures::paging::Page {
+    
+    unsafe fn map_physical_region(&self, physical_address: usize) -> x86_64::structures::paging::Page {
         let frame =
             PhysFrame::from_start_address(PhysAddr::new(physical_address.try_into().unwrap())).unwrap();
         let flags = Flags::PRESENT | Flags::WRITABLE;
@@ -144,10 +153,22 @@ impl BootInfoFrameAllocator {
         page
     }
 }
+impl AcpiHandler for BootInfoFrameAllocator {
+    unsafe fn map_physical_region<T>(&self, physical_address: usize, size: usize) -> rsdp::handler::PhysicalMapping<Self, T> {
+        let phys_mem_offset = crate::state::get_boot_info().physical_memory_offset as usize;
+        let frame_allocator = crate::state::get_mem_handler().get_mut().frame_allocator;
+        let ptr = core::ptr::NonNull::new(&mut T).unwrap();
+
+        rsdp::handler::PhysicalMapping::<BootInfoFrameAllocator, usize>::new(physical_address, ptr, 4096, 4096, frame_allocator)
+    }
+
+    fn unmap_physical_region<T>(region: &rsdp::handler::PhysicalMapping<Self, T>) {panic!()}
+}
+
 
 unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
     fn allocate_frame(&mut self) -> Option<PhysFrame> {
-        let frame = self.usable_frames().nth(self.next);
+        let frame = self.usable_frames().nth(self.next); //TODO: Store usable frames as a struct field
         self.next += 1;
         frame
     }
@@ -162,7 +183,7 @@ pub fn find_search_areas(frame_allocator: &BootInfoFrameAllocator) -> [Range<usi
      * Read the base address of the EBDA from its location in the BDA (BIOS Data Area). Not all BIOSs fill this out
      * unfortunately, so we might not get a sensible result. We shift it left 4, as it's a segment address.
      */
-    serial_println!("{:x}", unsafe { frame_allocator.map_physical_region(RSDP_BIOS_AREA_START) }.start_address());
+    // serial_println!("{:x}", unsafe { frame_allocator.map_physical_region(RSDP_BIOS_AREA_START) }.start_address());
     let ebda_start_mapping = unsafe { frame_allocator.map_physical_region(EBDA_START_SEGMENT_PTR) };
     let ebda_start = (unsafe { *ebda_start_mapping.start_address().as_ptr::<u16>() } as usize) << 4;
     [

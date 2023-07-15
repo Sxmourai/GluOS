@@ -14,7 +14,7 @@ use core::panic::PanicInfo;
 use crate::kernel::{serial_println, hlt_loop};
 use alloc::vec::Vec;
 use bootloader::{BootInfo, entry_point};
-use kernel::{serial_print, println};
+use kernel::{serial_print, println, state::get_mem_handler};
 use pci_ids::SubSystem;
 use x86_64::VirtAddr;
 
@@ -23,10 +23,10 @@ entry_point!(kernel_main);
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     kernel::init(boot_info);
 
+    // serial_println!("{:?}", unsafe { rsdp::Rsdp::search_for_on_bios(get_mem_handler()) });
 
-
-    // let to_print = memory::search_for_on_bios(&mut kernel::state::get_mem_handler().get_mut().frame_allocator);
-    // crate::serial_println!("{:?}", to_print);
+    let to_print = unsafe { rsdp::Rsdp::search_for_on_bios(&mut kernel::state::get_mem_handler().get_mut().frame_allocator) }.unwrap();
+    crate::serial_println!("Phys start: {:?}", to_print.physical_start());
 
     // x86_64::PhysAddr::new(0x40E)
     // unsafe { & *(x86_64::PhysAddr::new(0x40E).as_u64() as *const u16) }
