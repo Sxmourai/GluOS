@@ -82,7 +82,7 @@ pub static PICS: spin::Mutex<ChainedPics> =
     spin::Mutex::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
 
 #[derive(Debug)]
-struct SendSyncWrapper<T: ?Sized>(T);
+pub struct SendSyncWrapper<T: ?Sized>(pub T);
 unsafe impl<T: ?Sized> Sync for SendSyncWrapper<T> {}
 unsafe impl<T: ?Sized> Send for SendSyncWrapper<T> {}
 
@@ -92,6 +92,10 @@ static KB_INPUTS: Mutex<Vec<Box<SendSyncWrapper<dyn KbInput>>>> = Mutex::new(Vec
 pub fn add_input(input:impl KbInput + 'static) -> usize {
     KB_INPUTS.lock().push(Box::new(SendSyncWrapper(input)));
     KB_INPUTS.lock().len()-1
+}
+// Removes prompt from list and returns it
+pub fn remove_input(idx:usize) -> Box<SendSyncWrapper<dyn KbInput>> {
+    KB_INPUTS.lock().remove(idx)
 }
 pub fn get_input_msg(idx:usize) -> Option<String> {
     if let Some(input) = KB_INPUTS.lock().get(idx) {

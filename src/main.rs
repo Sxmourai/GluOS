@@ -23,10 +23,10 @@ entry_point!(kernel_main);
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     kernel::init(boot_info);
 
-    // serial_println!("{:?}", unsafe { rsdp::Rsdp::search_for_on_bios(get_mem_handler()) });
+    serial_println!("{}", kernel::prompt::input("Command: "));
 
-    let to_print = unsafe { rsdp::Rsdp::search_for_on_bios(&mut kernel::state::get_mem_handler().get_mut().frame_allocator) }.unwrap();
-    crate::serial_println!("Phys start: {:?}", to_print.physical_start());
+    // let to_print = unsafe { rsdp::Rsdp::search_for_on_bios(&mut kernel::state::get_mem_handler().get_mut().frame_allocator) }.unwrap();
+    // crate::serial_println!("Phys start: {:?}", to_print.physical_start());
 
     // x86_64::PhysAddr::new(0x40E)
     // unsafe { & *(x86_64::PhysAddr::new(0x40E).as_u64() as *const u16) }
@@ -43,7 +43,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     //         serial_println!("{:#b} - {:?} - {} - {}", device.prog_if, device.status, device.int_line, device.int_pin);
     //     }
     // }
-
+    // kernel::boot::end()
     hlt_loop()
 }
 

@@ -153,17 +153,17 @@ impl BootInfoFrameAllocator {
         page
     }
 }
-impl AcpiHandler for BootInfoFrameAllocator {
-    unsafe fn map_physical_region<T>(&self, physical_address: usize, size: usize) -> rsdp::handler::PhysicalMapping<Self, T> {
-        let phys_mem_offset = crate::state::get_boot_info().physical_memory_offset as usize;
-        let frame_allocator = crate::state::get_mem_handler().get_mut().frame_allocator;
-        let ptr = core::ptr::NonNull::new(&mut T).unwrap();
+// impl AcpiHandler for BootInfoFrameAllocator {
+//     unsafe fn map_physical_region<T>(&self, physical_address: usize, size: usize) -> rsdp::handler::PhysicalMapping<Self, T> {
+//         let phys_mem_offset = crate::state::get_boot_info().physical_memory_offset as usize;
+//         let frame_allocator = crate::state::get_mem_handler().get_mut().frame_allocator;
+//         let ptr = core::ptr::NonNull::new(&mut T).unwrap();
 
-        rsdp::handler::PhysicalMapping::<BootInfoFrameAllocator, usize>::new(physical_address, ptr, 4096, 4096, frame_allocator)
-    }
+//         rsdp::handler::PhysicalMapping::<BootInfoFrameAllocator, usize>::new(physical_address, ptr, 4096, 4096, frame_allocator)
+//     }
 
-    fn unmap_physical_region<T>(region: &rsdp::handler::PhysicalMapping<Self, T>) {panic!()}
-}
+//     fn unmap_physical_region<T>(region: &rsdp::handler::PhysicalMapping<Self, T>) {panic!()}
+// }
 
 
 unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {

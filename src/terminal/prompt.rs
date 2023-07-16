@@ -206,7 +206,9 @@ impl KbInput for BlockingPrompt {
         loop {
             if let Some(msg) = crate::interrupts::get_input_msg(idx) {
                 if !msg.is_empty(){
+                    crate::interrupts::remove_input(idx).as_mut().0.restore_blinked(); // Remove cursor blink
                     return msg;
+
                 }
             } else {panic!("Trying to get an input that doesn't exist, index isn't right:{}",idx)}
             x86_64::instructions::hlt(); // Halts until next hardware interrupt, can be time or keyboard
