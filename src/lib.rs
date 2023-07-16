@@ -23,27 +23,11 @@ pub mod memory;     use memory::MemoryHandler;
 pub mod allocator;  
 pub mod task;       
 pub mod test;       pub use test::{exit_qemu, QemuExitCode, test_panic_handler};
-pub mod boot;       pub use boot::hlt_loop;
+pub mod boot;       pub use boot::{hlt_loop,boot};
 pub mod timer;      
 pub mod cpu;        
 pub mod pci;        
 pub mod apic;       
-
-// Boot the os, with the help of the 'boot_info' provided by the bootloader crate
-pub fn boot(boot_info: &'static bootloader::BootInfo) { //TODO: Merge crate::boot::init and mem handler + os state struct
-    dbg!("-------Kernel init-------");
-    crate::boot::init();
-    let memory_handler = MemoryHandler::new(VirtAddr::new(boot_info.physical_memory_offset), &boot_info.memory_map);
-    unsafe {
-        state::STATE.mem_handler = Some(memory_handler);
-        state::STATE.boot_info = Some(boot_info);
-    };
- }
-
-
-
-
-
 
 //-----------TESTS HANDLING-----------
 #[cfg(test)]

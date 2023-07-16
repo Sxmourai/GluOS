@@ -1,17 +1,25 @@
+use x86_64::VirtAddr;
+
 use crate::{
     gdt, interrupts,
-    task::executor::Executor,
+    task::executor::Executor, memory::MemoryHandler, state,
 };
 // Supress compiler warning about unused imports, but if removed, error
 #[allow(unused_imports)]
 use crate::println;
 
-pub fn init() -> () {
+// Boot the os, with the help of the 'boot_info' provided by the bootloader crate
+pub fn boot(boot_info: &'static bootloader::BootInfo) {
     gdt::init();
-    interrupts::IDT.load(); // Init the interrupt descriptor table, handling cpu exceptions
-    unsafe { interrupts::PICS.lock().initialize() }; // Init pic, for hardware interrupts (Time, Keyboard...)
-    x86_64::instructions::interrupts::enable(); // Enable hardware interrupts
-}
+    interrupts::init();
+    let memory_handler = MemoryHandler::new(VirtAddr::new(boot_info.physical_memory_offset), &boot_info.memory_map);
+    unsafe {
+        state::STATE.mem_handler = Some(memory_handler);
+        state::STATE.boot_info = Some(boot_info);
+    };
+ }
+
+
 
 pub fn end() -> ! {
     let mut executor = Executor::new();
