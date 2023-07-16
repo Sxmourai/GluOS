@@ -6,7 +6,6 @@
 #![feature(abi_x86_interrupt)]
 #![feature(const_mut_refs)]
 #![feature(linkage)]
-// #![feature(llvm_asm)]
 #![feature(naked_functions)]
 #![allow(unused, dead_code)] //TODO: Only for debug (#[cfg(debug_assertions)])
 
@@ -30,14 +29,14 @@ pub mod cpu;
 pub mod pci;        
 pub mod apic;       
 
-
-pub fn init(boot_info: &'static bootloader::BootInfo) {
+// Boot the os, with the help of the 'boot_info' provided by the bootloader crate
+pub fn boot(boot_info: &'static bootloader::BootInfo) { //TODO: Merge crate::boot::init and mem handler + os state struct
     dbg!("-------Kernel init-------");
     crate::boot::init();
     let memory_handler = MemoryHandler::new(VirtAddr::new(boot_info.physical_memory_offset), &boot_info.memory_map);
-    unsafe { 
+    unsafe {
         state::STATE.mem_handler = Some(memory_handler);
-        state::STATE.boot_info = Some(boot_info)
+        state::STATE.boot_info = Some(boot_info);
     };
  }
 
@@ -64,20 +63,19 @@ fn test_kernel_main(boot_info: &'static BootInfo) -> ! {
     hlt_loop()
 }
 
-//TODO: Adding extern crates... Needs to be removed but idk how
+//TODO: Remove the need for these
 
 extern crate crossbeam_queue;
-extern crate futures_util;
+extern crate futures_util; // Async/Await, not very used for now
 extern crate conquer_once;
-extern crate x86_64;
-extern crate alloc;
-extern crate lazy_static;
-extern crate spin;
-extern crate volatile;
+extern crate x86_64; // A lot of asm macros, and useful for paging... Everything far and near CPU related
+extern crate alloc; // Lib which stores some useful structs on the heap / smart pointers from stdlib like Vec, String, Box...
+extern crate lazy_static; // Useful to declare some static without using only 'const fn ...'
+extern crate spin; // Mutex and lock
+extern crate volatile; //TODO: replace by core::Volatile... In vga_buffer in terminal
 extern crate uart_16550;
-extern crate pic8259;
-extern crate pc_keyboard;
-extern crate bootloader;
+extern crate pic8259; //TODO: Switch from PIC (Programmable interupt controller) to APIC (Advanced PIC)
+extern crate pc_keyboard; // Transforms keyboard scancode (i.e. 158) to letters, provides some keyboard like US, French...
+extern crate bootloader; // The bootloader crate, usefull for boot_info, paging and other stuff
 extern crate linked_list_allocator;
-extern crate hashbrown;
-extern crate libc;
+extern crate hashbrown; // Reimplementation of HashMap and HashSet from stdlib

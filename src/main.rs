@@ -3,7 +3,7 @@
 #![feature(custom_test_frameworks)] // Required for ´cargo test´ because it searches in main.rs even if no tests
 #![test_runner(kernel::test::runner)]
 #![reexport_test_harness_main = "test_main"]
-#![allow(unused)]
+#![allow(unused)] // Stop cargo warnings
 
 extern crate kernel;
 extern crate bootloader;
@@ -18,10 +18,12 @@ use kernel::{serial_print, println, state::get_mem_handler};
 use pci_ids::SubSystem;
 use x86_64::VirtAddr;
 
-
+// Sets the entry point of our kernel for the bootloader. This means we can have the 'boot_info' variable which stores some crucial info
 entry_point!(kernel_main);
+// Main function of our kernel (1 func to start when boot if not in test mode). Never returns, because kernel runs until machine poweroff
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
-    kernel::init(boot_info);
+    // Initialize & boot the device and kernel
+    kernel::boot(boot_info);
 
     serial_println!("{}", kernel::prompt::input("Command: "));
 
@@ -35,7 +37,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     // crate::serial_println!("{:?}", unsafe{& *(0x000FFFFF as *const u16)});
     
     #[cfg(test)]
-    test_main();
+    test_main(); // Useless, but compiler is angry without it.
 
     // print_all_pci_devices();
     // for device in kernel::pci::pci_device_iter() {
@@ -44,6 +46,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     //     }
     // }
     // kernel::boot::end()
+    // Enter a 'sleep' phase (a.k.a. finished booting)
     hlt_loop()
 }
 

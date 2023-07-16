@@ -8,8 +8,8 @@ use crate::println;
 
 pub fn init() -> () {
     gdt::init();
-    interrupts::init_idt(); // Init the interrupt descriptor table
-    unsafe { interrupts::PICS.lock().initialize() };
+    interrupts::IDT.load(); // Init the interrupt descriptor table, handling cpu exceptions
+    unsafe { interrupts::PICS.lock().initialize() }; // Init pic, for hardware interrupts (Time, Keyboard...)
     x86_64::instructions::interrupts::enable(); // Enable hardware interrupts
 }
 
