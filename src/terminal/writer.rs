@@ -114,6 +114,8 @@ impl Writer {
             }
             if !self.console.lock().top_buffer.is_empty() {
                 self.write_screenchars_at(0, 0, self.console.lock().top_buffer.get_youngest_line().unwrap());
+            } else{
+                self.write_screenchars_at(0, 0, [DEFAULT_CHAR; 80]);
             }
         })
     }
