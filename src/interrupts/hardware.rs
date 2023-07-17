@@ -1,5 +1,5 @@
 use alloc::{string::String, boxed::Box, vec::Vec};
-use pc_keyboard::{Keyboard, layouts::Us104Key, ScancodeSet1, HandleControl};
+use pc_keyboard::{Keyboard, layouts::Us104Key, ScancodeSet1, HandleControl, DecodedKey, KeyCode};
 use pic8259::ChainedPics;
 use spin::Mutex;
 
@@ -76,11 +76,19 @@ pub extern "x86-interrupt" fn keyboard(_stack_frame: InterruptStackFrame) {
     // crate::task::keyboard::add_scancode(scancode);
     let mut keyboard = KEYBOARD.lock();
     if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
-        if let Some(key) = keyboard.process_keyevent(key_event) {
-            drop(keyboard);
+        if let Some(key) = keyboard.process_keyevent(key_event) { // Could drop keyboard, but only this function should use it, so for now it's fine
             for input in KB_INPUTS.lock().iter_mut() {
                 input.0.handle_key(key);
             }
+            match key {
+                DecodedKey::RawKey(k) => match k {
+                    KeyCode::ArrowUp => WRITER.lock().move_down(),
+                    KeyCode::ArrowDown => WRITER.lock().move_up(),
+                    _ => serial_println!("Unsupported key: {:?}", k),
+                },
+                DecodedKey::Unicode(k) => {serial_println!("Don't need this shit: {:?}", k)}
+            }
+            
         }
     }
     
@@ -93,4 +101,4 @@ pub extern "x86-interrupt" fn keyboard(_stack_frame: InterruptStackFrame) {
 }
 
 use x86_64::structures::idt::{PageFaultErrorCode, InterruptStackFrame};
-use crate::{boot::hlt_loop, prompt::KbInput};
+use crate::{boot::hlt_loop, prompt::KbInput, writer::WRITER, serial_println};

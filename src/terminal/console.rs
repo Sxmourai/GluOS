@@ -1,34 +1,28 @@
+use alloc::vec::Vec;
 use spin::Mutex;
 use volatile::Volatile;
-use super::writer::{ColorCode,Color,ScreenPos};
-use lazy_static::lazy_static;
+use crate::terminal::buffer::VgaBuffer;
 
-pub const BUFFER_HEIGHT: usize = 25;
-pub const BUFFER_WIDTH: usize = 80;
-lazy_static!{pub static ref CONSOLE: Mutex<Console> = Mutex::new(Console::new());}
+use super::{writer::{ColorCode,Color,ScreenPos}, buffer::{Buffer, BUFFER_HEIGHT, BUFFER_WIDTH, ConsoleBuffer}};
+use lazy_static::lazy_static;
+lazy_static!{pub static ref CONSOLE: Mutex<Console> = Mutex::new(Console::new(unsafe { &mut *(0xb8000 as *mut VgaBuffer) }));}
 
 pub const DEFAULT_CHAR:ScreenChar = ScreenChar::from(0x00);
 
 pub struct Console {
-    buffer: &'static mut dyn ConsoleBuffer,
+    buffer: &'static mut dyn Buffer<SIZE = (usize,usize)>,
+    pub top_buffer: ConsoleBuffer,
+    pub bottom_buffer: ConsoleBuffer, 
 }
 impl Console {
-    pub fn new() -> Self {
+    pub fn new(buffer: &'static mut dyn Buffer<SIZE = (usize,usize)>) -> Self {
         Self {
-            buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
+            buffer,
+            top_buffer: ConsoleBuffer::new(),
+            bottom_buffer: ConsoleBuffer::new(),
         }
     }
 
-    pub fn clear(&mut self) {
-        for row in 0..BUFFER_HEIGHT {
-            for column in 0..BUFFER_WIDTH {
-                self.write_char_at(row, column, DEFAULT_CHAR);
-            }
-        }
-    }
-    pub fn remove(&mut self, row:usize, column:usize) {
-        self.write_char_at(row,column, DEFAULT_CHAR);
-    }
     pub fn write_char_at(&mut self, row:usize, column:usize, chr:ScreenChar) {
         // serial_println!("Printing {} at r:{} c:{}", character.ascii_character as char, row, column);
         self.buffer.write_screenchar_at(&ScreenPos(row, column), chr)
@@ -36,12 +30,40 @@ impl Console {
     pub fn write_byte_at(&mut self, row:usize, column:usize, byte:u8) {
         self.write_char_at(row, column, ScreenChar::from(byte))
     }
-    pub fn get_at(&mut self, row:usize, column:usize) -> ScreenChar {
+
+    pub fn clear(&mut self) {
+        for row in 0..self.size().0 {
+            for column in 0..self.size().1 {
+                self.write_char_at(row, column, DEFAULT_CHAR);
+            }
+        }
+        self.top_buffer = ConsoleBuffer::new(); // Don't use clear because the allocated size doesn't change
+        self.bottom_buffer = ConsoleBuffer::new(); // Don't use clear because the allocated size doesn't change
+        // Could use clear then shrink to fit I think
+        //TODO: Find out which is faster (even tho I don't think it will be a gigantic improvement)
+    }
+    
+    pub fn remove(&mut self, row:usize, column:usize) {
+        self.write_char_at(row,column, DEFAULT_CHAR);
+    }
+
+    pub fn get_at(&self, row:usize, column:usize) -> ScreenChar {
         self.buffer.get_screenchar_at(&ScreenPos(row, column))
     }
-    pub fn get_atp(&mut self, pos:&ScreenPos) -> ScreenChar {
+    pub fn get_atp(&self, pos:&ScreenPos) -> ScreenChar {
         self.get_at(pos.0, pos.1)
     }
+    // Note that this makes a copy
+    pub fn get_str_at(&self, pos:&ScreenPos, len:usize) -> Vec<ScreenChar> {
+        let mut buffer = Vec::new();
+        let (width, height) = self.buffer.size();
+        for i in 0..len {
+            buffer.push(self.get_at(pos.0+i/width, (pos.1+i)%width)); // Wrap around
+        }
+        buffer
+    }
+    pub fn size(&self) -> (usize,usize) {self.buffer.size()}
+    // pub fn iter_chars(&self) -> impl Iterator<Item = ScreenChar> {self.buffer.}
 }
 unsafe impl Sync for Console {}
 unsafe impl Send for Console {}
@@ -75,21 +97,4 @@ impl ScreenChar {
     pub const fn from(ascii_character: u8) -> ScreenChar {
         ScreenChar { ascii_character, color_code: ColorCode::new(Color::White, Color::Black) }
     }
-}
-
-trait ConsoleBuffer {
-    fn get_size(&self) -> (usize,usize);
-    fn write_screenchar_at(&mut self, pos:&ScreenPos, chr:ScreenChar);
-    fn get_screenchar_at(&self, pos:&ScreenPos) -> ScreenChar;
-}
-
-#[repr(transparent)]
-#[derive(Debug)]
-pub struct Buffer {
-    chars: [[Volatile<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT], // [row][column]
-}
-impl ConsoleBuffer for Buffer {
-    fn get_size(&self) -> (usize,usize) {(self.chars.len(), self.chars[0].len())}
-    fn write_screenchar_at(&mut self, pos:&ScreenPos, chr:ScreenChar) {self.chars[pos.0][pos.1].write(chr)}
-    fn get_screenchar_at(&self, pos:&ScreenPos) -> ScreenChar {self.chars[pos.0][pos.1].read()}
 }

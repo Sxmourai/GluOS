@@ -1,9 +1,11 @@
 use alloc::vec::Vec;
-use lazy_static::lazy_static;
 use core::fmt;
+use lazy_static::lazy_static;
 use spin::Mutex;
 
-use super::console::{Console, BUFFER_WIDTH, ScreenChar, BUFFER_HEIGHT, ConsoleError, DEFAULT_CHAR};
+use super::{console::{
+    Console, ConsoleError, ScreenChar, DEFAULT_CHAR,
+}, buffer::{Buffer, BUFFER_WIDTH, BUFFER_HEIGHT}};
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,13 +39,12 @@ impl ColorCode {
     }
 }
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Hash)]
-pub struct ScreenPos(pub usize,pub usize);
-
+pub struct ScreenPos(pub usize, pub usize);
 
 pub struct Writer {
     pub cursor_pos: ScreenPos,
     color_code: ColorCode,
-    console:&'static Mutex<Console>
+    console: &'static Mutex<Console>,
 }
 
 impl Writer {
@@ -56,40 +57,89 @@ impl Writer {
                 }
 
                 let color_code = self.color_code;
-                self.write_char_at(self.cursor_pos.clone(), ScreenChar {
-                    ascii_character: byte,
-                    color_code,
-                });
+                self.write_char_at(
+                    self.cursor_pos.clone(),
+                    ScreenChar {
+                        ascii_character: byte,
+                        color_code,
+                    },
+                );
                 self.cursor_pos.1 += 1;
             }
         }
     }
-    pub fn get_at(&self, pos:ScreenPos) -> ScreenChar {self.console.lock().get_atp(&pos)}
-    pub fn write_char_at(&mut self, pos:ScreenPos, chr:ScreenChar) {self.console.lock().write_char_at(pos.0, pos.1, chr)}
-    pub fn write_string_at(&mut self, mut row:usize,mut column:usize, s: &str) -> Result<(), ConsoleError> {
-        for byte in s.bytes() {
-            if column >= BUFFER_WIDTH {
-                column = 0;
-                if row+1 == BUFFER_HEIGHT {return Result::Err(ConsoleError::OutOfBounds)}
-                else {row += 1}
-            }
-            self.write_char_at(ScreenPos(row,column), ScreenChar{ascii_character: byte, color_code: self.color_code});
-            column += 1;
-        }
-        Ok(())
+    pub fn get_at(&self, pos: ScreenPos) -> ScreenChar {
+        self.console.lock().get_atp(&pos)
     }
-    pub fn write_string_atp(&mut self, pos:&ScreenPos, s:&Vec<ScreenChar>) -> Result<(), ConsoleError> {
-        let (mut row, mut column) = (pos.0, pos.1);
-        for chr in s {
+    pub fn write_char_at(&mut self, pos: ScreenPos, chr: ScreenChar) {
+        self.console.lock().write_char_at(pos.0, pos.1, chr)
+    }
+    fn save_top_line(&mut self) { // Could use &self, but because we mutate console, I prefer explicitely making this mutable
+        let mut console: spin::MutexGuard<'_, Console> = self.console.lock();
+        let mut top_line = console.get_str_at(&ScreenPos(0, 0), console.size().1);
+        drop(console); // Drop lock even if it reuse it afterwards
+        let mut top_line_arr = [DEFAULT_CHAR; 80];
+        for i in 0..80 {
+            top_line_arr[i] = top_line.pop().unwrap(); // Can use unwrap because terminal width should always be 80
+            //TODO make change 80 to the console.width attribute
+        }
+        drop(top_line);
+        // Concats both buffer. Puts data at index 0, (pushes everything down)
+        self.console.lock().top_buffer.append(top_line_arr);
+    }
+    pub fn move_up(&mut self) {
+        let (width, height) = self.console.lock().size();
+        x86_64::instructions::interrupts::without_interrupts(|| { // If press enter while executed, can do deadlocks ?
+            //TODO Do we really need without_interrupts?
+            // Move every line one up
+            for row in 1..height {
+                let line = self.console.lock().get_str_at(&ScreenPos(row, 0), width);
+                self.write_screenchars_at(row-1, 0, line);
+            }
+            if !self.console.lock().bottom_buffer.is_empty() {
+                self.write_screenchars_at(height, 0, self.console.lock().bottom_buffer.get_youngest_line().unwrap());
+            }
+        })
+    }
+    pub fn move_down(&mut self) {
+        let (width, height) = self.console.lock().size();
+        x86_64::instructions::interrupts::without_interrupts(|| { // If press enter while executed, can do deadlocks ?
+            //TODO Do we really need without_interrupts?
+            // Move every line one down
+            // Iterate in reverse order because it would copy the same line every time
+            // It's like write left to write as a left-handed, the ink would be go on the text you are currently writing (I know that, I'm left-handed) 
+            for row in (0..height-1).rev() { // Same as -1 step in python
+                let line: Vec<ScreenChar> = self.console.lock().get_str_at(&ScreenPos(row, 0), width);
+                self.write_screenchars_at(row+1, 0, line);
+            }
+            if !self.console.lock().top_buffer.is_empty() {
+                self.write_screenchars_at(0, 0, self.console.lock().top_buffer.get_youngest_line().unwrap());
+            }
+        })
+    }
+    pub fn write_screenchars_at(&mut self, mut row: usize, mut column: usize, s:impl IntoIterator<Item = ScreenChar>) {
+        for screenchar in s.into_iter() {
             if column >= BUFFER_WIDTH {
                 column = 0;
-                if row+1 == BUFFER_HEIGHT {return Result::Err(ConsoleError::OutOfBounds)}
-                else {row += 1}
+                if row + 1 == BUFFER_HEIGHT {
+                    self.save_top_line();
+                    self.move_down()
+                } else {
+                    row += 1
+                }
             }
-            self.write_char_at(ScreenPos(row, column), *chr);
+            self.write_char_at(
+                ScreenPos(row, column),
+                screenchar
+            );
             column += 1;
         }
-        Ok(())
+    }
+    pub fn write_string_at(&mut self, mut row: usize, mut column: usize, s: &str) {
+        self.write_screenchars_at(row, column, &mut s.split("").map(|chr| ScreenChar::from(chr.as_bytes()[0])))
+    }
+    pub fn write_string_atp(&mut self, pos: &ScreenPos, s: &str) {
+        self.write_string_at(pos.0, pos.1, s)
     }
 
     pub fn write_string(&mut self, s: &str) {
@@ -100,17 +150,17 @@ impl Writer {
                 // not part of printable ASCII range
                 _ => self.write_byte(0xfe),
             }
-
         }
     }
 
     pub fn new_line(&mut self) {
-        if self.cursor_pos.0+1 < BUFFER_HEIGHT {self.cursor_pos.0 += 1;}
-        else {
+        if self.cursor_pos.0 + 1 < BUFFER_HEIGHT {
+            self.cursor_pos.0 += 1;
+        } else {
             for row in 1..BUFFER_HEIGHT {
                 for col in 0..BUFFER_WIDTH {
                     let character = self.get_at(ScreenPos(row, col));
-                    self.write_char_at(ScreenPos(row -1, col), character);
+                    self.write_char_at(ScreenPos(row - 1, col), character);
                 }
             }
             for col in 0..BUFFER_WIDTH {
@@ -145,7 +195,6 @@ macro_rules! print {
 //     ($row, $column, $($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
 // }
 
-
 #[macro_export]
 macro_rules! println {
     () => ($crate::print!("\n"));
@@ -161,40 +210,46 @@ pub fn _print(args: fmt::Arguments) {
     });
 }
 
-pub fn print_at(row:usize, column:usize, s:&str) -> Result<(), ConsoleError>{
+pub fn print_at(row: usize, column: usize, s: &str) {
     x86_64::instructions::interrupts::without_interrupts(|| {
         WRITER.lock().write_string_at(row, column, s)
     })
 }
 
-pub fn print_char_at(row:usize, column:usize, c:char) {
+pub fn print_char_at(row: usize, column: usize, c: char) {
     print_byte_at(row, column, c as u8)
 }
-pub fn print_byte_at(row:usize, column:usize, byte:u8) {
+pub fn print_byte_at(row: usize, column: usize, byte: u8) {
     print_screenchar_at(row, column, ScreenChar::from(byte))
 }
-pub fn print_screenchar_at(row:usize, column:usize, c:ScreenChar) {
+pub fn print_screenchar_at(row: usize, column: usize, c: ScreenChar) {
     x86_64::instructions::interrupts::without_interrupts(|| {
         WRITER.lock().write_char_at(ScreenPos(row, column), c);
     });
 }
-pub fn print_char_atp(pos:&ScreenPos, c:char) {
+pub fn print_char_atp(pos: &ScreenPos, c: char) {
     print_byte_at(pos.0, pos.1, c as u8)
 }
-pub fn print_byte_atp(pos:&ScreenPos, byte:u8) {
+pub fn print_byte_atp(pos: &ScreenPos, byte: u8) {
     print_screenchar_at(pos.0, pos.1, ScreenChar::from(byte))
 }
-pub fn print_screenchar_atp(pos:&ScreenPos, c:ScreenChar) {
+pub fn print_screenchar_atp(pos: &ScreenPos, c: ScreenChar) {
     print_screenchar_at(pos.0, pos.1, c)
 }
-pub fn print_atp(pos:&ScreenPos, s:&Vec<ScreenChar>) {
+pub fn print_atp(pos: &ScreenPos, s: &str) {
     x86_64::instructions::interrupts::without_interrupts(|| {
-        WRITER.lock().write_string_atp(pos, s).unwrap();
+        WRITER.lock().write_string_atp(pos, s);
+    });
+}
+pub fn print_screenchars_atp(pos: &ScreenPos, s: impl IntoIterator<Item = ScreenChar>) {
+    x86_64::instructions::interrupts::without_interrupts(|| {
+        WRITER.lock().write_screenchars_at(pos.0,pos.1, s);
     });
 }
 
-
-
-pub fn calculate_end(start:&ScreenPos, s:&str) -> ScreenPos {
-    ScreenPos(start.0+((s.len()-start.1)/BUFFER_WIDTH), start.1+(s.len()%BUFFER_WIDTH))
+pub fn calculate_end(start: &ScreenPos, s: &str) -> ScreenPos {
+    ScreenPos(
+        start.0 + ((s.len() - start.1) / BUFFER_WIDTH),
+        start.1 + (s.len() % BUFFER_WIDTH),
+    )
 }

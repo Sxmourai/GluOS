@@ -1,11 +1,13 @@
+use core::panic;
+
 use alloc::{vec::Vec, format, string::{String, ToString}};
 use hashbrown::HashMap;
 use pc_keyboard::DecodedKey;
 
-use crate::{writer::{ScreenPos, ColorCode, Color, print_screenchar_at, print_screenchar_atp, print_byte_at, print_atp, print_at}, println, print};
+use crate::{writer::{ScreenPos, ColorCode, Color, print_screenchar_at, print_screenchar_atp, print_byte_at, print_atp, print_at, print_screenchars_atp}, println, print, serial_println};
 use crate::terminal::console::ScreenChar;
 
-use super::console::BUFFER_WIDTH;
+use super::{buffer::BUFFER_WIDTH, console::DEFAULT_CHAR};
 
 #[derive(Debug)]
 pub struct Cursor {
@@ -45,19 +47,20 @@ pub trait KbInput: Send + Sync {
     fn get_char_at_cursor(&self) -> ScreenChar {crate::writer::WRITER.lock().get_at(self.get_cursor_pos())}
     fn store_previous_cursor(&mut self) {
         let c = self.get_char_at_cursor();
-        if c != self.get_cursor_chr() {
+        // if c != self.get_cursor_chr() {
             self.insert_blink(self.get_cursor_pos(), c);
-        }
+        // }
     }
     fn appear_blink(&self) {print_screenchar_atp(&self.get_cursor_pos(), self.get_cursor_chr());}
     fn restore_blinked(&mut self) {
         for (pos, key) in self.get_blinked_chrs() {
             print_screenchar_atp(pos, *key);
         }
+        serial_println!("{:?}", self.get_blinked_chrs());
         self.clear_blinked_chrs();
     }
     fn cursor_blink(&mut self) {
-        if !self.get_blink_state() {
+        if self.get_blink_state() == false {
             self.store_previous_cursor();
             self.appear_blink(); // Make cursor appear
             self.set_blink(true); // Set state to on
@@ -68,7 +71,7 @@ pub trait KbInput: Send + Sync {
         }
     }
     fn remove(&mut self, idx:usize) -> ScreenChar;
-    
+    //TODO Change name to something more accurate
     fn rmove_curs_idx(&mut self, relative_idx:isize) { // Neg for left, + for right, 0 none
         if (relative_idx < 0 && (self.get_cursor_idx() as isize)+relative_idx < 0) ||
            (relative_idx+self.get_cursor_idx() as isize > self.get_pressed_keys_len() as isize) 
@@ -194,6 +197,7 @@ impl BlockingPrompt {
     }
     fn handle_end(&mut self) {
         self.return_message = self.pressed_keys.iter().map(|sc| sc.ascii_character as char).collect();
+        self.return_message.push(' '); // Flag for the run fn
     }
 }
 impl KbInput for BlockingPrompt {
@@ -204,11 +208,11 @@ impl KbInput for BlockingPrompt {
         print!("{}", self.message);
         let idx = crate::interrupts::add_input(self);
         loop {
-            if let Some(msg) = crate::interrupts::get_input_msg(idx) {
-                if !msg.is_empty(){
-                    crate::interrupts::remove_input(idx).as_mut().0.restore_blinked(); // Remove cursor blink
+            if let Some(mut msg) = crate::interrupts::get_input_msg(idx) {
+                if msg.ends_with(' ') {
+                    crate::interrupts::remove_input(idx).as_mut().0.restore_blinked();
+                    if msg.remove(msg.len()-1) != ' ' {panic!("ERROR: {}", msg)}
                     return msg;
-
                 }
             } else {panic!("Trying to get an input that doesn't exist, index isn't right:{}",idx)}
             x86_64::instructions::hlt(); // Halts until next hardware interrupt, can be time or keyboard
@@ -229,21 +233,21 @@ impl KbInput for BlockingPrompt {
     fn handle_key(&mut self, key:DecodedKey) {
         match key {
             DecodedKey::Unicode(character) => match character {
-                '\u{8}' => x86_64::instructions::interrupts::without_interrupts(|| {
+                '\u{8}' => x86_64::instructions::interrupts::without_interrupts(|| {// Backspace
                     if self.cursor.pos > 0 {
                         // print_at(self.origin.0, self.origin.1, format!("{}",0x00 as char).repeat(self.pressed_keys.len()).as_str() ).unwrap();
-                        print_at(self.origin.0, self.origin.1, format!("{}",0x00 as char).repeat(self.pressed_keys.len()).as_str() ).unwrap();
+                        print_at(self.origin.0, self.origin.1, format!("{}",0x00 as char).repeat(self.pressed_keys.len()).as_str() );
                         
                         self.rmove_curs_idx(-1);
                         self.remove(self.cursor.pos); //TODO: FIX HORRIBLE CODE
-                        print_atp(&self.origin, &self.pressed_keys);
+                        print_screenchars_atp(&self.origin, self.pressed_keys.clone());
                     }
-                }), // Backspace
+                }), 
                 '\u{7f}' => x86_64::instructions::interrupts::without_interrupts(|| {
                     if self.cursor.pos < self.pressed_keys.len() {
-                        print_at(self.origin.0, self.origin.1, format!("{}",0x00 as char).repeat(self.pressed_keys.len()).as_str() ).unwrap();
+                        print_at(self.origin.0, self.origin.1, format!("{}",0x00 as char).repeat(self.pressed_keys.len()).as_str() );
                         self.remove(self.cursor.pos); //TODO: FIX HORRIBLE CODE
-                        print_atp(&self.origin, &self.pressed_keys);
+                        print_screenchars_atp(&self.origin, self.pressed_keys.clone());
                     }
                 }), // Delete
                 '\t' => {}, // Tab
@@ -260,14 +264,14 @@ impl KbInput for BlockingPrompt {
                         }
                     }
                     self.rmove_curs_idx(1);
-                    if self.cursor.blink_state {self.appear_blink();}
-                    else {print_screenchar_atp(&self.get_cursor_pos(), ScreenChar::from(0x00));}
+                    if self.get_blink_state()==true {self.appear_blink()}
+                    // else {print_screenchar_atp(&self.get_cursor_pos(), DEFAULT_CHAR)}
                 },
             },
             DecodedKey::RawKey(key) => match key {
                 pc_keyboard::KeyCode::ArrowLeft => x86_64::instructions::interrupts::without_interrupts(|| {if self.cursor.pos > 0 {self.rmove_curs_idx(-1);}}),
                 pc_keyboard::KeyCode::ArrowRight => x86_64::instructions::interrupts::without_interrupts(|| {if self.cursor.pos < self.pressed_keys.len() {self.rmove_curs_idx(1);}}),
-                _ => println!("{:?}", key)
+                _ => {}
             }
         }
     }
