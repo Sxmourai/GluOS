@@ -15,7 +15,6 @@ use defmt::info;
 use x86_64::VirtAddr;
 
 pub mod state;      pub use state::Kernel;
-pub mod serial;     
 pub mod terminal;   pub use terminal::writer;pub use terminal::prompt;
 pub mod interrupts; 
 pub mod gdt;        

@@ -1,4 +1,3 @@
-
 use x86_64::VirtAddr;
 use x86_64::structures::gdt::{GlobalDescriptorTable, Descriptor, SegmentSelector};
 use x86_64::structures::tss::TaskStateSegment;
