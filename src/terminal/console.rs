@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 use spin::Mutex;
 use volatile::Volatile;
-use crate::terminal::buffer::VgaBuffer;
+use crate::{terminal::buffer::VgaBuffer, serial_println};
 
 use super::{writer::{ColorCode,Color,ScreenPos}, buffer::{Buffer, BUFFER_HEIGHT, BUFFER_WIDTH, ConsoleBuffer}};
 use lazy_static::lazy_static;
@@ -10,7 +10,7 @@ lazy_static!{pub static ref CONSOLE: Mutex<Console> = Mutex::new(Console::new(un
 pub const DEFAULT_CHAR:ScreenChar = ScreenChar::from(0x00);
 
 pub struct Console {
-    buffer: &'static mut dyn Buffer<SIZE = (usize,usize)>,
+    pub buffer: &'static mut dyn Buffer<SIZE = (usize,usize)>,
     pub top_buffer: ConsoleBuffer,
     pub bottom_buffer: ConsoleBuffer, 
 }
@@ -25,8 +25,10 @@ impl Console {
 
     pub fn write_char_at(&mut self, row:usize, column:usize, chr:ScreenChar) {
         // serial_println!("Printing {} at r:{} c:{}", character.ascii_character as char, row, column);
+        
         self.buffer.write_screenchar_at(&ScreenPos(row, column), chr)
     }
+    
     pub fn write_byte_at(&mut self, row:usize, column:usize, byte:u8) {
         self.write_char_at(row, column, ScreenChar::from(byte))
     }
@@ -96,5 +98,19 @@ impl ScreenChar {
     }
     pub const fn from(ascii_character: u8) -> ScreenChar {
         ScreenChar { ascii_character, color_code: ColorCode::new(Color::White, Color::Black) }
+    }
+}
+
+pub fn pretty_print() {
+    let buffer = &mut CONSOLE.lock().buffer;
+    let mut i:usize = 256;
+    loop {
+        i += 1;
+        for row in 0..buffer.size().1 {
+            for column in 0..buffer.size().0 {
+                buffer.write_screenchar_at(&ScreenPos(row, column), ScreenChar { ascii_character: (row as u8).wrapping_add(u8_i), color_code: ColorCode::newb((column as f32*2.7)as u8, 0) })
+            }
+        }
+            // x86_64::instructions::hlt();x86_64::instructions::hlt();x86_64::instructions::hlt();x86_64::instructions::hlt();
     }
 }

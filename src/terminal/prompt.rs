@@ -56,7 +56,6 @@ pub trait KbInput: Send + Sync {
         for (pos, key) in self.get_blinked_chrs() {
             print_screenchar_atp(pos, *key);
         }
-        serial_println!("{:?}", self.get_blinked_chrs());
         self.clear_blinked_chrs();
     }
     fn cursor_blink(&mut self) {

@@ -14,7 +14,7 @@ use core::panic::PanicInfo;
 use crate::kernel::{serial_println, hlt_loop};
 use alloc::vec::Vec;
 use bootloader::{BootInfo, entry_point};
-use kernel::{serial_print, println, state::get_mem_handler};
+use kernel::{serial_print, println, state::get_mem_handler, terminal::console::{pretty_print, CONSOLE}};
 use pci_ids::SubSystem;
 use x86_64::VirtAddr;
 
@@ -24,8 +24,12 @@ entry_point!(kernel_main);
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     // Initialize & boot the device and kernel
     kernel::boot(boot_info);
-
-    serial_println!("{}", kernel::prompt::input("Command: "));
+    pretty_print();
+    // for device in kernel::pci::pci_device_iter() {
+    //     if device.class == 1 {
+    //         serial_println!("{:?}", device.subclass);
+    //     }
+    // }
 
     // let to_print = unsafe { rsdp::Rsdp::search_for_on_bios(&mut kernel::state::get_mem_handler().get_mut().frame_allocator) }.unwrap();
     // crate::serial_println!("Phys start: {:?}", to_print.physical_start());
@@ -38,13 +42,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     
     #[cfg(test)]
     test_main(); // Useless, but compiler is angry without it.
-
-    // print_all_pci_devices();
-    // for device in kernel::pci::pci_device_iter() {
-    //     if device.class == 1 {
-    //         serial_println!("{:#b} - {:?} - {} - {}", device.prog_if, device.status, device.int_line, device.int_pin);
-    //     }
-    // }
+    
     // kernel::boot::end()
     // Enter a 'sleep' phase (a.k.a. finished booting)
     hlt_loop()

@@ -1,8 +1,10 @@
+use core::ffi::c_uchar;
+
 use x86_64::VirtAddr;
 
 use crate::{
     gdt, interrupts,
-    task::executor::Executor, memory::MemoryHandler, state,
+    task::executor::Executor, memory::MemoryHandler, state, writer::{outb, inb}, serial_println,
 };
 // Supress compiler warning about unused imports, but if removed, error
 #[allow(unused_imports)]
@@ -17,7 +19,7 @@ pub fn boot(boot_info: &'static bootloader::BootInfo) {
         state::STATE.mem_handler = Some(memory_handler);
         state::STATE.boot_info = Some(boot_info);
     };
- }
+}
 
 
 

@@ -1,7 +1,9 @@
 use alloc::vec::Vec;
-use core::fmt;
+use core::{fmt, arch::asm};
 use lazy_static::lazy_static;
 use spin::Mutex;
+
+use crate::serial_println;
 
 use super::{console::{
     Console, ConsoleError, ScreenChar, DEFAULT_CHAR,
@@ -31,10 +33,13 @@ pub enum Color {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct ColorCode(u8);
+pub struct ColorCode(pub u8);
 
 impl ColorCode {
     pub const fn new(foreground: Color, background: Color) -> ColorCode {
+        ColorCode((background as u8) << 4 | (foreground as u8))
+    }
+    pub const fn newb(foreground: u8, background: u8) -> ColorCode {
         ColorCode((background as u8) << 4 | (foreground as u8))
     }
 }
@@ -64,9 +69,13 @@ impl Writer {
                         color_code,
                     },
                 );
-                self.cursor_pos.1 += 1;
+                self.move_cursor(self.cursor_pos.0, self.cursor_pos.1+1);
             }
         }
+    }
+    fn move_cursor(&mut self, x: usize, y: usize) {
+        self.cursor_pos = ScreenPos(x,y);
+
     }
     pub fn get_at(&self, pos: ScreenPos) -> ScreenChar {
         self.console.lock().get_atp(&pos)
@@ -254,4 +263,18 @@ pub fn calculate_end(start: &ScreenPos, s: &str) -> ScreenPos {
         start.0 + ((s.len() - start.1) / BUFFER_WIDTH),
         start.1 + (s.len() % BUFFER_WIDTH),
     )
+}
+
+pub unsafe fn outb(port:u16, data:u8) {
+    unsafe {
+        asm!("out dx, al", in("dx") port, in("al") data, options(nomem, nostack, preserves_flags));
+    }
+}
+pub unsafe fn inb(port:u16) -> u32 {
+    let value: u32;
+    unsafe {
+        asm!("in eax, dx", out("eax") value, in("dx") port, options(nomem, nostack, preserves_flags));
+    }
+    // serial_println!("Read {} from port {:x}", value, port);
+    value
 }
