@@ -9,7 +9,7 @@ use x86_64::{
     },
     VirtAddr,
 };
-use crate::{memory::BootInfoFrameAllocator};
+use crate::memory::BootInfoFrameAllocator;
 
 use self::fixed_size_block::FixedSizeBlockAllocator;
 

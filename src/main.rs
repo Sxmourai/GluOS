@@ -24,7 +24,7 @@ entry_point!(kernel_main);
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     // Initialize & boot the device and kernel
     kernel::boot(boot_info);
-    pretty_print();
+    
     // for device in kernel::pci::pci_device_iter() {
     //     if device.class == 1 {
     //         serial_println!("{:?}", device.subclass);

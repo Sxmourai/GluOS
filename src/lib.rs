@@ -16,14 +16,13 @@ use x86_64::VirtAddr;
 
 pub mod state;      pub use state::Kernel;
 pub mod terminal;   pub use terminal::writer;pub use terminal::prompt;
-pub mod interrupts; 
+pub mod interrupts; pub use interrupts::timer;
 pub mod gdt;        
-pub mod memory;     use memory::MemoryHandler;
+pub mod memory;     pub use crate::memory::handler::MemoryHandler;
 pub mod allocator;  
 pub mod task;       
 pub mod test;       pub use test::{exit_qemu, QemuExitCode, test_panic_handler};
 pub mod boot;       pub use boot::{hlt_loop,boot};
-pub mod timer;      
 pub mod cpu;        
 pub mod pci;        
 pub mod apic;       

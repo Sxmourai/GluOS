@@ -4,7 +4,7 @@ use x86_64::VirtAddr;
 
 use crate::{
     gdt, interrupts,
-    task::executor::Executor, memory::MemoryHandler, state, writer::{outb, inb}, serial_println,
+    task::executor::Executor, MemoryHandler, state, writer::{outb, inb}, serial_println,
 };
 // Supress compiler warning about unused imports, but if removed, error
 #[allow(unused_imports)]

@@ -101,14 +101,14 @@ impl ScreenChar {
     }
 }
 
-pub fn pretty_print() {
+pub fn pretty_print() -> !{
     let buffer = &mut CONSOLE.lock().buffer;
     let mut i:usize = 256;
     loop {
         i += 1;
         for row in 0..buffer.size().1 {
             for column in 0..buffer.size().0 {
-                buffer.write_screenchar_at(&ScreenPos(row, column), ScreenChar { ascii_character: (row as u8).wrapping_add(u8_i), color_code: ColorCode::newb((column as f32*2.7)as u8, 0) })
+                buffer.write_screenchar_at(&ScreenPos(row, column), ScreenChar { ascii_character: (row as u8).wrapping_add(i as u8), color_code: ColorCode::newb((column as f32*2.7)as u8, 0) })
             }
         }
             // x86_64::instructions::hlt();x86_64::instructions::hlt();x86_64::instructions::hlt();x86_64::instructions::hlt();

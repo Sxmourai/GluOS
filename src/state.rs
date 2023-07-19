@@ -6,7 +6,8 @@ use lazy_static::lazy_static;
 use spin::Mutex;
 use x86_64::{VirtAddr, structures::paging::OffsetPageTable};
 
-use crate::memory::{MemoryHandler, BootInfoFrameAllocator};
+use crate::memory::BootInfoFrameAllocator;
+use crate::MemoryHandler;
 
 // const MEM_HANDLER
 

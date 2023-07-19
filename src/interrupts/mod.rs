@@ -1,6 +1,7 @@
 pub mod idt;
 pub mod exceptions;
 pub mod hardware;
+pub mod timer;
 
 pub use hardware::{add_input,get_input_msg,remove_input};
 
