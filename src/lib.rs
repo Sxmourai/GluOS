@@ -25,7 +25,7 @@ pub mod test;       pub use test::{exit_qemu, QemuExitCode, test_panic_handler};
 pub mod boot;       pub use boot::{hlt_loop,boot};
 pub mod cpu;        
 pub mod pci;        
-pub mod apic;       
+//pub mod apic; //!causes compiler error     
 
 //-----------TESTS HANDLING-----------
 #[cfg(test)]

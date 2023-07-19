@@ -18,12 +18,31 @@ use kernel::{serial_print, println, state::get_mem_handler, terminal::console::{
 use pci_ids::SubSystem;
 use x86_64::VirtAddr;
 
+/* //! This is how to include C stuff
+* //! Im pretty sure you are forced to use #link
+* //! I wont change that because it makes it clear what c module you are using
+* //! kind = library kind, it will probably always be static
+#[link(name = "ide", kind = "static")]
+extern "C"
+{
+    fn c_test(); 
+}
+*/
 // Sets the entry point of our kernel for the bootloader. This means we can have the 'boot_info' variable which stores some crucial info
 entry_point!(kernel_main);
 // Main function of our kernel (1 func to start when boot if not in test mode). Never returns, because kernel runs until machine poweroff
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     // Initialize & boot the device and kernel
     kernel::boot(boot_info);
+
+    /* //! this was the c_test, it will output something on the vga buffer
+    *  //! the libraries made in C should be accessable anywhere in the project 
+    *  //! this is because of where we put them with cmake and I think it's necissary
+    *unsafe
+    *{
+    *    c_test(); 
+    *}
+    */
     
     // for device in kernel::pci::pci_device_iter() {
     //     if device.class == 1 {

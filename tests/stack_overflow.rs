@@ -11,9 +11,14 @@ use kernel::{exit_qemu, QemuExitCode, serial_println, serial_print};
 use lazy_static::lazy_static;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 
+extern "C"
+{
+    fn c_add(a: i32, b: i32) -> i32;
+}
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
+    serial_print!("Testing C functions: {}", unsafe{c_add(1, 2)}); 
     serial_print!("stack_overflow::stack_overflow...\t");
 
     kernel::gdt::init();
@@ -30,7 +35,6 @@ fn stack_overflow() {
     stack_overflow(); // for each recursion, the return address is pushed
     volatile::Volatile::new(0).read(); // prevent tail recursion optimizations
 }
-
 
 lazy_static! {
     static ref TEST_IDT: InterruptDescriptorTable = {
