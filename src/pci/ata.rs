@@ -810,3 +810,8 @@
 //    }
 //    value
 // }
+
+#[link(name = "ide", kind = "static")]
+extern "C" {
+    pub fn c_test(); 
+}
