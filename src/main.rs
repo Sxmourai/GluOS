@@ -1,6 +1,9 @@
 #![no_std]
 #![no_main]
-#![allow(unused)] // Stop cargo warnings
+#![allow(unused)]
+#![feature(custom_test_frameworks)]
+#![test_runner(kernel::test::runner)]
+#![reexport_test_harness_main = "test_runner"]
 
 extern crate kernel;
 extern crate bootloader;

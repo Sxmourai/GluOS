@@ -11,23 +11,6 @@ use crate::MemoryHandler;
 
 // const MEM_HANDLER
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 pub static mut STATE: Kernel = Kernel::new();
 pub struct Kernel {
     pub mem_handler: Option<MemoryHandler>,

@@ -4,17 +4,24 @@
 #![test_runner(kernel::test::runner)]
 #![reexport_test_harness_main = "test_runner"]
 
-use bootloader::BootInfo;
+extern crate alloc;extern crate bootloader;extern crate kernel;
+
+use core::panic::PanicInfo;
+
+use alloc::{boxed::Box, vec::Vec};
+use bootloader::{BootInfo, entry_point};
+use kernel::{println, allocator::HEAP_SIZE};
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {kernel::test::panic_handler(info)}
 
 entry_point!(main);
-fn main(boot_info: &'static BootInfo) {
+fn main(boot_info: &'static BootInfo) -> !{
     kernel::boot(boot_info);
     
     test_runner();
-    kernel::test::end();
+    
+    kernel::test::end()
 }
 
 #[test_case]

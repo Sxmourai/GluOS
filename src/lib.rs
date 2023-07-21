@@ -21,7 +21,7 @@ pub mod gdt;
 pub mod memory;     pub use crate::memory::handler::MemoryHandler;
 pub mod allocator;  
 pub mod task;       
-pub mod test;       pub use test::{exit_qemu, QemuExitCode, test_panic_handler};
+pub mod test;       pub use test::{exit_qemu, QemuExitCode};
 pub mod boot;       pub use boot::{hlt_loop,boot};
 pub mod cpu;        
 pub mod pci;        
@@ -32,7 +32,7 @@ pub mod pci;
 use core::panic::PanicInfo;
 #[cfg(test)]
 #[panic_handler]
-fn panic(info: &PanicInfo) -> ! {test_panic_handler(info)}
+fn panic(info: &PanicInfo) -> ! {test::panic_handler(info)}
 
 #[cfg(test)]
 use bootloader::{entry_point, BootInfo};
@@ -40,9 +40,9 @@ use bootloader::{entry_point, BootInfo};
 entry_point!(test_kernel_main);
 #[cfg(test)]
 fn test_kernel_main(boot_info: &'static BootInfo) -> ! {
-    init(boot_info);
+    boot(boot_info);
     test_main();
-    hlt_loop()
+    test::end()
 }
 
 //TODO: Remove the need for these
