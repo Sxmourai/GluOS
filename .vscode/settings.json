@@ -5,6 +5,8 @@
     "C_Cpp.errorSquiggles": "enabled",
     "cmake.configureOnOpen": true,
     "files.associations": {
-        "chrono": "c"
+        "chrono": "c",
+        "stdint.h": "c",
+        "stdint-gcc.h": "c"
     },
 }

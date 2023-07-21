@@ -61,3 +61,4 @@ extern crate pc_keyboard; // Transforms keyboard scancode (i.e. 158) to letters,
 extern crate bootloader; // The bootloader crate, usefull for boot_info, paging and other stuff
 extern crate linked_list_allocator;
 extern crate hashbrown; // Reimplementation of HashMap and HashSet from stdlib
+//TODO Make vga cursor move (os dev vga terminal doc) so we don't need to do our blinking, which means we don't need hashmaps anymore

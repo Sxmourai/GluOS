@@ -811,7 +811,9 @@
 //    value
 // }
 
-#[link(name = "ide", kind = "static")]
-extern "C" {
-    pub fn c_test(); 
-}
+// use core::ffi::c_uint;
+
+// #[link(name = "ide", kind = "static")]
+// extern "C" {
+//     pub fn ide_initialize(BAR0: c_uint, BAR1: c_uint, BAR2: c_uint, BAR3: c_uint, BAR4: c_uint);
+// }

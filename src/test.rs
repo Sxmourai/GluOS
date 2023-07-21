@@ -13,13 +13,16 @@ impl<T> Testable for T where T: Fn() {
         serial_println!("[ok]");
     }
 }
-
-pub fn runner(tests: &[&dyn Testable]) {
+pub fn end() -> ! {
+    exit_qemu(QemuExitCode::Success);
+    hlt_loop()
+}
+pub fn runner(tests: &[&dyn Testable]) -> ! {
     serial_println!("Running {} tests", tests.len());
     for test in tests {
         test.run();
     }
-    exit_qemu(QemuExitCode::Success);
+    end()
 }
 pub fn test_panic_handler(info: &PanicInfo) -> ! {
     serial_println!("[failed]\n");
