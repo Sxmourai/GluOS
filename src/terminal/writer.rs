@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use x86_64::structures::port::{PortWrite, PortRead};
 use core::{fmt, arch::asm};
 use lazy_static::lazy_static;
 use spin::Mutex;
@@ -266,15 +267,19 @@ pub fn calculate_end(start: &ScreenPos, s: &str) -> ScreenPos {
 }
 
 pub unsafe fn outb(port:u16, data:u8) {
-    unsafe {
-        asm!("out dx, al", in("dx") port, in("al") data, options(nomem, nostack, preserves_flags));
-    }
+    // crate::serial_print!("Write 0b{:b} from port 0x{:x} - ", data, port);
+    PortWrite::write_to_port(port, data);
+    // asm!("out dx, al", in("al") data, in("dx") port);
+    // serial_println!("Ok");
 }
-pub unsafe fn inb(port:u16) -> u32 {
-    let value: u32;
-    unsafe {
-        asm!("in eax, dx", out("eax") value, in("dx") port, options(nomem, nostack, preserves_flags));
-    }
-    // serial_println!("Read {} from port {:x}", value, port);
-    value
+
+pub unsafe fn inb(port:u16) -> u8 {
+    return PortRead::read_from_port(port);
+    // let value: u32;
+//     asm!("in eax, dx", out("eax") value, in("dx") port);
+    // if (value != 0 && value.count_zeros() != 0) { // Check if it's not 0 // just ones
+    //     serial_println!("Read 0b{:b} from port 0x{:x}", value, port);
+    // }
+
+    // value
 }

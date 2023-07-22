@@ -8,7 +8,7 @@ use pc_keyboard::{layouts, HandleControl, Keyboard, ScancodeSet1};
 
 static WAKER: AtomicWaker = AtomicWaker::new();
 static SCANCODE_QUEUE: OnceCell<ArrayQueue<u8>> = OnceCell::uninit();
-lazy_static!{static ref DEFAULT_KEYBOARD: Keyboard<layouts::Us104Key, ScancodeSet1> = Keyboard::new(layouts::Us104Key, ScancodeSet1, HandleControl::Ignore);}
+lazy_static!{pub static ref DEFAULT_KEYBOARD: spin::Mutex<Keyboard<layouts::Us104Key,ScancodeSet1>>  = spin::Mutex::new(Keyboard::new(ScancodeSet1::new(), layouts::Us104Key, HandleControl::Ignore));}
 
 
 /// Called by the keyboard interrupt handler

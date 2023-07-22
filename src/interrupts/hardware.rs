@@ -31,9 +31,6 @@ pub fn get_input_msg(idx:usize) -> Option<String> {
     } 
     None
 }
-lazy_static::lazy_static!{
-    static ref KEYBOARD: Mutex<Keyboard<Us104Key, ScancodeSet1>> = Mutex::new(Keyboard::new(Us104Key, ScancodeSet1, HandleControl::Ignore));
-} 
 
 
 #[derive(Debug, Clone, Copy)]
@@ -74,7 +71,7 @@ pub extern "x86-interrupt" fn keyboard(_stack_frame: InterruptStackFrame) {
     let mut port = Port::new(0x60);
     let scancode: u8 = unsafe { port.read() };
     // crate::task::keyboard::add_scancode(scancode);
-    let mut keyboard = KEYBOARD.lock();
+    let mut keyboard = crate::task::keyboard::DEFAULT_KEYBOARD.lock();
     if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
         if let Some(key) = keyboard.process_keyevent(key_event) { // Could drop keyboard, but only this function should use it, so for now it's fine
             for input in KB_INPUTS.lock().iter_mut() {

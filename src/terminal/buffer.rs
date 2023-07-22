@@ -30,13 +30,13 @@ pub trait Buffer {
 #[repr(transparent)]
 #[derive(Debug)]
 pub struct VgaBuffer {
-    chars: [[ScreenChar; BUFFER_WIDTH]; BUFFER_HEIGHT], // [row][column]
+    chars: [[volatile::Volatile<ScreenChar>; BUFFER_WIDTH]; BUFFER_HEIGHT], // [row][column]
 }
 impl Buffer for VgaBuffer {
     type SIZE = (usize,usize);
     fn size(&self) -> Self::SIZE {(BUFFER_WIDTH, BUFFER_HEIGHT)} // WIDTH, HEIGHT
-    fn write_screenchar_at(&mut self, pos:&ScreenPos, chr:ScreenChar) {self.chars[pos.0][pos.1] = chr}
-    fn get_screenchar_at(&self, pos:&ScreenPos) -> ScreenChar {self.chars[pos.0][pos.1]}
+    fn write_screenchar_at(&mut self, pos:&ScreenPos, chr:ScreenChar) {self.chars[pos.0][pos.1].write(chr)}
+    fn get_screenchar_at(&self, pos:&ScreenPos) -> ScreenChar {self.chars[pos.0][pos.1].read()}
     // Loop over all chars to check if they are DEFAULT_CHARS, so heavy function (O(1))
     fn is_empty(&self) -> bool {
         for row in 0..BUFFER_HEIGHT {

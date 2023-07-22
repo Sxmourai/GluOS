@@ -1,6 +1,5 @@
 use alloc::vec::Vec;
 use spin::Mutex;
-use volatile::Volatile;
 use crate::{terminal::buffer::VgaBuffer, serial_println};
 
 use super::{writer::{ColorCode,Color,ScreenPos}, buffer::{Buffer, BUFFER_HEIGHT, BUFFER_WIDTH, ConsoleBuffer}};
