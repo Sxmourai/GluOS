@@ -57,8 +57,11 @@ impl Writer {
     // Function to move the cursor to a specific position in the VGA buffer
     pub fn move_cursor(&mut self, x: u8, y: u8) {
         self.pos = ScreenPos(x,y);
-        let pos: u16 = (y * 80 + x).into();
-        self.write_char_at(self.pos.clone(), ScreenChar::new('\0' as u8, ColorCode::new(Color::White, Color::Black)));
+        let pos: u16 = (y as u16 * 80 + x as u16);
+        
+        if self.get_at(&self.pos).ascii_character == DEFAULT_CHAR.ascii_character {
+            self.write_char_at(self.pos.clone(), ScreenChar::new('\0' as u8, ColorCode::new(Color::White, Color::Black)));
+        }
         unsafe {
             outb(0x3D4, 0x0F);
             outb16(0x3D5, (pos).try_into().unwrap());
@@ -66,28 +69,8 @@ impl Writer {
             outb16(0x3D5, (pos >> 8).try_into().unwrap());
         }
     }
-    pub fn write_byte(&mut self, byte: u8) {
-        match byte {
-            b'\n' => self.new_line(),
-            byte => {
-                if self.pos.0 >= BUFFER_WIDTH {
-                    self.new_line();
-                }
-
-                let color_code = self.color_code;
-                self.write_char_at(
-                    self.pos.clone(),
-                    ScreenChar {
-                        ascii_character: byte,
-                        color_code,
-                    },
-                );
-                self.move_cursor(self.pos.0+1, self.pos.1);
-            }
-        }
-    }
-    pub fn get_at(&self, pos: ScreenPos) -> ScreenChar {
-        self.console.lock().get_atp(&pos)
+    pub fn get_at(&self, pos: &ScreenPos) -> ScreenChar {
+        self.console.lock().get_atp(pos)
     }
     pub fn write_char_at(&mut self, pos: ScreenPos, chr: ScreenChar) {
         self.console.lock().write_char_at(pos.0, pos.1, chr)
@@ -155,22 +138,40 @@ impl Writer {
             x += 1;
         }
     }
-    pub fn write_string_at(&mut self, mut x: u8, mut y: u8, s: &str) {
-        self.write_screenchars_at(x, y, &mut s.split("").map(|chr| ScreenChar::from(chr.as_bytes()[0])))
+    // Prints characters at desired position, with color of self.color_code and returns the end index
+    pub fn write_string_at(&mut self, mut x: u8, mut y: u8, s: &str) -> (u8,u8) {
+        for byte in s.bytes() {
+            match byte {
+                b'\n' => {x = 0; y+=1},
+                byte => {
+                    if x > BUFFER_WIDTH {
+                        x = 0;
+                        if y+1 < BUFFER_HEIGHT {
+                            y += 1
+                        } else {
+                            self.move_up()
+                        }
+                    }
+                    self.write_char_at(
+                        ScreenPos(x, y),
+                        ScreenChar {
+                            ascii_character: byte,
+                            color_code: self.color_code,
+                        },
+                    );
+                    x += 1;
+                }
+            }
+        }
+        (x,y)
     }
-    pub fn write_string_atp(&mut self, pos: &ScreenPos, s: &str) {
+    pub fn write_string_atp(&mut self, pos: &ScreenPos, s: &str) -> (u8,u8) {
         self.write_string_at(pos.0, pos.1, s)
     }
 
     pub fn write_string(&mut self, s: &str) {
-        for byte in s.bytes() {
-            match byte {
-                // printable ASCII byte or newline
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
-                // not part of printable ASCII range
-                _ => self.write_byte(0xfe),
-            }
-        }
+        let (x,y) = self.write_string_atp(&self.pos.clone(), s);
+        self.move_cursor(x,y);
     }
 
     pub fn new_line(&mut self) {
@@ -179,7 +180,7 @@ impl Writer {
         } else { // Move everything
             for y in 1..BUFFER_HEIGHT {
                 for x in 0..BUFFER_WIDTH {
-                    let character = self.get_at(ScreenPos(x, y));
+                    let character = self.get_at(&ScreenPos(x, y));
                     self.write_char_at(ScreenPos(x, y-1), character);
                 }
             }
@@ -229,7 +230,7 @@ pub fn _print(args: fmt::Arguments) {
     });
 }
 
-pub fn print_at(x: u8, y: u8, s: &str) {
+pub fn print_at(x: u8, y: u8, s: &str) -> (u8,u8) {
     x86_64::instructions::interrupts::without_interrupts(|| {
         WRITER.lock().write_string_at(x, y, s)
     })

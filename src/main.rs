@@ -13,6 +13,7 @@ extern crate x86_64;
 use crate::kernel::{hlt_loop, serial_println};
 use alloc::vec::Vec;
 use bootloader::{entry_point, BootInfo};
+use hashbrown::HashMap;
 use core::{
     ffi::{c_uchar, c_ushort},
     panic::PanicInfo,
@@ -20,7 +21,7 @@ use core::{
 use kernel::{
     println, serial_print,
     state::get_mem_handler,
-    terminal::console::{pretty_print, CONSOLE},
+    terminal::{console::{pretty_print, CONSOLE}, shell::Shell},
     writer::{inb, outb, outb16}, prompt::input,
 };
 use pci_ids::SubSystem;
@@ -32,7 +33,7 @@ entry_point!(kernel_main);
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     // Initialize & boot the device and kernel
     kernel::boot(boot_info);
-    
+    Shell::new();
 
     hlt_loop()
 }

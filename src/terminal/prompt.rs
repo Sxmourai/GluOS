@@ -62,6 +62,7 @@ impl BlockingPrompt {
         }
     }
     fn handle_end(&mut self) {
+        println!();
         self.return_message = self.pressed_keys.iter().map(|sc| sc.ascii_character as char).collect();
         self.return_message.push(' '); // Flag for the run fn
     }
@@ -97,19 +98,18 @@ impl KbInput for BlockingPrompt {
         match key {
             DecodedKey::Unicode(character) => match character {
                 '\u{8}' => x86_64::instructions::interrupts::without_interrupts(|| {// Backspace
-                    if self.pos > 0 {
-                        // print_at(self.origin.0, self.origin.1, format!("{}",0x00 as char).repeat(self.pressed_keys.len()).as_str() ).unwrap();
+                    if self.pos > 0 {//TODO: Fix the fact that we clear entire input every time we backspace
+                        // Remove all chars of line
                         print_at(self.origin.0, self.origin.1, format!("{}",0x00 as char).repeat(self.pressed_keys.len()).as_str() );
-                        
                         self.move_cursor(self.pos-1);
-                        self.remove(self.pos); //TODO: FIX HORRIBLE CODE
+                        self.remove(self.pos); 
                         print_screenchars_atp(&self.origin, self.pressed_keys.clone());
                     }
                 }), 
                 '\u{7f}' => x86_64::instructions::interrupts::without_interrupts(|| {
-                    if self.pos < self.pressed_keys.len() {
+                    if self.pos < self.pressed_keys.len() {//TODO: Same as backspace
                         print_at(self.origin.0, self.origin.1, format!("{}",0x00 as char).repeat(self.pressed_keys.len()).as_str() );
-                        self.remove(self.pos); //TODO: FIX HORRIBLE CODE
+                        self.remove(self.pos);
                         print_screenchars_atp(&self.origin, self.pressed_keys.clone());
                     }
                 }), // Delete
@@ -119,11 +119,11 @@ impl KbInput for BlockingPrompt {
                 _ => {
                     let c = ScreenChar::from(character as u8);
 
-                    print_screenchar_at(self.origin.0+(self.pos%SBUFFER_WIDTH) as u8, ((self.pos)/SBUFFER_WIDTH) as u8, c);
+                    print_screenchar_at((self.origin.0 as usize+self.pos%SBUFFER_WIDTH) as u8, ((self.pos)/SBUFFER_WIDTH) as u8+self.origin.1, c);
                     self.pressed_keys.insert(self.pos, c);
                     if self.pos < self.pressed_keys.len()-1 { // Push elements
                         for (i, chr) in &mut self.pressed_keys[self.pos..].iter().enumerate() {
-                            print_screenchar_at((self.pos+i/SBUFFER_WIDTH) as u8, (self.pos+i%SBUFFER_WIDTH) as u8, *chr);
+                            print_screenchar_at(((self.pos+i+self.origin.0 as usize)%SBUFFER_WIDTH) as u8, (((self.pos+i+self.origin.0 as usize)/SBUFFER_WIDTH) as u8 + self.origin.1), *chr);
                         }
                     }
                     self.move_cursor(self.pos+1);

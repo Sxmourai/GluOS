@@ -43,7 +43,7 @@ impl Buffer for VgaBuffer {
     fn is_empty(&self) -> bool {
         for y in 0..BUFFER_HEIGHT {
             for x in 0..BUFFER_WIDTH {
-                if self.get_screenchar_at(&ScreenPos(x, y)) == DEFAULT_CHAR {
+                if self.get_screenchar_at(&ScreenPos(x, y)).ascii_character == DEFAULT_CHAR.ascii_character {
                     return false;
                 }
             }

@@ -6,7 +6,7 @@ use super::{writer::{ColorCode,Color,ScreenPos}, buffer::{Buffer, BUFFER_HEIGHT,
 use lazy_static::lazy_static;
 lazy_static!{pub static ref CONSOLE: Mutex<Console> = Mutex::new(Console::new(unsafe { &mut *(0xb8000 as *mut VgaBuffer) }));}
 
-pub const DEFAULT_CHAR:ScreenChar = ScreenChar::from(0x00);
+pub const DEFAULT_CHAR:ScreenChar = ScreenChar::new('\0' as u8, ColorCode(15)); // Black on black
 
 pub struct Console {
     pub buffer: &'static mut dyn Buffer<SIZE = (u8,u8)>,
@@ -33,7 +33,7 @@ impl Console {
     pub fn clear(&mut self) {
         for y in 0..self.size().0 {
             for x in 0..self.size().1 {
-                self.write_char_at(x, y, DEFAULT_CHAR);
+                self.remove(x, y);
             }
         }
         self.top_buffer = ConsoleBuffer::new(); // Don't use clear because the allocated size doesn't change
