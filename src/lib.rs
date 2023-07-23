@@ -53,6 +53,24 @@ fn test_kernel_main(boot_info: &'static BootInfo) -> ! {
     test::end()
 }
 
+// ! UTILITIES FUNCTIONS
+pub fn find_string(bytes: &[u8], search_string: &[u8]) -> Option<usize> {
+    let search_len = search_string.len();
+
+    for i in 0..(bytes.len() - search_len + 1) {
+        if &bytes[i..(i + search_len)] == search_string {
+            return Some(i);
+        }
+    }
+
+    None
+}
+
+
+
+
+
+
 //TODO: Remove the need for these
 
 extern crate alloc; // Lib which stores some useful structs on the heap / smart pointers from stdlib like Vec, String, Box...

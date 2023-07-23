@@ -1,3 +1,4 @@
 target
 .vscode-ctags
 Cargo.lock
+mem.txt

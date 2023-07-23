@@ -11,11 +11,15 @@ use x86_64::{
     },
     PhysAddr, VirtAddr,
 };
+use x86_64::structures::paging::PageTableFlags;
 
 pub mod frame_allocator;
 pub mod handler;
+pub mod rsdp;
 
 pub use frame_allocator::BootInfoFrameAllocator;
+
+use crate::serial_println;
 
 /// Creates an example mapping for the given page to frame `0xb8000`.
 pub fn create_example_mapping(
@@ -62,72 +66,21 @@ pub unsafe fn init(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static>
     OffsetPageTable::new(level_4_table, physical_memory_offset)
 }
 
-//////////////CODE FROM https://docs.rs/rsdp/latest/src/rsdp/lib.rs.html#175-203
-// (rsdp crate)
+// end_page is using .containing address
+pub fn read_phys_memory_and_map(location: u64, size: usize, end_page:u64) -> &'static [u8] {
+    let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
+    let phys_frame: PhysFrame<Size4KiB> = PhysFrame::containing_address(PhysAddr::new(location));
+    let mut mem_handler = unsafe { crate::state::STATE.get_mem_handler() };
+    let mut mem_h = mem_handler.get_mut();
+    let page = Page::containing_address(VirtAddr::new(end_page));
+    unsafe { mem_h.mapper.map_to(page, phys_frame, flags, &mut mem_h.frame_allocator).unwrap().flush() };
 
-// /// Find the areas we should search for the RSDP in.
-// pub fn find_search_areas(frame_allocator: &BootInfoFrameAllocator) -> [Range<usize>; 2] {
-//     /*
-//      * Read the base address of the EBDA from its location in the BDA (BIOS Data Area). Not all BIOSs fill this out
-//      * unfortunately, so we might not get a sensible result. We shift it left 4, as it's a segment address.
-//      */
-//     // serial_println!("{:x}", unsafe { frame_allocator.map_physical_region(RSDP_BIOS_AREA_START) }.start_address());
-//     let ebda_start_mapping = unsafe { frame_allocator.map_physical_region(EBDA_START_SEGMENT_PTR) };
-//     let ebda_start = (unsafe { *ebda_start_mapping.start_address().as_ptr::<u16>() } as usize) << 4;
-//     [
-//         /*
-//          * The main BIOS area below 1MiB. In practice, from my [Restioson's] testing, the RSDP is more often here
-//          * than the EBDA. We also don't want to search the entire possible EBDA range, if we've failed to find it
-//          * from the BDA.
-//          */
-//         RSDP_BIOS_AREA_START..(RSDP_BIOS_AREA_END + 1),
-//         // Check if base segment ptr is in valid range for EBDA base
-//         if (EBDA_EARLIEST_START..EBDA_END).contains(&ebda_start) {
-//             // First KiB of EBDA
-//             ebda_start..ebda_start + 1024
-//         } else {
-//             // We don't know where the EBDA starts, so just search the largest possible EBDA
-//             EBDA_EARLIEST_START..(EBDA_END + 1)
-//         },
-//     ]
-// }
+    let addr = location-phys_frame.start_address().as_u64() + end_page;
 
-// /// This (usually!) contains the base address of the EBDA (Extended Bios Data Area), shifted right by 4
-// const EBDA_START_SEGMENT_PTR: usize = 0x40e;
-// /// The earliest (lowest) memory address an EBDA (Extended Bios Data Area) can start
-// const EBDA_EARLIEST_START: usize = 0x80000;
-// /// The end of the EBDA (Extended Bios Data Area)
-// const EBDA_END: usize = 0x9ffff;
-// /// The start of the main BIOS area below 1mb in which to search for the RSDP (Root System Description Pointer)
-// const RSDP_BIOS_AREA_START: usize = 0xe0000;
-// /// The end of the main BIOS area below 1mb in which to search for the RSDP (Root System Description Pointer)
-// const RSDP_BIOS_AREA_END: usize = 0xfffff;
-// /// The RSDP (Root System Description Pointer)'s signature, "RSD PTR " (note trailing space)
-// pub const RSDP_SIGNATURE: &'static [u8; 8] = b"RSD PTR ";
-
-// pub fn search_for_on_bios(handler: &BootInfoFrameAllocator) -> Option<usize> {
-//     let mut rsdp_address = None;
-//     let areas = find_search_areas(handler);
-//     'areas: for area in areas.iter() {
-//         serial_println!("{:?}", area);
-//         // let mapping = unsafe { handler.map_physical_region(area.start) };
-
-//         for address in area.clone().step_by(16) {
-//             serial_println!("{:x}", address);
-//             let ptr_in_mapping = unsafe { *(address as *const isize) };
-//                 // unsafe { area.start.as_ptr::<u8>().offset((address - area.start) as isize) };
-//             let signature = unsafe { *(ptr_in_mapping as *const [u8; 8]) };
-
-//             if signature == *RSDP_SIGNATURE {
-//                 match unsafe { *(ptr_in_mapping as *const Rsdp) }.validate() {
-//                     Ok(()) => {
-//                         rsdp_address = Some(address);
-//                         break 'areas;
-//                     }
-//                     Err(err) => serial_println!("Invalid RSDP found at {:#x}: {:?}", address, err),
-//                 }
-//             }
-//         }
-//     }
-//     rsdp_address
-// }
+    serial_println!("{:?} addr: {:x} but {:x?}", (phys_frame, addr, page,addr as *const u8), addr, (location,end_page));
+    unsafe { read_memory(addr as *const u8, size) }
+}
+// Create a slice from the memory location with the given size
+pub unsafe fn read_memory(location: *const u8, size: usize) -> &'static [u8] {
+    core::slice::from_raw_parts(location, size)    
+}

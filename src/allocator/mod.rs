@@ -42,9 +42,7 @@ pub fn init_heap(
         Page::range_inclusive(heap_start_page, heap_end_page)
     };
     for page in page_range {
-        let frame = frame_allocator
-            .allocate_frame()
-            .ok_or(MapToError::FrameAllocationFailed)?;
+        let frame = frame_allocator.allocate_frame().ok_or(MapToError::FrameAllocationFailed)?;
         let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
         unsafe { mapper.map_to(page, frame, flags, frame_allocator)?.flush() };
     }

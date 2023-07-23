@@ -45,51 +45,51 @@ pub fn initialize_sata_controller() {
 
 
 const DETECTED:i32 = 1;
-pub unsafe fn detect_ata() {
-    /* detecting hard disc */
-    outb(0x1F3, 0x88);
-    let mut drive=inb(0x1F3);
-    let mut harddisc_primary = 0;
-    let mut harddisc_secundary = 0;
-    let mut harddisc = 0;
+// pub unsafe fn detect_ata() {
+//     /* detecting hard disc */
+//     outb(0x1F3, 0x88);
+//     let mut drive=inb(0x1F3);
+//     let mut harddisc_primary = 0;
+//     let mut harddisc_secundary = 0;
+//     let mut harddisc = 0;
 
-    if(drive==0x88) {
-        //detecting primary
-        outb(0x1F6, 0xA0);
-        //flush
-        outb(0x1F2, 0);
-        outb(0x1F3, 0);
-        outb(0x1F4, 0);
-        outb(0x1F5, 0);
-        //identify command
-        outb(0x1F7, 0xEC);
-        //sleep();
-        drive=inb(0x1F7);   // read the status port
-        if (drive > 0) {
-            harddisc_primary=DETECTED;
-            tp("primary");
-        }
+//     if(drive==0x88) {
+//         //detecting primary
+//         outb(0x1F6, 0xA0);
+//         //flush
+//         outb(0x1F2, 0);
+//         outb(0x1F3, 0);
+//         outb(0x1F4, 0);
+//         outb(0x1F5, 0);
+//         //identify command
+//         outb(0x1F7, 0xEC);
+//         //sleep();
+//         drive=inb(0x1F7);   // read the status port
+//         if (drive > 0) {
+//             harddisc_primary=DETECTED;
+//             tp("primary");
+//         }
        
-        //detecting secundary
-        outb(0x1F6, 0xB0);
-        //flush
-        outb(0x1F2, 0);
-        outb(0x1F3, 0);
-        outb(0x1F4, 0);
-        outb(0x1F5, 0);
-        //identify command
-        outb(0x1F7, 0xEC);
-        //sleep();
-        drive=inb(0x1F7);   // read the status port
-        if (drive > 0) {   // see if the busy bit is set
-            harddisc_secundary=DETECTED;
-            tp("secundary");
-        }
+//         //detecting secundary
+//         outb(0x1F6, 0xB0);
+//         //flush
+//         outb(0x1F2, 0);
+//         outb(0x1F3, 0);
+//         outb(0x1F4, 0);
+//         outb(0x1F5, 0);
+//         //identify command
+//         outb(0x1F7, 0xEC);
+//         //sleep();
+//         drive=inb(0x1F7);   // read the status port
+//         if (drive > 0) {   // see if the busy bit is set
+//             harddisc_secundary=DETECTED;
+//             tp("secundary");
+//         }
 
-        outb(0x3F6, 0x02);
-        harddisc=DETECTED;
-    }
-}
+//         outb(0x3F6, 0x02);
+//         harddisc=DETECTED;
+//     }
+// }
 
 // /// Implementation Courtesy of MOROS.
 // /// Currently Only Supports ATA-PIO, with 24-bit LBA Addressing.

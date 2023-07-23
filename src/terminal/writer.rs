@@ -175,9 +175,9 @@ impl Writer {
                     y += 1
                 }
                 byte => {
-                    if x > BUFFER_WIDTH {
+                    if x+1 == BUFFER_WIDTH {
                         x = 0;
-                        if y + 1 < BUFFER_HEIGHT {
+                        if y+1 == BUFFER_HEIGHT { // Last char + last line
                             y += 1
                         } else {
                             self.move_up()
