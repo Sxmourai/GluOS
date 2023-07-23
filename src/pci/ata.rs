@@ -1,3 +1,96 @@
+use alloc::string::String;
+
+use crate::{writer::{outb, inb, inw}, println, serial_println};
+
+pub fn initialize_sata_controller() {
+    unsafe {
+        // Wait for the controller to be ready
+        while (inb(0x1F7) & 0xC0) != 0x40 {}
+
+        // Select the master drive
+        outb(0x1F6, 0xA0);
+        // Delay to wait for the controller to switch to the master drive
+        // You may need to adjust the delay based on your hardware
+        for _ in 0..1000000 {
+            x86_64::instructions::interrupts::without_interrupts(|| {});
+        }
+        
+        // Send ATA Identify command (0xEC) to the controller
+        outb(0x1F7, 0xEC);
+        
+        return;
+        // Wait for the controller to respond
+        while (inb(0x1F7) & 0x80) == 0x80 {}
+
+        // Read IDENTIFY data from the data ports (0x1F0 - 0x1F7)
+        let mut identify_data = [0u16; 256];
+        for i in 0..256 {
+            let lower = inw(0x1F0);
+            let upper = inw(0x1F0);
+            identify_data[i] = (upper << 8) | lower;
+        }
+
+        // Parse the IDENTIFY data and identify the device
+        // (Note: The parsing and identification process depends on the device and chipset)
+        let device_model = String::from_utf16_lossy(&identify_data[27..47]);
+        let serial_number = String::from_utf16_lossy(&identify_data[10..20]);
+        let firmware_revision = String::from_utf16_lossy(&identify_data[23..27]);
+
+        // Print information about the SATA device
+        println!("Device Model: {}", device_model);
+        println!("Serial Number: {}", serial_number);
+        println!("Firmware Revision: {}", firmware_revision);
+    }
+}
+
+
+const DETECTED:i32 = 1;
+pub unsafe fn detect_ata() {
+    /* detecting hard disc */
+    outb(0x1F3, 0x88);
+    let mut drive=inb(0x1F3);
+    let mut harddisc_primary = 0;
+    let mut harddisc_secundary = 0;
+    let mut harddisc = 0;
+
+    if(drive==0x88) {
+        //detecting primary
+        outb(0x1F6, 0xA0);
+        //flush
+        outb(0x1F2, 0);
+        outb(0x1F3, 0);
+        outb(0x1F4, 0);
+        outb(0x1F5, 0);
+        //identify command
+        outb(0x1F7, 0xEC);
+        //sleep();
+        drive=inb(0x1F7);   // read the status port
+        if (drive > 0) {
+            harddisc_primary=DETECTED;
+            tp("primary");
+        }
+       
+        //detecting secundary
+        outb(0x1F6, 0xB0);
+        //flush
+        outb(0x1F2, 0);
+        outb(0x1F3, 0);
+        outb(0x1F4, 0);
+        outb(0x1F5, 0);
+        //identify command
+        outb(0x1F7, 0xEC);
+        //sleep();
+        drive=inb(0x1F7);   // read the status port
+        if (drive > 0) {   // see if the busy bit is set
+            harddisc_secundary=DETECTED;
+            tp("secundary");
+        }
+
+        outb(0x3F6, 0x02);
+        harddisc=DETECTED;
+    }
+}
+
 // /// Implementation Courtesy of MOROS.
 // /// Currently Only Supports ATA-PIO, with 24-bit LBA Addressing.
 

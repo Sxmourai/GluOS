@@ -38,6 +38,7 @@ entry_point!(kernel_main);
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     // Initialize & boot the device and kernel
     kernel::boot(boot_info);
+    unsafe { kernel::pci::ata::detect_ata() };
     Shell::new();
 
     hlt_loop()

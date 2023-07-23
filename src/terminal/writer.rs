@@ -324,3 +324,20 @@ pub unsafe fn inb(port: u16) -> u8 {
 
     // value
 }
+pub unsafe fn inw(mut port: u16) -> u16 {
+    let lower_byte: u8;
+    let upper_byte: u8;
+
+    // Read the lower byte (LSB) from the I/O port
+    asm!("in al, dx", inout("dx") port, out("al") lower_byte);
+
+    // Increment the port number to read the upper byte (MSB)
+    let mut port_upper = port + 1;
+
+    // Read the upper byte (MSB) from the incremented I/O port
+    asm!("in al, dx", inout("dx") port_upper, out("al") upper_byte);
+
+    // Combine the two bytes to form a 16-bit word (little-endian)
+    let value = ((upper_byte as u16) << 8) | lower_byte as u16;
+    value
+}
