@@ -53,11 +53,6 @@ impl InterruptIndex {
 pub extern "x86-interrupt" fn timer(_stack_frame: InterruptStackFrame) {
     crate::timer::tick();
     
-    if crate::timer::get_ticks()%14==0 { // Blinking
-        for prompt in KB_INPUTS.lock().iter_mut() { 
-            prompt.0.cursor_blink();
-        }
-    }
     unsafe {
         PICS.lock()
             .notify_end_of_interrupt(InterruptIndex::Timer.as_u8());
@@ -81,9 +76,9 @@ pub extern "x86-interrupt" fn keyboard(_stack_frame: InterruptStackFrame) {
                 DecodedKey::RawKey(k) => match k {
                     KeyCode::ArrowUp => WRITER.lock().move_down(),
                     KeyCode::ArrowDown => WRITER.lock().move_up(),
-                    _ => serial_println!("Unsupported key: {:?}", k),
+                    _ => {}, //serial_println!("Unsupported key: {:?}", k),
                 },
-                DecodedKey::Unicode(k) => {serial_println!("Don't need this shit: {:?}", k)}
+                DecodedKey::Unicode(k) => {}
             }
             
         }
