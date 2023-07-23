@@ -1,10 +1,13 @@
-use core::{panic, cell::{Cell, RefCell}};
+use core::{
+    cell::{Cell, RefCell},
+    panic,
+};
 
 use alloc::{boxed::Box, sync::Arc};
 use bootloader::BootInfo;
 use lazy_static::lazy_static;
 use spin::Mutex;
-use x86_64::{VirtAddr, structures::paging::OffsetPageTable};
+use x86_64::{structures::paging::OffsetPageTable, VirtAddr};
 
 use crate::memory::BootInfoFrameAllocator;
 use crate::MemoryHandler;
@@ -14,12 +17,13 @@ use crate::MemoryHandler;
 pub static mut STATE: Kernel = Kernel::new();
 pub struct Kernel {
     pub mem_handler: Option<MemoryHandler>,
-    pub boot_info: Option<&'static BootInfo>
+    pub boot_info: Option<&'static BootInfo>,
 }
 impl Kernel {
     pub const fn new() -> Self {
         Self {
-            mem_handler:None,boot_info:None
+            mem_handler: None,
+            boot_info: None,
         }
     }
     pub fn get_mem_handler(&mut self) -> Cell<&mut MemoryHandler> {
@@ -43,7 +47,7 @@ pub fn get_boot_info() -> &'static BootInfo {
     unsafe { STATE.boot_info() }
 }
 
-trait InKernel : Send {
+trait InKernel: Send {
     fn get_memory_handler(self: Box<Self>) -> MemoryHandler;
     fn get_boot_info(&self) -> &'static BootInfo;
 }
@@ -53,11 +57,19 @@ struct InnerKernel {
     pub boot_info: &'static BootInfo,
 }
 impl InKernel for InnerKernel {
-    fn get_memory_handler(self: Box<Self>) -> MemoryHandler {self.memory_handler}
-    fn get_boot_info(&self) -> &'static BootInfo {self.boot_info}
+    fn get_memory_handler(self: Box<Self>) -> MemoryHandler {
+        self.memory_handler
+    }
+    fn get_boot_info(&self) -> &'static BootInfo {
+        self.boot_info
+    }
 }
 struct DummyInKernel; // Cheating on the borrow checker ^^
 impl InKernel for DummyInKernel {
-    fn get_memory_handler(self: Box<Self>) -> MemoryHandler {panic!("Dummy kernel can't return app state !")}
-    fn get_boot_info(&self) -> &'static BootInfo {panic!("Dummy kernel can't return app state !")}
+    fn get_memory_handler(self: Box<Self>) -> MemoryHandler {
+        panic!("Dummy kernel can't return app state !")
+    }
+    fn get_boot_info(&self) -> &'static BootInfo {
+        panic!("Dummy kernel can't return app state !")
+    }
 }

@@ -1,8 +1,8 @@
+use super::Locked;
+use alloc::alloc::GlobalAlloc;
 use alloc::alloc::Layout;
 use core::ptr;
-use super::Locked;
 use core::{mem, ptr::NonNull};
-use alloc::alloc::GlobalAlloc;
 
 /// The block sizes to use.
 ///
@@ -59,8 +59,7 @@ unsafe impl GlobalAlloc for Locked<FixedSizeBlockAllocator> {
                         let block_size = BLOCK_SIZES[index];
                         // only works if all block sizes are a power of 2
                         let block_align = block_size;
-                        let layout = Layout::from_size_align(block_size, block_align)
-                            .unwrap();
+                        let layout = Layout::from_size_align(block_size, block_align).unwrap();
                         allocator.fallback_alloc(layout)
                     }
                 }
@@ -90,7 +89,6 @@ unsafe impl GlobalAlloc for Locked<FixedSizeBlockAllocator> {
         }
     }
 }
-
 
 /// Choose an appropriate block size for the given layout.
 ///

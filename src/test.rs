@@ -1,12 +1,15 @@
-use crate::{serial_print, serial_println, boot::hlt_loop};
-use x86_64::instructions::port::Port;
+use crate::{boot::hlt_loop, serial_print, serial_println};
 use core::panic::PanicInfo;
+use x86_64::instructions::port::Port;
 
 pub trait Testable {
     fn run(&self);
 }
 
-impl<T> Testable for T where T: Fn() {
+impl<T> Testable for T
+where
+    T: Fn(),
+{
     fn run(&self) {
         serial_print!("{}...\t", core::any::type_name::<T>());
         self();
@@ -30,7 +33,6 @@ pub fn panic_handler(info: &PanicInfo) -> ! {
     exit_qemu(QemuExitCode::Failed);
     hlt_loop()
 }
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]

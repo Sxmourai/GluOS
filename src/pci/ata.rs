@@ -16,7 +16,6 @@
 
 // // use crate::serial_println;
 
-
 // // pub type BlockIndex = u32;
 
 // // pub const ATA_BLOCK_SIZE: usize = 512;
@@ -189,7 +188,7 @@
 
 // //         self.write_command(Command::Identify);serial_println!("Identifz cmd");
 
-// //         if self.status() == 0 { 
+// //         if self.status() == 0 {
 // //             return None;
 // //         }
 // //         serial_println!("STATUD");
@@ -201,7 +200,7 @@
 
 // //         for i in 0.. {
 // //             serial_println!("{}", i);
-// //             if i == 256 { 
+// //             if i == 256 {
 // //                 self.reset();
 // //                 return None;
 // //             }
@@ -228,7 +227,7 @@
 // //     /// pub fn read_single() {
 // //     ///     use x86_ata::{init, ATA_BLOCK_SIZE, read};
 // //     ///     // 1. Initialise ATA Subsystem. (Perform Once, on boot)
-// //     ///     init().expect("Failed To Start ATA...");  
+// //     ///     init().expect("Failed To Start ATA...");
 // //     ///     // 2. Create a temporary buffer of size 512.
 // //     ///     let mut buffer: [u8;ATA_BLOCK_SIZE] = [0; ATA_BLOCK_SIZE];
 // //     ///     // 3. Pass the buffer over to the Subsystem, to be filled.
@@ -260,7 +259,7 @@
 // //     /// pub fn write_single() {
 // //     ///     use x86_ata::{init, ATA_BLOCK_SIZE, write};
 // //     ///     // 1. Initialise ATA Subsystem. (Perform Once, on boot)
-// //     ///     init().expect("Failed To Start ATA...");  
+// //     ///     init().expect("Failed To Start ATA...");
 // //     ///     // 2. Create a temporary buffer of size 512.
 // //     ///     let buffer: [u8;ATA_BLOCK_SIZE] = [0; ATA_BLOCK_SIZE];
 // //     ///     // 3. Pass the buffer over to the Subsystem, to be filled.
@@ -298,8 +297,6 @@
 // //     }
 // // }
 
-
-
 // // pub fn list() -> Vec<(u8, u8, String, String, u32, String, u32)> {
 // //     let mut buses = BUSES.lock();
 // //     let mut res = Vec::new();
@@ -329,7 +326,7 @@
 // //     res
 // // }
 
-// // /// Identify a specific drive on a bus, format: (bus, drive, model, serial. size, unit, sectors) 
+// // /// Identify a specific drive on a bus, format: (bus, drive, model, serial. size, unit, sectors)
 // // pub fn indentify_drive(bus : u8, drive : u8) -> Option<(u8, u8, String, String, u32, String, u32)> {
 // //     let mut buses = BUSES.lock();
 // //     if let Some(buf) = buses[bus as usize].identify_drive(drive) {
@@ -352,7 +349,7 @@
 // //         Some((bus, drive, model, serial, size, unit, sectors))
 // //     } else {
 // //         None
-// //     } 
+// //     }
 // // }
 
 // // pub fn read(bus: u8, drive: u8, block: BlockIndex, buf: &mut [u8]) {
@@ -368,13 +365,9 @@
 // //     (drive, block, buf);
 // // }
 
-
-
 // // pub fn drive_is_present(bus : usize) -> bool {
 // //     unsafe {BUSES.lock()[bus].status_register.read() != 0xFF}
 // // }
-
-
 
 // // pub fn init() -> Result<(), ()> {
 // //     {
@@ -451,7 +444,7 @@
 
 // const IDE_ATA: c_ushort = 0x00;
 // const IDE_ATAPI: c_ushort = 0x01;
- 
+
 // const ATA_MASTER: c_ushort = 0x00;
 // const ATA_SLAVE: c_ushort = 0x01;
 // // Task File is a range of 8 ports which are offsets from BAR0 (primary channel) and/or BAR2 (secondary channel). To exemplify:
@@ -500,7 +493,7 @@
 // // Channels:
 // const ATA_PRIMARY: c_ushort = 0x00;
 // const ATA_SECONDARY: c_ushort = 0x01;
- 
+
 // // Directions:
 // const ATA_READ: c_ushort = 0x00;
 // const ATA_WRITE: c_ushort = 0x01;
@@ -520,11 +513,9 @@
 //     n_ien: 0,
 // }; 2];
 
-
 // const IDE_BUFFER: [c_uchar; 2048] = [b'\0'; 2048];
 // static IDE_IRQ_INVOKED: c_uchar = b'\0';
 // static ATAPI_PACKET: [c_uchar; 12] = [0xA8 as c_uchar, b'\0',b'\0',b'\0',b'\0',b'\0',b'\0',b'\0',b'\0',b'\0',b'\0',b'\0'];
-
 
 // #[derive(Copy, Clone)]
 // #[repr(C)]
@@ -552,8 +543,6 @@
 //     model: [0; 41],
 // }; 4];
 
-
-
 // fn ide_read(channel:usize, reg:u16) -> c_uchar {
 //     let result;
 //     if (reg > 0x07 && reg < 0x0C) {
@@ -572,7 +561,6 @@
 //     return result;
 //  }
 
- 
 // fn ide_write(channel:usize, reg:u16, data:c_uchar) {//0x0C
 //     if (reg > 0x07 && reg < 0x0C) {
 //        ide_write(channel, ATA_REG_CONTROL, 0x80 | CHANNELS[channel].n_ien);}
@@ -596,47 +584,47 @@
 //    if (reg > 0x07 && reg < 0x0C) {
 //       ide_write(channel, ATA_REG_CONTROL, 0x80 | CHANNELS[channel].n_ien);
 //       unsafe{ asm!("pushw %es; movw %ds, %ax; movw %ax, %es"); }
-//    } 
+//    }
 //    if (reg < 0x08) {
 //       unsafe { insl(CHANNELS[channel].base  + reg - 0x00, buffer, quads); }
-//    } 
+//    }
 //    else if (reg < 0x0C) {
 //       unsafe { insl(CHANNELS[channel].base  + reg - 0x06, buffer, quads); }
-//    } 
+//    }
 //    else if (reg < 0x0E) {
 //       unsafe { insl(CHANNELS[channel].ctrl  + reg - 0x0A, buffer, quads); }
-//    } 
+//    }
 //    else if (reg < 0x16) {
 //       unsafe{ insl(CHANNELS[channel].bmide + reg - 0x0E, buffer, quads); }
-//       unsafe{ asm!("popw %es;"); } 
-//    } 
+//       unsafe{ asm!("popw %es;"); }
+//    }
 //    if (reg > 0x07 && reg < 0x0C) {
 //       ide_write(channel, ATA_REG_CONTROL, CHANNELS[channel].n_ien);
 //    }
 // }
 
 // fn ide_polling(channel: usize, advanced_check: c_uint) -> c_uchar {
- 
+
 //    // (I) Delay 400 nanosecond for BSY to be set:
 //    // -------------------------------------------------
 //    for i in 0..4 {
 //       ide_read(channel, ATA_REG_ALTSTATUS); // Reading the Alternate Status port wastes 100ns; loop four times.
 //    }
- 
+
 //    // (II) Wait for BSY to be cleared:
 //    // -------------------------------------------------
 
 //    while ide_read(channel, ATA_REG_STATUS) as u16 & ATA_SR_BSY != c_uchar::default() as u16 {serial_println!("A");} // Wait for BSY to be zero.
- 
+
 //    if (advanced_check != 0) {
 //       let state:c_uchar = ide_read(channel, ATA_REG_STATUS); // Read Status Register.
- 
+
 //       // (III) Check For Errors:
 //       // -------------------------------------------------
 //       if (state & ATA_SR_ERR as u8 != 0) {
 //          return 2; // Error.
 //       }
- 
+
 //       // (IV) Check If Device fault:
 //       // -------------------------------------------------
 //       if (state & ATA_SR_DF as u8 != 0) {
@@ -652,12 +640,11 @@
 //    return 0; // No Error.
 // }
 
-
 // fn ide_print_error(drive:c_uint, mut err:c_uchar) -> c_uchar {
 //    if (err == 0) {
 //       return err;
 //    }
- 
+
 //    serial_println!("IDE:");
 //    if (err == 1) {serial_println!("- Device Fault\n     "); err = 19;}
 //    else if (err == 2) {
@@ -674,18 +661,17 @@
 //    } else  if (err == 3)           {serial_println!("- Reads Nothing\n     "); err = 23;}
 //      else  if (err == 4)  {serial_println!("- Write Protected\n     "); err = 8;}
 //    let drive = drive as usize;
-//    let _type = if unsafe { IDE_DEVICES }[drive].channel == 0 {"Primary"} else {"Secondary"}; 
+//    let _type = if unsafe { IDE_DEVICES }[drive].channel == 0 {"Primary"} else {"Secondary"};
 //    let role = if unsafe { IDE_DEVICES }[drive].drive == 0 {"Master"} else {"Slave"};
 //    let model = unsafe { IDE_DEVICES }[drive].model;
 //    serial_println!("- [{} {}] {:?}", _type, role, model);
- 
+
 //    return err;
 // }
 
-
 // fn ide_initialize(BAR0: u16, BAR1: u16, BAR2: u16, BAR3: u16, BAR4: u16) {
 //       let (j, k, count) = (0,0,0);
-    
+
 //       // 1- Detect I/O Ports which interface IDE Controller:
 //       CHANNELS[ATA_PRIMARY   as usize].base  = (BAR0 & 0xFFFFFFFC) + 0x1F0 * (!BAR0);
 //       CHANNELS[ATA_PRIMARY   as usize].ctrl  = (BAR1 & 0xFFFFFFFC) + 0x3F6 * (!BAR1);
@@ -698,33 +684,32 @@
 //       ide_write(ATA_PRIMARY   as usize, ATA_REG_CONTROL, 2);
 //       ide_write(ATA_SECONDARY as usize, ATA_REG_CONTROL, 2);
 
-
 //       // 3- Detect ATA-ATAPI Devices:
 //       for i in 0..2 {
 //          for j in 0..2 {
 //             let err: c_uchar = 0;
 //             IDE_DEVICES[count].reserved = 0; // Assuming that no drive here.
-   
+
 //             // (I) Select Drive:
 //             ide_write(i, ATA_REG_HDDEVSEL, 0xA0 | (j << 4)); // Select Drive.
 //             x86_64::instructions::hlt();//sleep(1); // Wait 1ms for drive select to work.
-   
+
 //             // (II) Send ATA Identify Command:
 //             ide_write(i, ATA_REG_COMMAND, ATA_CMD_IDENTIFY);
 //             x86_64::instructions::hlt();
 //                      // it is based on System Timer Device Driver.
-   
+
 //             // (III) Polling:
 //             if (ide_read(i, ATA_REG_STATUS) == 0) {continue}; // If Status = 0, No Device.
-   
+
 //             loop {
 //                let status = ide_read(i, ATA_REG_STATUS);
 //                if ((status & ATA_SR_ERR)) {err = 1; break;} // If Err, Device is not ATA.
 //                if (!(status & ATA_SR_BSY) && (status & ATA_SR_DRQ)) {break}; // Everything is right.
 //             }
-   
+
 //             // (IV) Probe for ATAPI Devices:
-   
+
 //             if (err != 0) {
 //                let cl: c_uchar = ide_read(i, ATA_REG_LBA1);
 //                let ch: c_uchar = ide_read(i, ATA_REG_LBA2);
@@ -733,14 +718,14 @@
 //                if (cl == 0x14 && ch ==0xEB) { _type = IDE_ATAPI }
 //                else if (cl == 0x69 && ch == 0x96) { _type = IDE_ATAPI }
 //                else {continue} // Unknown Type (may not be a device).
-   
+
 //                ide_write(i, ATA_REG_COMMAND, ATA_CMD_IDENTIFY_PACKET.try_into().unwrap());
 //                x86_64::instructions::hlt();x86_64::instructions::hlt();x86_64::instructions::hlt();
 //             }
-   
+
 //             // (V) Read Identification Space of the Device:
 //             ide_read_buffer(i, ATA_REG_DATA, IDE_BUFFER, 128);
-   
+
 //             // (VI) Read Device Parameters:
 //             IDE_DEVICES[count].reserved     = 1;
 //             IDE_DEVICES[count]._type         = _type;
@@ -749,7 +734,7 @@
 //             IDE_DEVICES[count].signature    = *(IDE_BUFFER + ATA_IDENT_DEVICETYPE as *const c_ushort);
 //             IDE_DEVICES[count].capabilities = *(IDE_BUFFER + ATA_IDENT_CAPABILITIES as *const c_ushort);
 //             IDE_DEVICES[count].command_sets  = *(IDE_BUFFER + ATA_IDENT_COMMANDSETS as *const c_uint);
-   
+
 //             // (VII) Get Size:
 //             if (IDE_DEVICES[count].command_sets & (1 << 26)) {
 //                // Device uses 48-Bit Addressing:
@@ -759,7 +744,7 @@
 //                // Device uses CHS or 28-bit Addressing:
 //                IDE_DEVICES[count].size   = *(IDE_BUFFER + ATA_IDENT_MAX_LBA as *const c_uint);
 //             }
-   
+
 //             // (VIII) String indicates model of device (like Western Digital HDD and SONY DVD-RW...):
 
 //             for k in 0..40 { //TODO:Fix this range to only do from 0 to 40 and step by 2 !
@@ -771,7 +756,7 @@
 //             count+=1;
 //             }
 //          }
-   
+
 //       // 4- Print Summary:
 //       for i in 0..4 {
 //          if (IDE_DEVICES[i].reserved == 1) {

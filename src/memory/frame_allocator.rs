@@ -1,6 +1,9 @@
 use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
-use x86_64::{structures::paging::{PhysFrame, Page, FrameAllocator, Size4KiB, self, Mapper}, PhysAddr, VirtAddr};
 use x86_64::structures::paging::PageTableFlags as Flags;
+use x86_64::{
+    structures::paging::{self, FrameAllocator, Mapper, Page, PhysFrame, Size4KiB},
+    PhysAddr, VirtAddr,
+};
 
 /// A FrameAllocator that returns usable frames from the bootloader's memory map.
 #[derive(Debug, Clone)]
@@ -33,21 +36,26 @@ impl BootInfoFrameAllocator {
         // create `PhysFrame` types from the start addresses
         frame_addresses.map(|addr| PhysFrame::containing_address(PhysAddr::new(addr)))
     }
-    
-    unsafe fn map_physical_region(&self, physical_address: usize) -> x86_64::structures::paging::Page {
+
+    unsafe fn map_physical_region(
+        &self,
+        physical_address: usize,
+    ) -> x86_64::structures::paging::Page {
         let frame =
-            PhysFrame::from_start_address(PhysAddr::new(physical_address.try_into().unwrap())).unwrap();
+            PhysFrame::from_start_address(PhysAddr::new(physical_address.try_into().unwrap()))
+                .unwrap();
         let flags = Flags::PRESENT | Flags::WRITABLE;
 
         let mut binding = crate::state::get_mem_handler();
         let mem_handler = binding.get_mut();
 
-        let page =
-            Page::containing_address(VirtAddr::new(0xfffffff9));
+        let page = Page::containing_address(VirtAddr::new(0xfffffff9));
 
         let map_to_result = unsafe {
             // FIXME: this is not safe, we do it only for testing
-            mem_handler.mapper.map_to(page, frame, flags, &mut mem_handler.frame_allocator)
+            mem_handler
+                .mapper
+                .map_to(page, frame, flags, &mut mem_handler.frame_allocator)
         };
         map_to_result.expect("map_to failed").flush();
         page
@@ -64,7 +72,6 @@ impl BootInfoFrameAllocator {
 
 //     fn unmap_physical_region<T>(region: &rsdp::handler::PhysicalMapping<Self, T>) {panic!()}
 // }
-
 
 unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
     fn allocate_frame(&mut self) -> Option<PhysFrame> {

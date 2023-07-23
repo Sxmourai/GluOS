@@ -5,14 +5,12 @@ use core::fmt;
 use core::marker::PhantomData;
 
 pub trait PortRead {
-
     unsafe fn read_from_port(port: u16) -> Self;
 }
 
 pub trait PortWrite {
     unsafe fn write_to_port(port: u16, value: Self);
 }
-
 
 impl PortRead for u8 {
     #[inline]

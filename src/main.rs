@@ -13,16 +13,21 @@ extern crate x86_64;
 use crate::kernel::{hlt_loop, serial_println};
 use alloc::vec::Vec;
 use bootloader::{entry_point, BootInfo};
-use hashbrown::HashMap;
 use core::{
     ffi::{c_uchar, c_ushort},
     panic::PanicInfo,
 };
+use hashbrown::HashMap;
 use kernel::{
-    println, serial_print,
+    println,
+    prompt::input,
+    serial_print,
     state::get_mem_handler,
-    terminal::{console::{pretty_print, CONSOLE}, shell::Shell},
-    writer::{inb, outb, outb16}, prompt::input,
+    terminal::{
+        console::{pretty_print, CONSOLE},
+        shell::Shell,
+    },
+    writer::{inb, outb, outb16},
 };
 use pci_ids::SubSystem;
 use x86_64::{instructions::hlt, VirtAddr};

@@ -3,9 +3,9 @@ use x86_64::structures::idt::InterruptDescriptorTable;
 use crate::interrupts::hardware::InterruptIndex;
 
 use super::exceptions::*;
-use super::hardware::{keyboard,timer};
+use super::hardware::{keyboard, timer};
 
-lazy_static::lazy_static!{
+lazy_static::lazy_static! {
     pub static ref IDT: InterruptDescriptorTable = {
         let mut idt = InterruptDescriptorTable::new();
         // Mapping the CPU exceptions (in alphabetical order)
@@ -14,7 +14,7 @@ lazy_static::lazy_static!{
         idt.breakpoint.set_handler_fn(breakpoint_handler);
         idt.device_not_available.set_handler_fn(device_not_available);
         idt.divide_error.set_handler_fn(divide_error);
-        unsafe { // Double fault occurs when an exception occurs while an exception function is being called... 
+        unsafe { // Double fault occurs when an exception occurs while an exception function is being called...
             // If double fault fails, a triple fault is invoked which, on most hardware, cause a system reboot
             idt.double_fault.set_handler_fn(double_fault_handler)
                 .set_stack_index(crate::gdt::DOUBLE_FAULT_IST_INDEX);

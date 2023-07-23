@@ -1,8 +1,8 @@
-use core::task::{Context, Poll};
 use super::Task;
-use core::task::RawWakerVTable;
 use alloc::collections::VecDeque;
-use core::task::{Waker, RawWaker};
+use core::task::RawWakerVTable;
+use core::task::{Context, Poll};
+use core::task::{RawWaker, Waker};
 
 fn dummy_raw_waker() -> RawWaker {
     fn no_op(_: *const ()) {}
@@ -43,4 +43,3 @@ impl SimpleExecutor {
         }
     }
 }
-

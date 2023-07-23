@@ -1,10 +1,9 @@
-use core::task::{Context, Poll};
 use super::{Task, TaskId};
+use alloc::task::Wake;
 use alloc::{collections::BTreeMap, sync::Arc};
 use core::task::Waker;
+use core::task::{Context, Poll};
 use crossbeam_queue::ArrayQueue;
-use alloc::task::Wake;
-
 
 pub struct Executor {
     tasks: BTreeMap<TaskId, Task>,
@@ -72,7 +71,6 @@ impl Executor {
         }
     }
 }
-
 
 struct TaskWaker {
     task_id: TaskId,

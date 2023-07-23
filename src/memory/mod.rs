@@ -4,11 +4,16 @@
 
 use core::ops::Range;
 
-use x86_64::{structures::paging::{Size4KiB, FrameAllocator, OffsetPageTable, Page, PhysFrame, Mapper, PageTable}, PhysAddr, VirtAddr};
 use x86_64::structures::paging::PageTableFlags as Flags;
+use x86_64::{
+    structures::paging::{
+        FrameAllocator, Mapper, OffsetPageTable, Page, PageTable, PhysFrame, Size4KiB,
+    },
+    PhysAddr, VirtAddr,
+};
 
-pub mod handler;
 pub mod frame_allocator;
+pub mod handler;
 
 pub use frame_allocator::BootInfoFrameAllocator;
 
