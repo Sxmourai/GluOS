@@ -65,7 +65,7 @@ fn search_rsdp_in_page(i:u64, physical_memory_offset:u64) {
             
             let entry: &ACPISDTHeader = unsafe { &*(bytes.as_ptr() as *const _) };
             let table = parse_table(entry, bytes.as_ptr() as usize);
-            serial_println!("Parsed table: {:?}",table);
+            // serial_println!("Parsed table: {:?}",table);
         }
     }
 }
@@ -173,7 +173,7 @@ struct FADT {
 
 #[repr(C)]
 #[derive(Debug)]
-struct MADT {
+struct RMADT {
     h: ACPISDTHeader,
     local_apic_addr: u32,
     flags: u32,
@@ -181,7 +181,52 @@ struct MADT {
     //Entry Type 0: Processor Local APIC
     // ETC
 }
+#[repr(C,packed)]
+struct MADT{
+    pub inner: &'static RMADT,
+    fields: Vec<&'static [u8]>,
+}
+impl MADT {
+    pub unsafe fn new(bytes:&[u8]) -> Self {
+        Self {
+            inner: &*(bytes.as_ptr() as *const RMADT),
+            fields: Vec::new(),
+        }
+    }
+}
 
+#[repr(C, packed)]
+pub struct HPET {
+    header: ACPISDTHeader,
+    hardware_rev_id: u8,
+    comparator_count: u8,
+    counter_size: u8,
+    reserved: u8,
+    legacy_replacement: u8,
+    pci_vendor_id: u16,
+    address: AddressStructure,
+    hpet_number: u8,
+    minimum_tick: u16,
+    page_protection: u8,
+}
+impl Debug for HPET {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let min_tick = self.minimum_tick;
+        let vendor_id = self.pci_vendor_id;
+        f.debug_struct("HPET")
+        .field("header", &self.header)
+        .field("hardware_rev_id", &self.hardware_rev_id)
+        .field("comparator_count", &self.comparator_count)
+        .field("counter_size", &self.counter_size)
+        .field("reserved", &self.reserved)
+        .field("legacy_replacement", &self.legacy_replacement)
+        .field("pci_vendor_id", &vendor_id)
+        .field("address", &self.address)
+        .field("hpet_number", &self.hpet_number)
+        .field("minimum_tick", &min_tick)
+        .field("page_protection", &self.page_protection).finish()
+    }
+}
 
 #[repr(C)]
 #[derive(Debug)]
@@ -192,24 +237,156 @@ struct GenericAddressStructure {
     access_size: u8,
     address: u64,
 }
+#[repr(C, packed)] //TODO Merge GenericAddressStructure and AddressStructure ?
+#[derive(Debug)]
+pub struct AddressStructure {
+    address_space_id: u8,
+    register_bit_width: u8,
+    register_bit_offset: u8,
+    reserved: u8,
+    address: u64,
+}
 
-fn parse_table(header: &ACPISDTHeader, start_address: usize) -> &'static dyn Debug {
+fn parse_table(header: &ACPISDTHeader, start_address: usize) -> () {
     let raw_table = unsafe { read_memory(start_address as *const u8, header.length as usize) };
     let binding = String::from_utf8_lossy(&header.signature).to_string();
     let str_table = binding.as_str();
-    let table:&'static dyn Debug = match str_table {
-        "FACP" => unsafe { &*(raw_table.as_ptr() as *const FADT) },
-        "APIC" => unsafe { &*(raw_table.as_ptr() as *const MADT) },
+    let table = match str_table {
+        "FACP" => unsafe { &*(raw_table.as_ptr() as *const FADT) as &dyn Debug; },
+        "APIC" => { // PARSE MADT
+            let madt = unsafe { &MADT::new(raw_table)};
+            let madt_size= core::mem::size_of::<RMADT>();
+            let logging:bool = false;
+            let mut start_idx = madt_size;
+            loop {
+                if start_idx+1 >= raw_table.len() {break} // Done looping over all records
+                let record_type =   &raw_table[start_idx+0];
+                let record_length = &raw_table[start_idx+1];
+
+                start_idx += match record_type {
+                    //TODO MAKE PARSING EASIER PLS
+                    0 => { // Entry Type 0: Processor Local APIC
+                        let acpi_proc_id = &raw_table[start_idx+2];
+                        let acpi_id = &raw_table[start_idx+3];
+                        let flags = u8_bytes_to_u32(&raw_table[start_idx+4..start_idx+8]);
+                        if logging {serial_println!("Processor ID: {}\t| Acpi ID: {}\t| Flags: {:#b}", acpi_proc_id,acpi_id, flags);
+                        serial_println!("If flags bit 0 is set the CPU is able to be enabled, if it is not set you need to check bit 1. If that one is set you can still enable it, if it is not the CPU can not be enabled and the OS should not try.");}
+                        8
+                    },
+                    1 => { // Entry Type 1: I/O APIC
+                        let io_apic_id = &raw_table[start_idx+2];
+                        let reserved = &raw_table[start_idx+3];
+                        let io_apic_addr = u8_bytes_to_u32(&raw_table[start_idx+4..start_idx+8]);
+                        let global_system_interrupt_base = u8_bytes_to_u32(&raw_table[start_idx+8..start_idx+12]);
+                        if logging {serial_println!("I/O APIC:");
+                        serial_println!("  io_apic_id: {}", io_apic_id);
+                        serial_println!("  reserved: {}", reserved);
+                        serial_println!("  io_apic_addr: {:x}", io_apic_addr);
+                        serial_println!("  global_system_interrupt_base: {:x}", global_system_interrupt_base);}
+                        12
+                    },
+                    2 => { // Entry Type 2: IO/APIC Interrupt Source Override
+                        let bus_source = &raw_table[start_idx+2];
+                        let irq_source = &raw_table[start_idx+3];
+                        let global_system_interrupt = u8_bytes_to_u32(&raw_table[start_idx+4..start_idx+8]);
+                        let flags = u8_bytes_to_u16(&raw_table[start_idx+8..start_idx+10]);
+                        if logging{serial_println!("Entry Type 2: IO/APIC Interrupt Source Override");
+                        serial_println!("  bus_source: {}", bus_source);
+                        serial_println!("  irq_source: {}", irq_source);
+                        serial_println!("  global_system_interrupt: {:x}", global_system_interrupt);
+                        serial_println!("  flags: {:x}", flags);}
+                        10
+                    },
+                    3 => { // Entry type 3: IO/APIC Non-maskable interrupt source
+                        let nmi_source = &raw_table[start_idx+2];
+                        let reserved = &raw_table[start_idx+3];
+                        let flags = u8_bytes_to_u16(&raw_table[start_idx+4..start_idx+6]);
+                        let global_system_interrupt = u8_bytes_to_u32(&raw_table[start_idx+6..start_idx+10]);
+                        
+                        if logging{serial_println!("Entry Type 3: IO/APIC Non-maskable interrupt source");
+                        serial_println!("  nmi_source: {}", nmi_source);
+                        serial_println!("  reserved: {}", reserved);
+                        serial_println!("  flags: {:x}", flags);
+                        serial_println!("  global_system_interrupt: {:x}", global_system_interrupt);}
+                        10
+                    },
+                    4 => { // Entry Type 4: Local APIC Non-maskable interrupts
+                        let acpi_proc_id = &raw_table[start_idx+2]; // (0xFF means all processors)
+                        let flags = u8_bytes_to_u16(&raw_table[start_idx+3..start_idx+5]);
+                        let lint = &raw_table[start_idx+5]; // 0 or 1, it's one byte, but could be stored in one bit
+                        if logging{serial_println!("Entry Type 4: Local APIC Non-maskable interrupts");
+                        serial_println!("  acpi_proc_id: {}", acpi_proc_id);
+                        serial_println!("  flags: {:x}", flags);
+                        serial_println!("  lint: {}", lint);}
+                        5
+                    },
+                    5 => { // Entry Type 5: Local APIC Address Override
+                        let reserved = u8_bytes_to_u16(&raw_table[start_idx+2..start_idx+4]);
+                        let phys_addr_local_apic = u8_bytes_to_u64(&raw_table[start_idx+4..start_idx+12]);
+                        if logging{serial_println!("Entry Type 5: Local APIC Address Override");
+                        serial_println!("  reserved: {:x}", reserved);
+                        serial_println!("  phys_addr_local_apic: {:x}", phys_addr_local_apic);}
+
+                        12
+                    },
+                    9 => { // Entry Type 9: Processor Local x2APIC
+                        let reserved = u8_bytes_to_u16(&raw_table[start_idx+2..start_idx+4]);
+                        let proc_local_x2apic_id = u8_bytes_to_u32(&raw_table[start_idx+4..start_idx+8]);
+                        let flags = u8_bytes_to_u32(&raw_table[start_idx+8..start_idx+12]);
+                        let acpi_id = u8_bytes_to_u32(&raw_table[start_idx+12..start_idx+16]);
+                        if logging{serial_println!("Entry Type 9: Processor Local x2APIC");
+                        serial_println!("  reserved: {:x}", reserved);
+                        serial_println!("  proc_local_x2apic_id: {:x}", proc_local_x2apic_id);
+                        serial_println!("  flags: {:x}", flags);
+                        serial_println!("  acpi_id: {:x}", acpi_id);}
+
+                        16
+                    },
+    
+                    _ => {panic!("Unrecognised record entry type: {} | length: {record_length}",record_type)},//TODO Improve error handling
+                }
+            }
+        },
+        "HPET" => {
+            let hpet = unsafe { &*(raw_table.as_ptr() as *const HPET) as &dyn Debug };
+        }
         _ => {
             panic!("Couldn't parse table: {}",str_table);
             // panic!("Couldn't parse table: {}\nRAW: {:?}",str_table, raw_table);
         },
     };
-    table
+    
 }
 
-
-
+// Make sure your data is 4 in length, more will be ignored
+fn u8_bytes_to_u32(bytes: &[u8]) -> u32 {
+    let mut result: u32 = 0;
+    result |= (bytes[0] as u32) << 24;
+    result |= (bytes[1] as u32) << 16;
+    result |= (bytes[2] as u32) << 8;
+    result |= bytes[3] as u32;
+    result
+}
+// Make sure your data is 2 in length, more will be ignored
+fn u8_bytes_to_u16(bytes: &[u8]) -> u16 {
+    let mut result = 0;
+    result |= (bytes[0] as u16) << 8;
+    result |=  bytes[1] as u16;
+    result
+}
+// Make sure your data is 8 in length, more will be ignored
+fn u8_bytes_to_u64(bytes: &[u8]) -> u64 {
+    let mut result = 0;
+    result |= (bytes[0] as u64) << 56;
+    result |= (bytes[1] as u64) << 48;
+    result |= (bytes[2] as u64) << 40;
+    result |= (bytes[3] as u64) << 32;
+    result |= (bytes[4] as u64) << 24;
+    result |= (bytes[5] as u64) << 16;
+    result |= (bytes[6] as u64) << 8;
+    result |=  bytes[7] as u64;
+    result
+}
 
 
 fn u8_to_u32(u8_data: &[u8]) -> Vec<u32> {
