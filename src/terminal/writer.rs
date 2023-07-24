@@ -58,6 +58,19 @@ impl Writer {
     // Function to move the cursor to a specific position in the VGA buffer
     pub fn move_cursor(&mut self, x: u8, y: u8) {
         self.pos = ScreenPos(x, y);
+        let size = self.console.lock().size();
+        if x+1 >= size.0 {
+            self.pos.0 = 0;
+            self.pos.1 += 1;
+            if y+1 >= size.1 {
+                self.move_up();
+            }
+        }
+        if y+1 >= size.1 {
+            self.move_up();
+            self.pos.0 = 0;
+            self.pos.1 = size.1-1;
+        }
         let pos: u16 = (y as u16 * 80 + x as u16);
 
         if self.get_at(&self.pos).ascii_character == DEFAULT_CHAR.ascii_character {
@@ -93,32 +106,27 @@ impl Writer {
         // Concats both buffer. Puts data at index 0, (pushes everything down)
         self.console.lock().top_buffer.append(top_line_arr);
     }
+    // If press enter while executed, can do deadlocks ?
+    //TODO Do we really need without_interrupts?
+    // Move every line one up
     pub fn move_up(&mut self) {
         let (width, height) = self.console.lock().size();
         x86_64::instructions::interrupts::without_interrupts(|| {
-            // If press enter while executed, can do deadlocks ?
-            //TODO Do we really need without_interrupts?
-            // Move every line one up
             for y in 1..height {
-                let line = self
-                    .console
-                    .lock()
+                let line = self.console.lock()
                     .get_str_at(&ScreenPos(0, y), width as u16);
                 self.write_screenchars_at(0, y - 1, line);
             }
             if !self.console.lock().bottom_buffer.is_empty() {
-                self.write_screenchars_at(
-                    0,
-                    height,
-                    self.console
-                        .lock()
+                self.write_screenchars_at(0, height,
+                    self.console.lock()
                         .bottom_buffer
-                        .get_youngest_line()
-                        .unwrap(),
+                        .get_youngest_line().unwrap(),
                 );
             }
         })
     }
+
     pub fn move_down(&mut self) {
         let (width, height) = self.console.lock().size();
         x86_64::instructions::interrupts::without_interrupts(|| {
@@ -212,6 +220,7 @@ impl Writer {
             // Move everything
             for y in 1..BUFFER_HEIGHT {
                 for x in 0..BUFFER_WIDTH {
+                    serial_println!("x: {} | y: {}",x,y);
                     let character = self.get_at(&ScreenPos(x, y));
                     self.write_char_at(ScreenPos(x, y - 1), character);
                 }

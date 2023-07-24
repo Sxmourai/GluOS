@@ -59,13 +59,14 @@ impl Console {
         self.get_at(pos.0, pos.1)
     }
     // Note that this makes a copy
+    //TODO Support top and bottom buffer ?
     pub fn get_str_at(&self, pos: &ScreenPos, len: u16) -> Vec<ScreenChar> {
         let mut buffer = Vec::new();
         let (width, height) = self.buffer.size();
         for i in 0..len {
             buffer.push(self.get_at(
-                (pos.0 + (i / width as u16) as u8).into(),
-                ((pos.1 as u16 + i) % width as u16) as u8,
+                (pos.0 + (i % width as u16) as u8),
+                ((i/width as u16) as u8 + pos.1),
             )); // Wrap around
         }
         buffer

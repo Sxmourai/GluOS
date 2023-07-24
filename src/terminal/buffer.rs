@@ -39,10 +39,18 @@ impl Buffer for VgaBuffer {
         (BUFFER_WIDTH, BUFFER_HEIGHT)
     } // WIDTH, HEIGHT
     fn write_screenchar_at(&mut self, pos: &ScreenPos, chr: ScreenChar) {
-        self.chars[pos.1 as usize][pos.0 as usize].write(chr)
+        if pos.0 < BUFFER_WIDTH && pos.1 < BUFFER_HEIGHT {
+            self.chars[pos.1 as usize][pos.0 as usize].write(chr)
+        } else {
+            panic!("Tried to write {:?} at {:?}",chr, pos)
+        }
     }
     fn get_screenchar_at(&self, pos: &ScreenPos) -> ScreenChar {
-        self.chars[pos.1 as usize][pos.0 as usize].read()
+        if pos.0 < BUFFER_WIDTH && pos.1 < BUFFER_HEIGHT {
+            self.chars[pos.1 as usize][pos.0 as usize].read()
+        } else {
+            panic!("Tried to read {:?}",pos)
+        }
     }
     // Loop over all chars to check if they are DEFAULT_CHARS, so heavy function (O(1))
     fn is_empty(&self) -> bool {
@@ -90,7 +98,11 @@ impl Buffer for ConsoleBuffer {
         (BUFFER_WIDTH, self.inner.len().try_into().unwrap())
     }
     fn write_screenchar_at(&mut self, pos: &ScreenPos, chr: ScreenChar) {
-        self.inner[pos.1 as usize][pos.0 as usize] = chr
+        if pos.0 < BUFFER_WIDTH && pos.1 < BUFFER_HEIGHT {
+            self.inner[pos.1 as usize][pos.0 as usize] = chr
+        } else {
+            panic!("Tried to write {:?} at {:?}",chr, pos)
+        }
     }
     fn get_screenchar_at(&self, pos: &ScreenPos) -> ScreenChar {
         self.inner[pos.1 as usize][pos.0 as usize]

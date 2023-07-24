@@ -7,7 +7,7 @@ use crate::{
     gdt, interrupts, serial_println, state::{self, STATE},
     task::executor::Executor,
     writer::{inb, outb, print_at},
-    MemoryHandler, memory::read_phys_memory_and_map, serial_print,
+    MemoryHandler, memory::{read_phys_memory_and_map, rsdp::search_rsdp}, serial_print,
 };
 // Supress compiler warning about unused imports, but if removed, error
 #[allow(unused_imports)]
@@ -27,6 +27,7 @@ pub fn boot(boot_info: &'static bootloader::BootInfo) {
         state::STATE.mem_handler = Some(memory_handler);
         state::STATE.boot_info = Some(boot_info);
     };
+    search_rsdp(boot_info.physical_memory_offset);
 }
 
 pub fn end() -> ! {

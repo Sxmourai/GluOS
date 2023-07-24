@@ -66,6 +66,16 @@ pub fn find_string(bytes: &[u8], search_string: &[u8]) -> Option<usize> {
     None
 }
 
+fn serial_print_all_bits<T: Into<u128>>(num: T) {
+    let num = num.into();
+    let size = core::mem::size_of::<T>() * 8;
+
+    for i in (0..size).rev() {
+        let bit = (num >> i) & 1;
+        serial_print!("{}", bit);
+    }
+}
+
 
 
 

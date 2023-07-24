@@ -67,6 +67,11 @@ pub unsafe fn init(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static>
 }
 
 // end_page is using .containing address
+//TODO Make a loop to map all frames that user is trying to get access:
+//i.e. size = 4096, so location is at a certain frame, but the end location is in another frame that ISNT MAP, which causes page fault
+// Two ways to fix: 
+// 1. Worst, just make a loop, align etc.
+// 2. Map a page when a page fault occurs (refer to interrupts/exceptions)
 pub fn read_phys_memory_and_map(location: u64, size: usize, end_page:u64) -> &'static [u8] {
     let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
     let phys_frame: PhysFrame<Size4KiB> = PhysFrame::containing_address(PhysAddr::new(location));
@@ -75,9 +80,9 @@ pub fn read_phys_memory_and_map(location: u64, size: usize, end_page:u64) -> &'s
     let page = Page::containing_address(VirtAddr::new(end_page));
     unsafe { mem_h.mapper.map_to(page, phys_frame, flags, &mut mem_h.frame_allocator).unwrap().flush() };
 
-    let addr = location-phys_frame.start_address().as_u64() + end_page;
-
-    serial_println!("{:?} addr: {:x} but {:x?}", (phys_frame, addr, page,addr as *const u8), addr, (location,end_page));
+    let addr = location-phys_frame.start_address().as_u64() + page.start_address().as_u64();
+    
+    // serial_println!("Physical frame_adress: {:x}\t-\tLocation: {:x}\nComputed location {:x}\t-\tFrame to page: {:x} (Provided (unaligned): {:x})", phys_frame.start_address().as_u64(), location, addr, page.start_address().as_u64(),end_page);
     unsafe { read_memory(addr as *const u8, size) }
 }
 // Create a slice from the memory location with the given size

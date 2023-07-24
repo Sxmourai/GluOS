@@ -113,10 +113,24 @@ pub extern "x86-interrupt" fn page_fault_handler(
     error_code: PageFaultErrorCode,
 ) {
     use x86_64::registers::control::Cr2;
-
+//TODO Map a page to a frame when page fault
     println!("EXCEPTION: PAGE FAULT");
     println!("Accessed Address: {:?}", Cr2::read());
     println!("Error Code: {:?}", error_code);
     println!("{:#?}", stack_frame);
     hlt_loop();
 }
+
+// pub fn map_phys_memory(location: u64, size: usize, end_page:u64) -> &'static [u8] {
+//     let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
+//     let phys_frame: PhysFrame<Size4KiB> = PhysFrame::containing_address(PhysAddr::new(location));
+//     let mut mem_handler = unsafe { crate::state::STATE.get_mem_handler() };
+//     let mut mem_h = mem_handler.get_mut();
+//     let page = Page::containing_address(VirtAddr::new(end_page));
+//     unsafe { mem_h.mapper.map_to(page, phys_frame, flags, &mut mem_h.frame_allocator).unwrap().flush() };
+
+//     let addr = location-phys_frame.start_address().as_u64() + page.start_address().as_u64();
+    
+//     // serial_println!("Physical frame_adress: {:x}\t-\tLocation: {:x}\nComputed location {:x}\t-\tFrame to page: {:x} (Provided (unaligned): {:x})", phys_frame.start_address().as_u64(), location, addr, page.start_address().as_u64(),end_page);
+//     unsafe { read_memory(addr as *const u8, size) }
+// }
