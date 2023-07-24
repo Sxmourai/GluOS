@@ -227,6 +227,20 @@ impl Debug for HPET {
         .field("page_protection", &self.page_protection).finish()
     }
 }
+#[repr(C, packed)]
+struct WAET {// TODO Contribute to osdev, to make a page for this
+    header: ACPISDTHeader,
+    emu_dev_flags: u32,
+}
+impl Debug for WAET {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let dev_flags = self.emu_dev_flags;
+        f.debug_struct("WAET")
+        .field("header", &self.header)
+        .field("emu_dev_flags", &format!("{:b}",dev_flags))
+        .finish()
+    }
+}
 
 #[repr(C)]
 #[derive(Debug)]
@@ -349,6 +363,9 @@ fn parse_table(header: &ACPISDTHeader, start_address: usize) -> () {
         },
         "HPET" => {
             let hpet = unsafe { &*(raw_table.as_ptr() as *const HPET) as &dyn Debug };
+        }
+        "WAET" => {
+            let waet = unsafe { &*(raw_table.as_ptr() as *const WAET) as &dyn Debug };
         }
         _ => {
             panic!("Couldn't parse table: {}",str_table);
