@@ -9,7 +9,7 @@ use lazy_static::lazy_static;
 use spin::Mutex;
 use x86_64::{structures::paging::OffsetPageTable, VirtAddr};
 
-use crate::memory::BootInfoFrameAllocator;
+use crate::memory::{BootInfoFrameAllocator, rsdp::DescriptorTablesHandler};
 use crate::MemoryHandler;
 
 // const MEM_HANDLER
@@ -18,12 +18,14 @@ pub static mut STATE: Kernel = Kernel::new();
 pub struct Kernel {
     pub mem_handler: Option<MemoryHandler>,
     pub boot_info: Option<&'static BootInfo>,
+    pub descriptor_tables: Option<DescriptorTablesHandler>
 }
 impl Kernel {
     pub const fn new() -> Self {
         Self {
             mem_handler: None,
             boot_info: None,
+            descriptor_tables: None,
         }
     }
     pub fn get_mem_handler(&mut self) -> Cell<&mut MemoryHandler> {

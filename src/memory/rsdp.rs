@@ -1,6 +1,6 @@
 //! Code inspired from rsdp crate
 
-use core::fmt::Debug;
+use core::{fmt::Debug, num};
 
 use alloc::{vec::Vec, format, string::{ToString, String}};
 use hashbrown::HashMap;
@@ -31,8 +31,8 @@ pub struct RSDPDescriptor {
     rsdt_addr: u32,
 }
 
-fn search_rsdp_in_page(i:u64, physical_memory_offset:u64) {
-    let bytes_read = unsafe { crate::memory::read_memory((i+physical_memory_offset) as *const u8, 4096) };
+fn search_rsdp_in_page(page:u64, physical_memory_offset:u64) -> Option<&'static RSDPDescriptor>{
+    let bytes_read = unsafe { crate::memory::read_memory((page+physical_memory_offset) as *const u8, 4096) };
     if let Some(offset) = find_string(&bytes_read, RSDP_SIGNATURE) {
         serial_println!("Found RSDP pointer");
         let sl: &[u8] = &bytes_read[offset..offset+core::mem::size_of::<RSDPDescriptor>()];
@@ -44,37 +44,25 @@ fn search_rsdp_in_page(i:u64, physical_memory_offset:u64) {
         let rsdp_descriptor: &RSDPDescriptor = unsafe { &*(rsdp_bytes.as_ptr() as *const _) };
         
         //TODO Verify checksum
-
-        let addr = rsdp_descriptor.rsdt_addr as usize;
-        let rsdt_size = core::mem::size_of::<RSDT>();
-        serial_println!("Getting RSDT at address (physical): {:x}", addr);
-        let rsdt_page_bytes = unsafe { crate::memory::read_phys_memory_and_map(addr as u64, rsdt_size, 0xFFFFFFFFFFF) };
-        
-        let rsdt: &RSDT = unsafe { &*(rsdt_page_bytes.as_ptr() as *const _) };
-        
-        // let pointer_to_other_sdt_size = rsdt.h.length as usize - core::mem::size_of::<ACPISDTHeader>();
-        // let n_fields = pointer_to_other_sdt_size / 4; // u32 is 4 bytes
-        // let u8_sdts = &rsdt_page_bytes[ACPI_HEAD_SIZE..rsdt.h.length as usize];
-        // let sdts = u8_to_u32(u8_sdts);
-
-        for (i,ptr) in rsdt.pointer_to_other_sdt.iter().enumerate() {
-            let location = *ptr as u64;
-            let size = ACPI_HEAD_SIZE;
-            let end_page = 0xFFFFFFFF+(i*4096) as u64;
-            let bytes = unsafe { crate::memory::read_phys_memory_and_map(location, ACPI_HEAD_SIZE, end_page) };
-            
-            let entry: &ACPISDTHeader = unsafe { &*(bytes.as_ptr() as *const _) };
-            let table = parse_table(entry, bytes.as_ptr() as usize);
-            // serial_println!("Parsed table: {:?}",table);
-        }
+        return Some(rsdp_descriptor);
     }
+    None
 }
 
 
 //TODO Support ACPI version 2 https://wiki.osdev.org/RSDP
-pub fn search_rsdp(physical_memory_offset:u64) {
-    for i in (0x80000..0x9ffff).step_by(4096) {search_rsdp_in_page(i,physical_memory_offset)}
-    for j in (0xe0000..0xfffff).step_by(4096) {search_rsdp_in_page(j,physical_memory_offset)}
+pub fn search_rsdp(physical_memory_offset:u64) -> &'static RSDPDescriptor {
+    for i in (0x80000..0x9ffff).step_by(4096) {
+        if let Some(rsdp) = search_rsdp_in_page(i,physical_memory_offset) {
+            return rsdp;
+        }
+    }
+    for j in (0xe0000..0xfffff).step_by(4096) {
+        if let Some(rsdp) = search_rsdp_in_page(j,physical_memory_offset) {
+            return rsdp;
+        }
+    }
+    panic!("Didn't find rsdp !");
 }
 
 
@@ -181,19 +169,88 @@ struct RMADT {
     //Entry Type 0: Processor Local APIC
     // ETC
 }
-#[repr(C,packed)]
 struct MADT{
     pub inner: &'static RMADT,
-    fields: Vec<&'static [u8]>,
+    pub fields: Vec<&'static dyn APICRecord>,
+    pub num_core: Vec<(usize, u8)>, // (core id, apic id)
 }
 impl MADT {
     pub unsafe fn new(bytes:&[u8]) -> Self {
         Self {
             inner: &*(bytes.as_ptr() as *const RMADT),
             fields: Vec::new(),
+            num_core: Vec::new(),
         }
     }
 }
+
+trait APICRecord : Debug{}
+
+#[repr(C, packed)]
+#[derive(Debug)]
+struct ProcLocalAPIC { // Entry Type 0: Processor Local APIC https://wiki.osdev.org/MADT#Entry_Type_0:_Processor_Local_APIC
+    acpi_proc_id: u8,
+    apic_id: u8,
+    flags: u32,
+}
+impl APICRecord for ProcLocalAPIC {}
+
+#[repr(C, packed)]
+#[derive(Debug)]
+struct IOAPIC { // Entry Type 1: I/O APIC
+    io_apic_id: u8,
+    reserved: u8,
+    io_apic_address: u32,
+    global_system_interrupt_base: u32,
+}
+impl APICRecord for IOAPIC {}
+
+#[repr(C, packed)]
+#[derive(Debug)]
+struct IOAPICInterruptSourceOverride { // Entry Type 2: IO/APIC Interrupt Source Override
+    bus_source: u8,
+    irq_source: u8,
+    global_system_interrupt: u32,
+    flags: u16,
+}
+impl APICRecord for IOAPICInterruptSourceOverride {}
+
+#[repr(C, packed)]
+#[derive(Debug)]
+struct IOAPICNonMaskableInterruptSource{ // Entry type 3: IO/APIC Non-maskable interrupt source
+    nmi_source: u8,
+    reserved: u8,
+    flags: u16,
+    global_system_interrupt: u32,
+}
+impl APICRecord for IOAPICNonMaskableInterruptSource {}
+
+#[repr(C, packed)]
+#[derive(Debug)]
+struct LocalAPICNonMaskableInterrupts { // Entry Type 4: Local APIC Non-maskable interrupts
+    acpi_proc_id: u8, // (0xFF means all processors)
+    flags: u16,
+    lint: u16,
+}
+impl APICRecord for LocalAPICNonMaskableInterrupts {}
+
+#[repr(C, packed)]
+#[derive(Debug)]
+struct LocalAPICAddressOverride { // Entry Type 5: Local APIC Address Override
+    reserved: u16,
+    phys_addr_local_apic: u64,
+}
+impl APICRecord for LocalAPICAddressOverride {}
+
+#[repr(C, packed)]
+#[derive(Debug)]
+struct ProcLocalx2Apic { // Entry Type 9: Processor Local x2APIC
+    reserved: u16,
+    proc_local_x2apic_id: u32,
+    flags: u32,
+    acpi_id: u32,
+}
+impl APICRecord for ProcLocalx2Apic {}
 
 #[repr(C, packed)]
 pub struct HPET {
@@ -261,119 +318,6 @@ pub struct AddressStructure {
     address: u64,
 }
 
-fn parse_table(header: &ACPISDTHeader, start_address: usize) -> () {
-    let raw_table = unsafe { read_memory(start_address as *const u8, header.length as usize) };
-    let binding = String::from_utf8_lossy(&header.signature).to_string();
-    let str_table = binding.as_str();
-    let table = match str_table {
-        "FACP" => unsafe { &*(raw_table.as_ptr() as *const FADT) as &dyn Debug; },
-        "APIC" => { // PARSE MADT
-            let madt = unsafe { &MADT::new(raw_table)};
-            let madt_size= core::mem::size_of::<RMADT>();
-            let logging:bool = false;
-            let mut start_idx = madt_size;
-            loop {
-                if start_idx+1 >= raw_table.len() {break} // Done looping over all records
-                let record_type =   &raw_table[start_idx+0];
-                let record_length = &raw_table[start_idx+1];
-
-                start_idx += match record_type {
-                    //TODO MAKE PARSING EASIER PLS
-                    0 => { // Entry Type 0: Processor Local APIC
-                        let acpi_proc_id = &raw_table[start_idx+2];
-                        let acpi_id = &raw_table[start_idx+3];
-                        let flags = u8_bytes_to_u32(&raw_table[start_idx+4..start_idx+8]);
-                        if logging {serial_println!("Processor ID: {}\t| Acpi ID: {}\t| Flags: {:#b}", acpi_proc_id,acpi_id, flags);
-                        serial_println!("If flags bit 0 is set the CPU is able to be enabled, if it is not set you need to check bit 1. If that one is set you can still enable it, if it is not the CPU can not be enabled and the OS should not try.");}
-                        8
-                    },
-                    1 => { // Entry Type 1: I/O APIC
-                        let io_apic_id = &raw_table[start_idx+2];
-                        let reserved = &raw_table[start_idx+3];
-                        let io_apic_addr = u8_bytes_to_u32(&raw_table[start_idx+4..start_idx+8]);
-                        let global_system_interrupt_base = u8_bytes_to_u32(&raw_table[start_idx+8..start_idx+12]);
-                        if logging {serial_println!("I/O APIC:");
-                        serial_println!("  io_apic_id: {}", io_apic_id);
-                        serial_println!("  reserved: {}", reserved);
-                        serial_println!("  io_apic_addr: {:x}", io_apic_addr);
-                        serial_println!("  global_system_interrupt_base: {:x}", global_system_interrupt_base);}
-                        12
-                    },
-                    2 => { // Entry Type 2: IO/APIC Interrupt Source Override
-                        let bus_source = &raw_table[start_idx+2];
-                        let irq_source = &raw_table[start_idx+3];
-                        let global_system_interrupt = u8_bytes_to_u32(&raw_table[start_idx+4..start_idx+8]);
-                        let flags = u8_bytes_to_u16(&raw_table[start_idx+8..start_idx+10]);
-                        if logging{serial_println!("Entry Type 2: IO/APIC Interrupt Source Override");
-                        serial_println!("  bus_source: {}", bus_source);
-                        serial_println!("  irq_source: {}", irq_source);
-                        serial_println!("  global_system_interrupt: {:x}", global_system_interrupt);
-                        serial_println!("  flags: {:x}", flags);}
-                        10
-                    },
-                    3 => { // Entry type 3: IO/APIC Non-maskable interrupt source
-                        let nmi_source = &raw_table[start_idx+2];
-                        let reserved = &raw_table[start_idx+3];
-                        let flags = u8_bytes_to_u16(&raw_table[start_idx+4..start_idx+6]);
-                        let global_system_interrupt = u8_bytes_to_u32(&raw_table[start_idx+6..start_idx+10]);
-                        
-                        if logging{serial_println!("Entry Type 3: IO/APIC Non-maskable interrupt source");
-                        serial_println!("  nmi_source: {}", nmi_source);
-                        serial_println!("  reserved: {}", reserved);
-                        serial_println!("  flags: {:x}", flags);
-                        serial_println!("  global_system_interrupt: {:x}", global_system_interrupt);}
-                        10
-                    },
-                    4 => { // Entry Type 4: Local APIC Non-maskable interrupts
-                        let acpi_proc_id = &raw_table[start_idx+2]; // (0xFF means all processors)
-                        let flags = u8_bytes_to_u16(&raw_table[start_idx+3..start_idx+5]);
-                        let lint = &raw_table[start_idx+5]; // 0 or 1, it's one byte, but could be stored in one bit
-                        if logging{serial_println!("Entry Type 4: Local APIC Non-maskable interrupts");
-                        serial_println!("  acpi_proc_id: {}", acpi_proc_id);
-                        serial_println!("  flags: {:x}", flags);
-                        serial_println!("  lint: {}", lint);}
-                        5
-                    },
-                    5 => { // Entry Type 5: Local APIC Address Override
-                        let reserved = u8_bytes_to_u16(&raw_table[start_idx+2..start_idx+4]);
-                        let phys_addr_local_apic = u8_bytes_to_u64(&raw_table[start_idx+4..start_idx+12]);
-                        if logging{serial_println!("Entry Type 5: Local APIC Address Override");
-                        serial_println!("  reserved: {:x}", reserved);
-                        serial_println!("  phys_addr_local_apic: {:x}", phys_addr_local_apic);}
-
-                        12
-                    },
-                    9 => { // Entry Type 9: Processor Local x2APIC
-                        let reserved = u8_bytes_to_u16(&raw_table[start_idx+2..start_idx+4]);
-                        let proc_local_x2apic_id = u8_bytes_to_u32(&raw_table[start_idx+4..start_idx+8]);
-                        let flags = u8_bytes_to_u32(&raw_table[start_idx+8..start_idx+12]);
-                        let acpi_id = u8_bytes_to_u32(&raw_table[start_idx+12..start_idx+16]);
-                        if logging{serial_println!("Entry Type 9: Processor Local x2APIC");
-                        serial_println!("  reserved: {:x}", reserved);
-                        serial_println!("  proc_local_x2apic_id: {:x}", proc_local_x2apic_id);
-                        serial_println!("  flags: {:x}", flags);
-                        serial_println!("  acpi_id: {:x}", acpi_id);}
-
-                        16
-                    },
-    
-                    _ => {panic!("Unrecognised record entry type: {} | length: {record_length}",record_type)},//TODO Improve error handling
-                }
-            }
-        },
-        "HPET" => {
-            let hpet = unsafe { &*(raw_table.as_ptr() as *const HPET) as &dyn Debug };
-        }
-        "WAET" => {
-            let waet = unsafe { &*(raw_table.as_ptr() as *const WAET) as &dyn Debug };
-        }
-        _ => {
-            panic!("Couldn't parse table: {}",str_table);
-            // panic!("Couldn't parse table: {}\nRAW: {:?}",str_table, raw_table);
-        },
-    };
-    
-}
 
 // Make sure your data is 4 in length, more will be ignored
 fn u8_bytes_to_u32(bytes: &[u8]) -> u32 {
@@ -419,4 +363,112 @@ fn u8_to_u32(u8_data: &[u8]) -> Vec<u32> {
     }
 
     u32_data
+}
+
+fn get_rsdt(rsdt_addr: u64) -> &'static RSDT {
+    let rsdt_size = core::mem::size_of::<RSDT>();
+    let rsdt_page_bytes = unsafe { crate::memory::read_phys_memory_and_map(rsdt_addr, rsdt_size, 0xFFFFFFFFFFF) };
+    
+    unsafe { &*(rsdt_page_bytes.as_ptr() as *const _) }
+}
+
+pub struct DescriptorTablesHandler {
+    facp: Option<&'static FADT>,
+    madt: Option<MADT>,
+    hpet: Option<&'static HPET>,
+    waet: Option<&'static WAET>,
+}
+impl DescriptorTablesHandler {
+    pub fn new(physical_memory_offset:u64) -> Self {
+        let rsdp = search_rsdp(physical_memory_offset);
+        let rsdt = get_rsdt(rsdp.rsdt_addr as u64);
+        let mut _self = Self {facp:None,madt:None,hpet:None,waet:None,};
+
+        for (i,ptr) in rsdt.pointer_to_other_sdt.iter().enumerate() {
+            let end_page = 0xFFFFFFFF+(i*4096) as u64;
+            let (header, table_bytes) = read_sdt(*ptr as u64, end_page);
+
+            //TODO Make parsing in another function for cleaner code
+            let binding = String::from_utf8_lossy(&header.signature).to_string();
+            let str_table = binding.as_str();
+            match str_table {
+                "FACP" => _self.facp = unsafe { handle_fadt(table_bytes) },
+                "APIC" => _self.madt = unsafe { handle_apic(table_bytes) },
+                "HPET" => _self.hpet = unsafe { handle_hpet(table_bytes) },
+                "WAET" => _self.waet = unsafe { handle_waet(table_bytes) },
+                _ => {
+                    panic!("Couldn't parse table: {}",str_table);
+                    // panic!("Couldn't parse table: {}\nRAW: {:?}",str_table, table_bytes);
+                },
+            };
+        }
+        _self
+    }
+    pub fn num_core(&self) -> usize {self.madt.as_ref().unwrap().num_core.len()}
+}
+
+unsafe fn handle_fadt(bytes: &[u8]) -> Option<&'static FADT> {
+    Some(unsafe { &*(bytes.as_ptr() as *const FADT) })
+}
+unsafe fn handle_apic(bytes: &[u8]) -> Option<MADT> {
+    let mut madt = unsafe { MADT::new(bytes) };
+    
+    let mut start_idx = core::mem::size_of::<RMADT>(); // Start at size of MADT - fields
+    //TODO Make proper stop handling (rn it stops when there are no more bytes, but if the provided bytes is too long, kernel panic)
+    let mut num_core:usize = 0;
+    loop {
+        if start_idx+1 >= bytes.len() {break} // Done looping over all records
+        let record_type =   &bytes[start_idx+0];
+        let record_length = &bytes[start_idx+1];
+        start_idx += match record_type {
+            0 => { // Entry Type 0: Processor Local APIC
+                let proc_local_apic = unsafe { &*(bytes[start_idx..].as_ptr() as *const ProcLocalAPIC) };
+                madt.fields.push(proc_local_apic);
+                madt.num_core.push((num_core, proc_local_apic.acpi_proc_id));
+                num_core += 1;
+                8
+            },
+            1 => { // Entry Type 1: I/O APIC
+                madt.fields.push(unsafe { &*(bytes[start_idx..].as_ptr() as *const IOAPIC)});
+                12
+            },
+            2 => { // Entry Type 2: IO/APIC Interrupt Source Override
+                madt.fields.push(unsafe { &*(bytes[start_idx..].as_ptr() as *const IOAPICInterruptSourceOverride)});
+                10
+            },
+            3 => { // Entry type 3: IO/APIC Non-maskable interrupt source
+                madt.fields.push(unsafe { &*(bytes[start_idx..].as_ptr() as *const IOAPICNonMaskableInterruptSource)});
+10
+            },
+            4 => { // Entry Type 4: Local APIC Non-maskable interrupts
+                madt.fields.push(unsafe { &*(bytes[start_idx..].as_ptr() as *const LocalAPICNonMaskableInterrupts)});
+                5
+            },
+            5 => { // Entry Type 5: Local APIC Address Override
+                madt.fields.push(unsafe { &*(bytes[start_idx..].as_ptr() as *const LocalAPICAddressOverride)});
+                12
+            },
+            9 => { // Entry Type 9: Processor Local x2APIC
+                madt.fields.push(unsafe { &*(bytes[start_idx..].as_ptr() as *const ProcLocalx2Apic)});
+                16
+            },
+
+            _ => {panic!("Unrecognised record entry type: {} | length: {record_length}",record_type)},//TODO Improve error handling
+        }
+    }
+    Some(madt)
+}
+unsafe fn handle_hpet(bytes: &[u8]) -> Option<&'static HPET> {
+    Some(unsafe { &*(bytes.as_ptr() as *const HPET) })
+}
+unsafe fn handle_waet(bytes: &[u8]) -> Option<&'static WAET> {
+    Some(unsafe { &*(bytes.as_ptr() as *const WAET) })
+}
+
+
+fn read_sdt(ptr:u64, end_page:u64) -> (&'static ACPISDTHeader, &'static [u8]) {
+    let bytes = unsafe { crate::memory::read_phys_memory_and_map(ptr, ACPI_HEAD_SIZE, end_page) };
+    let entry: &ACPISDTHeader = unsafe { &*(bytes.as_ptr() as *const _) };
+    let bytes = unsafe { crate::memory::read_memory(bytes.as_ptr(), entry.length as usize) };
+    (entry, bytes)
 }
