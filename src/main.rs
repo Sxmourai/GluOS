@@ -27,7 +27,7 @@ use kernel::{
         console::{pretty_print, CONSOLE},
         shell::Shell,
     },
-    writer::{inb, outb, outb16},
+    writer::{inb, outb, outb16}, pci::pci_data::print_all_pci_devices,
 };
 use pci_ids::SubSystem;
 use x86_64::{instructions::hlt, VirtAddr};
@@ -38,6 +38,7 @@ entry_point!(kernel_main);
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     // Initialize & boot the device and kernel
     kernel::boot(boot_info);
+    print_all_pci_devices();
     // unsafe { kernel::pci::ata::initialize_sata_controller() };
     // Shell::new();
 
