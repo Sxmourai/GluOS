@@ -3,6 +3,12 @@
 version = 3
 
 [[package]]
+name = "acpica-sys"
+version = "0.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3fd770c61d9e528fd78b69b6f5150c221aee744bed61ebe833ff4568cb21b8cd"
+
+[[package]]
 name = "ahash"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -182,6 +188,7 @@ dependencies = [
 name = "kernel"
 version = "0.1.0"
 dependencies = [
+ "acpica-sys",
  "bit_field",
  "bootloader",
  "cmake",
@@ -191,6 +198,7 @@ dependencies = [
  "futures-util",
  "hashbrown",
  "lazy_static",
+ "libacpica",
  "libc",
  "linked_list_allocator",
  "pc-keyboard",
@@ -212,6 +220,12 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 dependencies = [
  "spin 0.5.2",
 ]
+
+[[package]]
+name = "libacpica"
+version = "0.0.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "750696106cf168dfc2a71dacb3a2e5224612425f04fd6772b482804e4e6b55b8"
 
 [[package]]
 name = "libc"
