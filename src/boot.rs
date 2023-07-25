@@ -28,7 +28,7 @@ pub fn boot(boot_info: &'static bootloader::BootInfo) {
         state::STATE.boot_info = Some(boot_info);
     };
     let dth = DescriptorTablesHandler::new(boot_info.physical_memory_offset);
-    memory::acpi::foo()
+
     // serial_println!("Num core: {}", dth.num_core());
 }
 
