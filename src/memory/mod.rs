@@ -16,6 +16,7 @@ use x86_64::structures::paging::PageTableFlags;
 pub mod frame_allocator;
 pub mod handler;
 pub mod rsdp;
+pub mod apic;
 
 pub use frame_allocator::BootInfoFrameAllocator;
 
