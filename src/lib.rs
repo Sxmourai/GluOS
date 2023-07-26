@@ -66,7 +66,7 @@ pub fn find_string(bytes: &[u8], search_string: &[u8]) -> Option<usize> {
     None
 }
 
-fn serial_print_all_bits<T: Into<u128>>(num: T) {
+pub fn serial_print_all_bits<T: Into<u128>>(num: T) {
     let num = num.into();
     let size = core::mem::size_of::<T>() * 8;
 
@@ -79,7 +79,13 @@ fn serial_print_all_bits<T: Into<u128>>(num: T) {
 
 
 
-
+pub fn is_bit_set(byte: u8, bit_position: u8) -> bool {
+    // Create a mask with only the bit at the specified position set to 1
+    let mask = 1 << bit_position;
+    // Perform a bitwise AND operation with the mask
+    // If the result is non-zero, the bit is set to 1; otherwise, the bit is 0.
+    byte & mask != 0
+}
 
 //TODO: Remove the need for these
 

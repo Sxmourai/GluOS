@@ -19,6 +19,7 @@ pub fn print_all_pci_classes_and_subclasses() {
     }
 }
 
+// Go on the discord, into #ressources to have the formated output
 pub fn print_all_pci_devices() {
     for device in crate::pci::pci_device_iter() {
         let mut name;
@@ -35,6 +36,7 @@ pub fn print_all_pci_devices() {
             name = d.name();
             subs = d.subsystems().collect();
             vendor = d.vendor().name(); 
+            
             for iter_class in pci_ids::Classes::iter() {
                 if iter_class.id() == device.class {
                     for iter_subclass in iter_class.subclasses() {
@@ -46,6 +48,8 @@ pub fn print_all_pci_devices() {
                 }
             }
         }
+        
+        subs[0].name();
         serial_println!(
             "BUS: {}\t- {}\t-\tVendor {:?}\nClass: {}\t-\tSubclass: {}\nSubsystems {:?}\n\n",
             device.bus(),
