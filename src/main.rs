@@ -27,7 +27,7 @@ use kernel::{
         console::{pretty_print, CONSOLE},
         shell::Shell,
     },
-    writer::{inb, outb, outb16, inw}, pci::pci_data::print_all_pci_devices, is_bit_set,
+    writer::{inb, outb, outb16, inw}, pci::pci_data::print_all_pci_devices, is_bit_set, memory::read_phys_memory_and_map,
 };
 use pci_ids::SubSystem;
 use x86_64::{instructions::hlt, VirtAddr};
@@ -36,16 +36,34 @@ use x86_64::{instructions::hlt, VirtAddr};
 entry_point!(kernel_main);
 // Main function of our kernel (1 func to start when boot if not in test mode). Never returns, because kernel runs until machine poweroff
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
-    // Initialize & boot the device and kernel
     kernel::boot(boot_info);
-    
+    // kernel::pci::pci_data::print_all_pci_devices_big();
+    unsafe { outb(0x1f6, 0xA0) }; // Select master drive of primary channel
+    unsafe { outb(0x1f7, 0xEC)} // Send IDENTIFY to selected drive
+    let mut i = 0;
+    read_phys_memory_and_map(0x100000F0, 4096, 0x100000F0);
+    while (unsafe { inb(0x177) } & 0xC0) != 0x40 {
+        i+=1;
+        if i % 1000 == 0 {
+            serial_print!(".");
+        }
+    }let mut data = [0u8; 512];
+
+    for i in 0..data.len() {
+        unsafe {
+            data[i] = inb(0x1F0);
+        }
+    }
+    let d = data;
+    serial_println!("b: {:?}", d);
+
+
     // let identify_data = unsafe {
     //     // Wait for the drive to be ready (BSY = 0, DRQ = 1)
-    //     while (inb(0x177) & 0xC0) != 0x40 {serial_print!(".");}
 
     //     // Send the IDENTIFY DEVICE command (0xEC) to the Command Register (0x1F7)
     //     serial_println!("here it's working");
-    //     outb(0x177, 0xEC);
+        // outb(0x177, 0xEC);
 
     //     // Wait for the drive to be ready (BSY = 0, DRQ = 1)
     //     while (inb(0x177) & 0xC0) != 0x40 {}
@@ -111,13 +129,13 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
                         serial_println!("Memory lib: {:?}", (p,q));
                     } else {
                         // I/O port address
-                        unsafe { outb((*bar).try_into().unwrap(), u8::MAX) };
-                        hlt();
+                        // unsafe { outb((*bar).try_into().unwrap(), u8::MAX) };
+                        // hlt();
                         let bar_size = unsafe { inb((*bar).try_into().unwrap()) }; // Send all ones
                         let io_port_address = bar & !0x1; // Mask out the least significant bit
                         // Read the size of the I/O port region from the device-specific register
                         // For example, if it's a 16-bit BAR, the size will be 2 bytes (1 << 1).
-                        let io_port_size = 1 << 1; // Replace `1` with the actual size of the BAR (depends on the device).
+                        let io_port_size = 1 << bar_size; // Replace `1` with the actual size of the BAR (depends on the device).
                         // Use `io_port_address` and `io_port_size` to access the I/O ports of the IDE controller.
                         
                         serial_println!("Size: {:b}\tAddress: {:b}\tPort size: {}", bar_size, io_port_address, io_port_size);

@@ -69,23 +69,20 @@ pub unsafe fn init(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static>
 }
 
 // end_page is using .containing address
-//TODO Make a loop to map all frames that user is trying to get access:
-//i.e. size = 4096, so location is at a certain frame, but the end location is in another frame that ISNT MAP, which causes page fault
-// Two ways to fix: 
-// 1. Worst, just make a loop, align etc.
-// 2. Map a page when a page fault occurs (refer to interrupts/exceptions)
+//TODO Map a page when a page fault occurs (in interrupts/exceptions.rs)
 pub fn read_phys_memory_and_map(location: u64, size: usize, end_page:u64) -> &'static [u8] {
-    let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
-    let phys_frame: PhysFrame<Size4KiB> = PhysFrame::containing_address(PhysAddr::new(location));
+    let flags:PageTableFlags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE; // TODO Change this to a constant
+    let start_addr = Page::<Size4KiB>::containing_address(VirtAddr::new(end_page)).start_address().as_u64();
     let mut mem_handler = unsafe { crate::state::STATE.get_mem_handler() };
     let mut mem_h = mem_handler.get_mut();
-    let page = Page::containing_address(VirtAddr::new(end_page));
-    unsafe { mem_h.mapper.map_to(page, phys_frame, flags, &mut mem_h.frame_allocator).unwrap().flush() };
-
-    let addr = location-phys_frame.start_address().as_u64() + page.start_address().as_u64();
-    
+    for i in (0..size).step_by(4096) { // Map all frames that might be used
+        let phys_frame: PhysFrame<Size4KiB> = PhysFrame::containing_address(PhysAddr::new(location+i as u64));
+        let page = Page::containing_address(VirtAddr::new(end_page+i as u64));
+        unsafe { mem_h.mapper.map_to(page, phys_frame, flags, &mut mem_h.frame_allocator).unwrap().flush() };
+    }
     // serial_println!("Physical frame_adress: {:x}\t-\tLocation: {:x}\nComputed location {:x}\t-\tFrame to page: {:x} (Provided (unaligned): {:x})", phys_frame.start_address().as_u64(), location, addr, page.start_address().as_u64(),end_page);
-    unsafe { read_memory(addr as *const u8, size) }
+    // Reads the content from memory, should be safe
+    unsafe { read_memory(start_addr as *const u8, size) }
 }
 // Create a slice from the memory location with the given size
 pub unsafe fn read_memory(location: *const u8, size: usize) -> &'static [u8] {

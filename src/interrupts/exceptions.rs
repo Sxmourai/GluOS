@@ -1,6 +1,6 @@
 use x86_64::structures::idt::{InterruptStackFrame, PageFaultErrorCode};
 
-use crate::{hlt_loop, println};
+use crate::{hlt_loop, println, serial_println};
 
 pub extern "x86-interrupt" fn alignment_check(stack_frame: InterruptStackFrame, error_code: u64) {
     panic!(
@@ -76,7 +76,7 @@ pub extern "x86-interrupt" fn segment_not_present(
     stack_frame: InterruptStackFrame,
     error_code: u64,
 ) {
-    panic!(
+    serial_println!(
         "EXCEPTION: segment_not_present\n{:#?}\nError code: {}",
         stack_frame, error_code
     );
