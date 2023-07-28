@@ -38,16 +38,20 @@ entry_point!(kernel_main);
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     kernel::boot(boot_info);
     // kernel::pci::pci_data::print_all_pci_devices_big();
+    serial_println!("A");
     unsafe { outb(0x1f6, 0xA0) }; // Select master drive of primary channel
+    serial_println!("B");
     unsafe { outb(0x1f7, 0xEC)} // Send IDENTIFY to selected drive
     let mut i = 0;
     read_phys_memory_and_map(0x100000F0, 4096, 0x100000F0);
+    serial_println!("C");
     while (unsafe { inb(0x177) } & 0xC0) != 0x40 {
         i+=1;
         if i % 1000 == 0 {
             serial_print!(".");
         }
     }let mut data = [0u8; 512];
+    serial_println!("D");
 
     for i in 0..data.len() {
         unsafe {

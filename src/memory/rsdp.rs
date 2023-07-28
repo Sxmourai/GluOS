@@ -367,7 +367,9 @@ fn u8_to_u32(u8_data: &[u8]) -> Vec<u32> {
 
 fn get_rsdt(rsdt_addr: u64) -> &'static RSDT {
     let rsdt_size = core::mem::size_of::<RSDT>();
+    serial_println!("Size: {} addr: {:X} End: {:x}", rsdt_size, rsdt_addr, rsdt_size+rsdt_addr as usize);
     let rsdt_page_bytes = unsafe { crate::memory::read_phys_memory_and_map(rsdt_addr, rsdt_size, 0xFFFFFFFFFFF) };
+    serial_println!("Bytes: {:?}", rsdt_page_bytes);
     
     unsafe { &*(rsdt_page_bytes.as_ptr() as *const _) }
 }
@@ -397,8 +399,8 @@ impl DescriptorTablesHandler {
                 "HPET" => _self.hpet = unsafe { handle_hpet(table_bytes) },
                 "WAET" => _self.waet = unsafe { handle_waet(table_bytes) },
                 _ => {
-                    panic!("Couldn't parse table: {}",str_table);
-                    // panic!("Couldn't parse table: {}\nRAW: {:?}",str_table, table_bytes);
+                    // panic!("Couldn't parse table: {}",str_table);
+                    panic!("Couldn't parse table: {}\nRAW: {:?}\nHeader: {:?}\nAddress: {:?}",str_table, table_bytes, header, table_bytes.as_ptr());
                 },
             };
         }
