@@ -74,29 +74,27 @@ pub fn read_phys_memory_and_map(location: u64, size: usize, end_page:u64) -> &'s
     let flags:PageTableFlags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE; // TODO Change this to a constant
     let mut mem_handler = unsafe { crate::state::STATE.get_mem_handler() };
     let mut mem_h = mem_handler.get_mut();
-    let start_addr = Page::<Size4KiB>::containing_address(VirtAddr::new(end_page)).start_address().as_u64();
 
-    let virt_offset = end_page - Page::<Size4KiB>::containing_address(VirtAddr::new(end_page)).start_address().as_u64();
-    let phys_offset = location - PhysFrame::<Size4KiB>::containing_address(PhysAddr::new(location)).start_address().as_u64();
     let size_64 = size as u64;
-    if virt_offset+size_64 > 4096 || phys_offset+size_64 > 4096 {}
     let start_frame_addr = PhysFrame::<Size4KiB>::containing_address(PhysAddr::new(location)).start_address().as_u64();
     let mut offset = 0;
     for i in (start_frame_addr..start_frame_addr+size as u64).step_by(4096) { // Map all frames that might be used
         let page:Page<Size4KiB> = Page::containing_address(VirtAddr::new(end_page+offset));
         let phys_frame = PhysFrame::containing_address(PhysAddr::new(i));
-
-        serial_println!("Physical frame_adress: {:X}\t-\tLocation: {:X}
-Computed location {:X}\t-\tFrame to page: {:X} (Provided (unaligned): {:X})
-Currently mapping: Physical({:X}-{:X})\t-\tVirtual({:X}-{:X})
-", 
-        phys_frame.start_address().as_u64(), location, end_page, page.start_address().as_u64(),end_page, i,i+4096, end_page+offset, end_page+offset+4096);
+        
+        // serial_println!("Physical frame_adress: {:X}\t-\tLocation: {:X}
+        // Computed location {:X}\t-\tFrame to page: {:X} (Provided (unaligned): {:X})
+        // Currently mapping: Physical({:X}-{:X})\t-\tVirtual({:X}-{:X})
+        // ", phys_frame.start_address().as_u64(), location, end_page, page.start_address().as_u64(),end_page, i,i+4096, end_page+offset, end_page+offset+4096);
         
         unsafe { mem_h.mapper.map_to(page, phys_frame, flags, &mut mem_h.frame_allocator).unwrap().flush() };
         offset += 4096;
     }
     // Reads the content from memory, should be safe
-    unsafe { read_memory(end_page as *const u8, size) }
+    let end_page_start_addr = Page::<Size4KiB>::containing_address(VirtAddr::new(end_page)).start_address().as_u64();
+    let phys_offset = location - PhysFrame::<Size4KiB>::containing_address(PhysAddr::new(location)).start_address().as_u64();
+    let start_addr = phys_offset+end_page_start_addr;
+    unsafe { read_memory(start_addr as *const u8, size) }
 }
 // Create a slice from the memory location with the given size
 pub unsafe fn read_memory(location: *const u8, size: usize) -> &'static [u8] {
