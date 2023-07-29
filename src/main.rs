@@ -27,7 +27,7 @@ use kernel::{
         console::{pretty_print, CONSOLE},
         shell::Shell,
     },
-    writer::{inb, outb, outb16, inw}, pci::pci_data::print_all_pci_devices, is_bit_set, memory::read_phys_memory_and_map,
+    writer::{inb, outb, outb16, inw}, pci::pci_data::print_all_pci_devices, is_bit_set, memory::read_phys_memory_and_map, serial_print_all_bits,
 };
 use pci_ids::SubSystem;
 use x86_64::{instructions::hlt, VirtAddr};
@@ -37,21 +37,21 @@ entry_point!(kernel_main);
 // Main function of our kernel (1 func to start when boot if not in test mode). Never returns, because kernel runs until machine poweroff
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     kernel::boot(boot_info);
-    // kernel::pci::pci_data::print_all_pci_devices_big();
-    serial_println!("A");
+    kernel::log!();
+
     unsafe { outb(0x1f6, 0xA0) }; // Select master drive of primary channel
-    serial_println!("B");
-    unsafe { outb(0x1f7, 0xEC)} // Send IDENTIFY to selected drive
+    hlt();
+    unsafe { outb(0x1f7, 0xEC)}; // Send IDENTIFY to selected drive Panics
+    hlt();
     let mut i = 0;
-    read_phys_memory_and_map(0x100000F0, 4096, 0x100000F0);
-    serial_println!("C");
-    while (unsafe { inb(0x177) } & 0xC0) != 0x40 {
+    while (unsafe { inb(0x1f7) } & 0xC0) != 0x40 {
         i+=1;
-        if i % 1000 == 0 {
-            serial_print!(".");
+        hlt();
+        if i % 10 == 0 {
+            kernel::log!(".");
         }
-    }let mut data = [0u8; 512];
-    serial_println!("D");
+    }
+    let mut data = [0u8; 512];
 
     for i in 0..data.len() {
         unsafe {
@@ -59,7 +59,21 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
         }
     }
     let d = data;
-    serial_println!("b: {:?}", d);
+    // serial_println!("b: {:?}", d);
+    let mut sum: usize = 0;
+    d.iter().map(|x| sum += *x as usize).collect::<Vec<_>>();
+    let ata_ident_devicetype = 0;
+    let ata_ident_cylinders = 2;
+    let ata_ident_heads = 6;
+    let ata_ident_sectors = 12;
+    let ata_ident_serial = 20;
+    let ata_ident_model = 54;
+    let ata_ident_capabilities = 98;
+    let ata_ident_fieldvalid = 106;
+    let ata_ident_max_lba = 120;
+    let ata_ident_commandsets = 164;
+    let ata_ident_max_lba_ext = 200;
+    serial_println!("Size: {:?}",(sum+ata_ident_max_lba_ext, sum+ata_ident_max_lba));
 
 
     // let identify_data = unsafe {
