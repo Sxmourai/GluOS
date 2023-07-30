@@ -85,12 +85,7 @@ pub struct ACPISDTHeader {
 
 pub struct RSDT {
     pub h: &'static ACPISDTHeader,
-    //TODO DONT USE THIS FIELD, USED FOR ALIGNEMENT, we need to :
-    // Read once the rsdt to parse the 'length' field
-    // Read it a second time, but this time read &[u8;rsdt.length]
-    // And find a way to make point_to_other_sdt dynamically changed in size
-    // From my testing, it never goes beyond 4...
-    pointer_to_other_sdt: Vec<u32>, // Placeholder for the array; its actual size will be determined at runtime.
+    pointer_to_other_sdt: Vec<u32>,
 }
 
 #[repr(C)]
@@ -364,7 +359,6 @@ fn get_rsdt(rsdt_addr: u64) -> RSDT {
     let sdts_size = (rsdt_header.length as usize - ACPI_HEAD_SIZE); // / core::mem::size_of::<u32>();
     let sdts_offset = ACPI_HEAD_SIZE;
     let ptr_addr = raw.as_ptr() as usize + sdts_offset;
-    serial_println!("{:X} s {:?}", ptr_addr, sdts_size);
     let sdts = unsafe { from_raw_parts(ptr_addr as *const u8, sdts_size) };
     let mut pointer_to_other_sdt = Vec::new();
     for i in (0..sdts.len()).step_by(4) {

@@ -36,12 +36,6 @@ pub mod pci;
 pub mod log;
 //pub mod apic; //!causes compiler error
 
-#[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    err!("Error: {}\n", info);
-    print_trace();
-    hlt_loop()
-}
 
 //-----------TESTS HANDLING-----------
 use core::panic::PanicInfo;

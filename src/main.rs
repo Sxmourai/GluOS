@@ -27,7 +27,7 @@ use kernel::{
         console::{pretty_print, CONSOLE},
         shell::Shell,
     },
-    writer::{inb, outb, outb16, inw}, pci::pci_data::print_all_pci_devices, is_bit_set, memory::read_phys_memory_and_map, serial_print_all_bits, err, log,
+    writer::{inb, outb, outb16, inw}, pci::pci_data::print_all_pci_devices, is_bit_set, memory::read_phys_memory_and_map, serial_print_all_bits, err, log::{self, print_trace},
 };
 use pci_ids::SubSystem;
 use x86_64::{instructions::hlt, VirtAddr};
@@ -135,3 +135,9 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     hlt_loop()
 }
 
+#[panic_handler]
+fn panic(info: &PanicInfo) -> ! {
+    err!("Error: {}\n", info);
+    print_trace();
+    hlt_loop()
+}
