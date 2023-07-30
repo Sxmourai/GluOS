@@ -1,6 +1,8 @@
 use bootloader::bootinfo::MemoryMap;
 use x86_64::{structures::paging::OffsetPageTable, VirtAddr};
 
+use crate::trace;
+
 use super::{active_level_4_table, frame_allocator::BootInfoFrameAllocator};
 
 #[derive(Debug)]
@@ -10,15 +12,19 @@ pub struct MemoryHandler {
 }
 impl MemoryHandler {
     pub fn new(physical_memory_offset: VirtAddr, memory_map: &'static MemoryMap) -> Self {
+        // trace!("Getting active level 4 table");
         let level_4_table = unsafe { active_level_4_table(physical_memory_offset) };
 
         // let mut mapper = unsafe { x86_64::structures::paging::MappedPageTable::new(level_4_table, MyPageTableFrameMapping{next:0}) };
+        // trace!("Creating new memory mapper");
         let mut mapper = unsafe { OffsetPageTable::new(level_4_table, physical_memory_offset) };
+        // trace!("Creating new frame allocator");
         let mut frame_allocator = unsafe {
             BootInfoFrameAllocator::init(memory_map) // Initialize the frame allocator
         };
         crate::allocator::init_heap(&mut mapper, &mut frame_allocator)
-            .expect("heap initialization failed"); // Initialize the heap allocator
+        .expect("heap initialization failed"); // Initialize the heap allocator
+        trace!("Finished initializing heap, can now begin tracing !");
         Self {
             mapper,
             frame_allocator,

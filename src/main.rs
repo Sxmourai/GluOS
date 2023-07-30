@@ -27,7 +27,7 @@ use kernel::{
         console::{pretty_print, CONSOLE},
         shell::Shell,
     },
-    writer::{inb, outb, outb16, inw}, pci::pci_data::print_all_pci_devices, is_bit_set, memory::read_phys_memory_and_map, serial_print_all_bits,
+    writer::{inb, outb, outb16, inw}, pci::pci_data::print_all_pci_devices, is_bit_set, memory::read_phys_memory_and_map, serial_print_all_bits, err, log,
 };
 use pci_ids::SubSystem;
 use x86_64::{instructions::hlt, VirtAddr};
@@ -37,44 +37,8 @@ entry_point!(kernel_main);
 // Main function of our kernel (1 func to start when boot if not in test mode). Never returns, because kernel runs until machine poweroff
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     kernel::boot(boot_info);
-    kernel::log!();
 
-    unsafe { outb(0x1f6, 0xA0) }; // Select master drive of primary channel
-    hlt();
-    unsafe { outb(0x1f7, 0xEC)}; // Send IDENTIFY to selected drive Panics
-    hlt();
-    let mut i = 0;
-    while (unsafe { inb(0x1f7) } & 0xC0) != 0x40 {
-        i+=1;
-        hlt();
-        if i % 10 == 0 {
-            kernel::log!(".");
-        }
-    }
-    let mut data = [0u8; 512];
-
-    for i in 0..data.len() {
-        unsafe {
-            data[i] = inb(0x1F0);
-        }
-    }
-    let d = data;
-    // serial_println!("b: {:?}", d);
-    let mut sum: usize = 0;
-    d.iter().map(|x| sum += *x as usize).collect::<Vec<_>>();
-    let ata_ident_devicetype = 0;
-    let ata_ident_cylinders = 2;
-    let ata_ident_heads = 6;
-    let ata_ident_sectors = 12;
-    let ata_ident_serial = 20;
-    let ata_ident_model = 54;
-    let ata_ident_capabilities = 98;
-    let ata_ident_fieldvalid = 106;
-    let ata_ident_max_lba = 120;
-    let ata_ident_commandsets = 164;
-    let ata_ident_max_lba_ext = 200;
-    serial_println!("Size: {:?}",(sum+ata_ident_max_lba_ext, sum+ata_ident_max_lba));
-
+    kernel::pci::ata::init();
 
     // let identify_data = unsafe {
     //     // Wait for the drive to be ready (BSY = 0, DRQ = 1)
@@ -171,8 +135,3 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     hlt_loop()
 }
 
-#[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    serial_println!("KERNEL PANIC:{}", info);
-    kernel::hlt_loop();
-}

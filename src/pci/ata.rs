@@ -1,7 +1,98 @@
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 
-use crate::{writer::{outb, inb, inw}, println, serial_println};
+use crate::{writer::{outb, inb, inw}, println, serial_println, err, log, trace, serial_print_all_bits};
 
+
+const ATA_IDENT_DEVICETYPE: u8   = 0;
+const ATA_IDENT_CYLINDERS: u8    = 2;
+const ATA_IDENT_HEADS: u8        = 6;
+const ATA_IDENT_SERIAL: u8       = 20;
+const ATA_IDENT_SECTORS: u8      = 12;
+const ATA_IDENT_CAPABILITIES: u8 = 98;
+const ATA_IDENT_MODEL: u8        = 54;
+const ATA_IDENT_MAX_LBA: u8      = 120;
+const ATA_IDENT_FIELDVALID: u8   = 106;
+const ATA_IDENT_MAX_LBA_EXT: u8  = 200;
+const ATA_IDENT_COMMANDSETS: u8  = 164;
+
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq)]
+enum Channel {
+    Primary = 0x1f0,
+    Secondary = 0x170,
+}
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq)]
+enum Drive {
+    Master = 0xA0,
+    Slave = 0xB0,
+}
+
+pub fn init() {
+    unsafe { outb(0x3f6, (1 << 1) | (1 << 2))}
+    detect(Channel::Primary, Drive::Master);
+    detect(Channel::Primary, Drive::Slave);
+    detect(Channel::Secondary, Drive::Master);
+    detect(Channel::Secondary, Drive::Slave);
+}
+
+fn detect(channel: Channel, drive: Drive) {
+    trace!("Drive: {:?} on channel: {:?}", drive, &channel);
+    let base = channel as u16;
+    // unsafe { outb(base+6, 0x80 | 0x40 | 0x20) }; // Send flags
+    unsafe { outb(base+6, drive as u8) }; // Select drive of channel
+    
+    unsafe { outb(base+2, 0) }; //Clear sector count
+    unsafe { outb(base+3, 0) }; //Clear lba's
+    unsafe { outb(base+4, 0) };
+    unsafe { outb(base+5, 0) };
+    
+    unsafe { outb(base+7, 0xEC)}; // Send IDENTIFY to selected drive
+    
+    trace!("Reading drive status");
+    if unsafe { inb(base+7) } == 0 {trace!("Drive does not exist !")}
+    else {
+        unsafe { bsy(base); }
+        if unsafe { inb(base+4) } != 0 && unsafe { inb(base+5) } != 0 {
+            trace!("ATAPI drive detected !");
+        } else {
+            if unsafe { check_drq_or_err(base) }.is_ok() {
+                let mut data = [0u8; 512];
+                let mut capa:u32 = 0;
+                for i in (0..data.len()) {
+                    data[i] = unsafe { inb(base+0) };
+                }
+                for i in 0..data.len()/2 {
+                    match i {
+                        83 => if data[i+1] & 0b100 == 0x01 {
+                            //TODO Parse info returned by IDENTIFY https://wiki.osdev.org/ATA_PIO_Mode
+                            trace!("Drive supports LBA48 mode");
+                        }
+                        _ => {}
+                    }
+                }
+                log!("Found {:?} drive in {:?} channel", drive, channel);
+            } else {
+                err!("Drive {:?} in {:?} channel returned an error after IDENTIFY command", drive, channel);
+            }
+        }
+        // let mut i = 0;
+        // loop { //TODO check if drive isn't ready to transfer DRQ
+        //     i+=1;
+        //     let status = unsafe { inb(base+7) };
+        //     if status & 0x80 == 0x0 ||
+        //        status & 0x08 == 0x1 ||
+        //        status & 0x01 == 0x1 {break}
+        //     //                      ^^^^^^^
+        //     // Use else if for clarity, but useless because of the 'break'
+        //     else if i == 10000000 { err!("Disk is taking too long to respond"); break; }
+        //     else if unsafe { inb(base+4) } != 0 && unsafe { inb(base+5) } != 0 {
+        //         log!("ATAPI drive detected");
+        //         break;
+        //     }
+        // }
+    }
+}
+
+/*
 pub fn initialize_sata_controller() {
     unsafe {
         // Wait for the controller to be ready
@@ -42,9 +133,32 @@ pub fn initialize_sata_controller() {
         println!("Firmware Revision: {}", firmware_revision);
     }
 }
+*/
+/// wait for BSY flag to be unset
+unsafe fn bsy(base: u16) {
+    trace!("Waiting BSY flag to unset at base: {:X}", base);
+    while inb(base+7) & 0x80 != 0x00 {}
+    // 0x80 = 0b10000000
+}
+
+enum DriveError {
+    Err
+}
+/// wait for DRQ to be ready or ERR to set
+unsafe fn check_drq_or_err(base: u16) -> Result<(), DriveError> {
+    trace!("Waiting DRQ flag to set at base: {:X}", base);
+    let mut status = inb(base+7);
+    while status & 0x08 == 0x00 {
+        if status & 0x01 == 0x01 {return Err(DriveError::Err)} //TODO Make better error handling... Or make error handling in top level function
+        status = inb(base+7);
+    }
+    Ok(())
+}
 
 
-const DETECTED:i32 = 1;
+
+
+
 // pub unsafe fn detect_ata() {
 //     /* detecting hard disc */
 //     outb(0x1F3, 0x88);

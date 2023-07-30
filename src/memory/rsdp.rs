@@ -1,6 +1,6 @@
 //! Code inspired from rsdp crate
 
-use core::{fmt::Debug, num};
+use core::{fmt::Debug, num, slice::from_raw_parts};
 
 use alloc::{vec::Vec, format, string::{ToString, String}};
 use hashbrown::HashMap;
@@ -9,7 +9,7 @@ use x86_64::{structures::paging::{PageTableFlags, PhysFrame, Size4KiB, Mapper, P
 
 static ACPI_HEAD_SIZE:usize = core::mem::size_of::<ACPISDTHeader>();
 
-use crate::{println, find_string, serial_println, serial_print, serial_print_all_bits, memory::read_memory, print};
+use crate::{println, find_string, serial_println, serial_print, serial_print_all_bits, memory::read_memory, print, trace};
 /// This (usually!) contains the base address of the EBDA (Extended Bios Data Area), shifted right by 4
 const EBDA_START_SEGMENT_PTR: usize = 0x40e; // Base address in in 2 bytes
 /// The earliest (lowest) memory address an EBDA (Extended Bios Data Area) can start
@@ -34,7 +34,6 @@ pub struct RSDPDescriptor {
 fn search_rsdp_in_page(page:u64, physical_memory_offset:u64) -> Option<&'static RSDPDescriptor>{
     let bytes_read = unsafe { crate::memory::read_memory((page+physical_memory_offset) as *const u8, 4096) };
     if let Some(offset) = find_string(&bytes_read, RSDP_SIGNATURE) {
-        serial_println!("Found RSDP pointer");
         let sl: &[u8] = &bytes_read[offset..offset+core::mem::size_of::<RSDPDescriptor>()];
         // Check that the bytes_in_memory size matches the size of RSDPDescriptor
         assert_eq!(sl.len(), core::mem::size_of::<RSDPDescriptor>());
@@ -52,11 +51,13 @@ fn search_rsdp_in_page(page:u64, physical_memory_offset:u64) -> Option<&'static 
 
 //TODO Support ACPI version 2 https://wiki.osdev.org/RSDP
 pub fn search_rsdp(physical_memory_offset:u64) -> &'static RSDPDescriptor {
+    trace!("Searching RSDP in first memory region");
     for i in (0x80000..0x9ffff).step_by(4096) {
         if let Some(rsdp) = search_rsdp_in_page(i,physical_memory_offset) {
             return rsdp;
         }
     }
+    trace!("Searching RSDP in second memory region");
     for j in (0xe0000..0xfffff).step_by(4096) {
         if let Some(rsdp) = search_rsdp_in_page(j,physical_memory_offset) {
             return rsdp;
@@ -82,22 +83,14 @@ pub struct ACPISDTHeader {
 
 // trait StandartDescriptorTable {}
 
-#[repr(C)]
 pub struct RSDT {
-    pub h: ACPISDTHeader,
+    pub h: &'static ACPISDTHeader,
     //TODO DONT USE THIS FIELD, USED FOR ALIGNEMENT, we need to :
     // Read once the rsdt to parse the 'length' field
     // Read it a second time, but this time read &[u8;rsdt.length]
     // And find a way to make point_to_other_sdt dynamically changed in size
     // From my testing, it never goes beyond 4...
-    pointer_to_other_sdt: [u32; 4], // Placeholder for the array; its actual size will be determined at runtime.
-}
-impl RSDT {
-    fn pointer_to_other_sdt(&self) -> &[u32] {
-        let size = (self.h.length - core::mem::size_of::<ACPISDTHeader>() as u32) / core::mem::size_of::<u32>() as u32;
-        let ptr = &self.pointer_to_other_sdt as *const u32;
-        unsafe { core::slice::from_raw_parts(ptr, size as usize) }
-    }
+    pointer_to_other_sdt: Vec<u32>, // Placeholder for the array; its actual size will be determined at runtime.
 }
 
 #[repr(C)]
@@ -321,12 +314,10 @@ pub struct AddressStructure {
 
 // Make sure your data is 4 in length, more will be ignored
 fn u8_bytes_to_u32(bytes: &[u8]) -> u32 {
-    let mut result: u32 = 0;
-    result |= (bytes[0] as u32) << 24;
-    result |= (bytes[1] as u32) << 16;
-    result |= (bytes[2] as u32) << 8;
-    result |= bytes[3] as u32;
-    result
+    (bytes[0] as u32) |
+    ((bytes[1] as u32) << 8) |
+    ((bytes[2] as u32) << 16) |
+    ((bytes[3] as u32) << 24)
 }
 // Make sure your data is 2 in length, more will be ignored
 fn u8_bytes_to_u16(bytes: &[u8]) -> u16 {
@@ -365,11 +356,21 @@ fn u8_to_u32(u8_data: &[u8]) -> Vec<u32> {
     u32_data
 }
 
-fn get_rsdt(rsdt_addr: u64) -> &'static RSDT {
-    let rsdt_size = core::mem::size_of::<RSDT>();
-    let rsdt_page_bytes = unsafe { crate::memory::read_phys_memory_and_map(rsdt_addr, rsdt_size, 0xFFFFFFFFFFF) };
-
-    unsafe { &*(rsdt_page_bytes.as_ptr() as *const _) }
+fn get_rsdt(rsdt_addr: u64) -> RSDT {
+    trace!("Getting RSDT at {}", rsdt_addr);
+    let (rsdt_header, raw) = read_sdt(rsdt_addr, rsdt_addr);
+    
+    
+    let sdts_size = (rsdt_header.length as usize - ACPI_HEAD_SIZE); // / core::mem::size_of::<u32>();
+    let sdts_offset = ACPI_HEAD_SIZE;
+    let ptr_addr = raw.as_ptr() as usize + sdts_offset;
+    serial_println!("{:X} s {:?}", ptr_addr, sdts_size);
+    let sdts = unsafe { from_raw_parts(ptr_addr as *const u8, sdts_size) };
+    let mut pointer_to_other_sdt = Vec::new();
+    for i in (0..sdts.len()).step_by(4) {
+        pointer_to_other_sdt.push(u8_bytes_to_u32(&sdts[i..i+4]));
+    }
+    RSDT { h: rsdt_header, pointer_to_other_sdt }
 }
 
 pub struct DescriptorTablesHandler {
@@ -397,8 +398,7 @@ impl DescriptorTablesHandler {
                 "HPET" => _self.hpet = unsafe { handle_hpet(table_bytes) },
                 "WAET" => _self.waet = unsafe { handle_waet(table_bytes) },
                 _ => {
-                    // panic!("Couldn't parse table: {}",str_table);
-                    panic!("Couldn't parse table: {}\nRAW: {:?}\nHeader: {:?}\nAddress: {:?}",str_table, table_bytes, header, table_bytes.as_ptr());
+                    panic!("Couldn't parse table: {}\nRAW: {:?}\nHeader: {:?}\nPhys Address: {:x}\t-\tVirt Address: {:?}\nNumber: {}",str_table, table_bytes, header, ptr, table_bytes.as_ptr(), i);
                 },
             };
         }

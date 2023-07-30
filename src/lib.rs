@@ -9,6 +9,7 @@
 #![feature(naked_functions)]
 #![allow(unused, dead_code)] //TODO: Only for debug (#[cfg(debug_assertions)])
 
+use alloc::vec::Vec;
 use defmt::dbg;
 use defmt::info;
 use x86_64::VirtAddr;
@@ -22,6 +23,7 @@ pub mod interrupts;
 pub use interrupts::timer;
 pub mod gdt;
 pub mod memory;
+use crate::log::print_trace;
 pub use crate::memory::handler::MemoryHandler;
 pub mod allocator;
 pub mod task;
@@ -34,8 +36,14 @@ pub mod pci;
 pub mod log;
 //pub mod apic; //!causes compiler error
 
+#[panic_handler]
+fn panic(info: &PanicInfo) -> ! {
+    err!("Error: {}\n", info);
+    print_trace();
+    hlt_loop()
+}
+
 //-----------TESTS HANDLING-----------
-#[cfg(test)]
 use core::panic::PanicInfo;
 #[cfg(test)]
 #[panic_handler]
@@ -75,9 +83,19 @@ pub fn serial_print_all_bits<T: Into<u128>>(num: T) {
         let bit = (num >> i) & 1;
         serial_print!("{}", bit);
     }
+    serial_print!(" - ");
 }
 
-
+// pub unsafe fn from_raw_parts_unchecked<T>(ptr:*mut T, len:usize) -> Vec<T>
+//     where T: Copy  {
+//     let mut v = Vec::new();
+//     let ele_size = core::mem::size_of::<T>();
+//     for i in 0..len {
+//         let addr = ptr as usize+i*ele_size;
+//         v.push(*ptr as T);
+//     }
+//     v
+// }
 
 
 pub fn is_bit_set(byte: u8, bit_position: u8) -> bool {
