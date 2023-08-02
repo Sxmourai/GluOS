@@ -137,7 +137,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    err!("Error: {}\n", info);
+    err!("Error: {}", info);
     print_trace();
     hlt_loop()
 }

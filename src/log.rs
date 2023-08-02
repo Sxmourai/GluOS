@@ -1,14 +1,15 @@
-use alloc::{format, string::String, vec::Vec};
+use alloc::{format, string::{String, ToString}, vec::Vec};
 use spin::Mutex;
 
-use crate::{serial_println, println, serial_print};
+use crate::{serial_println, println, serial_print, dbg};
+use lazy_static::lazy_static;
 
 const ELAPSED_TICKS: Mutex<usize> = Mutex::new(0);
-const TRACE: Mutex<Vec<String>> = Mutex::new(Vec::new());
+lazy_static!{static ref TRACE: Mutex<Vec<String>> = Mutex::new(Vec::new());}
+
 pub fn tick() {
     *ELAPSED_TICKS.lock() += 1;
 }
-
 pub fn get_ticks() -> usize {*ELAPSED_TICKS.lock()}
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -20,8 +21,13 @@ pub enum Level {
     Trace = 5,
 }
 pub fn print_trace() {
+    let mut i = 0;
+    let len = TRACE.lock().len();
     for trace in TRACE.lock().iter() {
-        serial_println!("{}", trace);
+        if (len-i) < 10 {
+            serial_println!("- {}", trace);
+        }
+        i += 1;
     }
 }
 
@@ -33,12 +39,12 @@ pub fn log(msg:impl core::fmt::Display, level: Level) {
         Level::Warn  => "\x1b[1;37m[\x1b[1;33mWARN\x1b[1;37m]  \x1b[;37m",
         Level::Trace => "\x1b[1;37m[\x1b[1;37mTRACE\x1b[1;37m] \x1b[;37m",
     };
-    let msg = format!("{}{}: {} \x1b[;37m", color, get_ticks(), msg);
+    let fmsg = format!("{}{}: {} \x1b[;37m", color, get_ticks(), msg);
     if level == Level::Trace {
-        TRACE.lock().push(msg.clone());
+        TRACE.lock().push(msg.to_string());
     } 
     else {
-        serial_println!("{}", msg);
+        serial_println!("{}", fmsg);
     }
 }
 
@@ -63,4 +69,9 @@ macro_rules! warn {
 macro_rules! trace {
     ($fmt:expr)              => ($crate::log::log($fmt, $crate::log::Level::Trace));
     ($fmt:expr, $($arg:tt)*) => ($crate::log::log(alloc::format!($fmt, $($arg)*), $crate::log::Level::Trace));
+}
+#[macro_export]
+macro_rules! dbg {
+    ($fmt:expr)              => ($crate::log::log($fmt, $crate::log::Level::Debug));
+    ($fmt:expr, $($arg:tt)*) => ($crate::log::log(alloc::format!($fmt, $($arg)*), $crate::log::Level::Debug));
 }

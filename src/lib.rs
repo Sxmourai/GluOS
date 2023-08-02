@@ -10,8 +10,6 @@
 #![allow(unused, dead_code)] //TODO: Only for debug (#[cfg(debug_assertions)])
 
 use alloc::vec::Vec;
-use defmt::dbg;
-use defmt::info;
 use x86_64::VirtAddr;
 
 pub mod state;
