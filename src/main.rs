@@ -11,7 +11,7 @@ extern crate kernel;
 extern crate x86_64;
 
 use crate::kernel::{hlt_loop, serial_println};
-use alloc::vec::Vec;
+use alloc::{vec::Vec, string::String};
 use bootloader::{entry_point, BootInfo};
 use core::{
     ffi::{c_uchar, c_ushort},
@@ -27,7 +27,7 @@ use kernel::{
         console::{pretty_print, CONSOLE},
         shell::Shell,
     },
-    writer::{inb, outb, outb16, inw}, pci::pci_data::print_all_pci_devices, is_bit_set, memory::read_phys_memory_and_map, serial_print_all_bits, err, log::{self, print_trace},
+    writer::{inb, outb, outb16, inw}, pci::pci_data::print_all_pci_devices, is_bit_set, memory::read_phys_memory_and_map, serial_print_all_bits, err, log::{self, print_trace}, dbg,
 };
 use pci_ids::SubSystem;
 use x86_64::{instructions::hlt, VirtAddr};
@@ -37,8 +37,49 @@ entry_point!(kernel_main);
 // Main function of our kernel (1 func to start when boot if not in test mode). Never returns, because kernel runs until machine poweroff
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     kernel::boot(boot_info);
-
     kernel::pci::ata::init();
+
+    // unsafe {
+    //     // dbg!("A{}", inb(0x177));
+    //     outb(0x3f6, (1 << 1) | (1 << 2));
+    //     // Wait for the controller to be ready
+    //     // while (inb(0x1F7) & 0xC0) != 0x40 {}
+
+    //     // Select the master drive
+    //     outb(0x1F6, 0xA0);
+    //     // Delay to wait for the controller to switch to the master drive
+    //     // You may need to adjust the delay based on your hardware
+    //     hlt();
+        
+    //     // Send ATA Identify command (0xEC) to the controller
+    //     outb(0x1F7, 0xEC);
+        
+
+    //     // Wait for the controller to respond
+    //     while (inb(0x1F7) & 0x80) == 0x80 {}
+
+    //     // Read IDENTIFY data from the data ports (0x1F0 - 0x1F7)
+    //     let mut identify_data = [0u16; 256];
+    //     for i in 0..256 {
+    //         let lower = inb(0x1F0);
+    //         identify_data[i] = lower as u16;
+    //     }
+    //     // dbg!("{:?}", identify_data);
+
+    //     // Parse the IDENTIFY data and identify the device
+    //     // (Note: The parsing and identification process depends on the device and chipset)
+    //     let device_model = String::from_utf16_lossy(&identify_data[27..47]);
+    //     let serial_number = String::from_utf16_lossy(&identify_data[10..20]);
+    //     let firmware_revision = String::from_utf16_lossy(&identify_data[23..27]);
+
+    //     // Print information about the SATA device
+    //     println!("Device Model: {}", device_model);
+    //     println!("Serial Number: {}", serial_number);
+    //     println!("Firmware Revision: {}", firmware_revision);
+    // }
+    
+
+
 
     // let identify_data = unsafe {
     //     // Wait for the drive to be ready (BSY = 0, DRQ = 1)

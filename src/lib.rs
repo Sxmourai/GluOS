@@ -98,6 +98,31 @@ pub fn is_bit_set(byte: u8, bit_position: u8) -> bool {
     byte & mask != 0
 }
 
+fn u8_to_u32(u8_data: &[u8]) -> Vec<u32> {
+    let mut u32_data = Vec::new();
+
+    for i in (0..u8_data.len()).step_by(4) {
+        let mut sum = 0;
+        for &byte in &u8_data[i..i + 4] {
+            // Perform the conversion by combining four consecutive u8 values into a u32
+            sum = (sum << 8) | u32::from(byte);
+        }
+        u32_data.push(sum);
+    }
+
+    u32_data
+}
+pub fn u8_bytes_to_u32(bytes: &[u8]) -> u32 { //TODO Change u32 to T
+    let mut result = 0u32;
+    for (i, &byte) in bytes.iter().rev().enumerate() {
+        if i > core::mem::size_of::<u32>() {break}
+        result = (result << 8) | u32::from(byte);
+    }
+
+    result
+}
+
+
 //TODO: Remove the need for these
 
 extern crate alloc; // Lib which stores some useful structs on the heap / smart pointers from stdlib like Vec, String, Box...

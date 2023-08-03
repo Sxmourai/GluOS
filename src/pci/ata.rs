@@ -1,7 +1,8 @@
 use alloc::{string::String, vec::Vec};
+use spin::Mutex;
 
-use crate::{writer::{outb, inb, inw}, println, serial_println, err, log, trace, serial_print_all_bits};
-
+use crate::{writer::{outb, inb, inw}, println, serial_println, err, log, trace, serial_print_all_bits, dbg, u8_to_u32, u8_bytes_to_u32};
+use lazy_static::lazy_static;
 
 const ATA_IDENT_DEVICETYPE: u8   = 0;
 const ATA_IDENT_CYLINDERS: u8    = 2;
@@ -17,7 +18,7 @@ const ATA_IDENT_COMMANDSETS: u8  = 164;
 
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq)]
 enum Channel {
-    Primary = 0x1f0,
+    Primary = 0x1F0,
     Secondary = 0x170,
 }
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq)]
@@ -26,17 +27,35 @@ enum Drive {
     Slave = 0xB0,
 }
 
+#[derive(Debug)]
+struct AddressingModes {
+    chs: bool,
+    lba28: u32, // total number of 28 bit LBA addressable sectors on the drive. (If non-zero, the drive supports LBA28.) 
+    lba48: bool
+}
+#[derive(Debug)]
+pub struct Disk {
+    base_address: u16,
+    addressing_modes: AddressingModes,
+    size: u64,
+    is_hardisk:bool, 
+    //TODO UDMA modes
+}
+
+lazy_static!{static ref DISKS: Mutex<Vec<Disk>> = Mutex::new(Vec::new());}
+
 pub fn init() {
     unsafe { outb(0x3f6, (1 << 1) | (1 << 2))}
+    unsafe { outb(0x376, (1 << 1) | (1 << 2))}
     detect(Channel::Primary, Drive::Master);
     detect(Channel::Primary, Drive::Slave);
     detect(Channel::Secondary, Drive::Master);
     detect(Channel::Secondary, Drive::Slave);
 }
 
-fn detect(channel: Channel, drive: Drive) {
-    trace!("Drive: {:?} on channel: {:?}", drive, &channel);
+fn detect(channel: Channel, drive: Drive) -> Option<Disk> {
     let base = channel as u16;
+    trace!("Drive: {:?} on channel: {:?} | Address: 0x{:X}", drive, &channel, base);
     // unsafe { outb(base+6, 0x80 | 0x40 | 0x20) }; // Send flags
     unsafe { outb(base+6, drive as u8) }; // Select drive of channel
     
@@ -48,48 +67,56 @@ fn detect(channel: Channel, drive: Drive) {
     unsafe { outb(base+7, 0xEC)}; // Send IDENTIFY to selected drive
     
     trace!("Reading drive status");
-    if unsafe { inb(base+7) } == 0 {trace!("Drive does not exist !")}
-    else {
-        unsafe { bsy(base); }
-        if unsafe { inb(base+4) } != 0 && unsafe { inb(base+5) } != 0 {
-            trace!("ATAPI drive detected !");
-        } else {
-            if unsafe { check_drq_or_err(base) }.is_ok() {
-                let mut data = [0u8; 512];
-                let mut capa:u32 = 0;
-                for i in (0..data.len()) {
-                    data[i] = unsafe { inb(base+0) };
-                }
-                for i in 0..data.len()/2 {
-                    match i {
-                        83 => if data[i+1] & 0b100 == 0x01 {
-                            //TODO Parse info returned by IDENTIFY https://wiki.osdev.org/ATA_PIO_Mode
-                            trace!("Drive supports LBA48 mode");
-                        }
-                        _ => {}
-                    }
-                }
-                log!("Found {:?} drive in {:?} channel", drive, channel);
-            } else {
-                err!("Drive {:?} in {:?} channel returned an error after IDENTIFY command", drive, channel);
-            }
-        }
-        // let mut i = 0;
-        // loop { //TODO check if drive isn't ready to transfer DRQ
-        //     i+=1;
-        //     let status = unsafe { inb(base+7) };
-        //     if status & 0x80 == 0x0 ||
-        //        status & 0x08 == 0x1 ||
-        //        status & 0x01 == 0x1 {break}
-        //     //                      ^^^^^^^
-        //     // Use else if for clarity, but useless because of the 'break'
-        //     else if i == 10000000 { err!("Disk is taking too long to respond"); break; }
-        //     else if unsafe { inb(base+4) } != 0 && unsafe { inb(base+5) } != 0 {
-        //         log!("ATAPI drive detected");
-        //         break;
-        //     }
-        // }
+    if unsafe { inb(base+7) } == 0 {
+        trace!("Drive does not exist !");
+        return None;
     }
+    dbg!("{:b}", unsafe {inb(base+7)});
+    unsafe { bsy(base); }
+    if unsafe { inb(base+4) } != 0 || unsafe { inb(base+5) } != 0 {
+        trace!("ATAPI drive detected !");
+    } else if unsafe { check_drq_or_err(base) }.is_err() {
+        dbg!("{:b}", unsafe {inb(base+7)});
+        err!("Drive {:?} in {:?} channel returned an error after IDENTIFY command", drive, channel);
+        //TODO Try to handle the error
+        return None;
+    }
+    dbg!("W{:b}", unsafe {inb(base+7)});
+    let identify = identify_drive(base+0);
+    
+    let mut chs = true; // Assume chs is supported on all ATA drives...
+    let mut lba28 = u8_bytes_to_u32(&identify[120..124]);
+    let mut lba48 = false;
+    let mut is_hardisk = true; //TODO Parse if 'is hard disk'
+
+    
+    for i in 0..identify.len()/2 { //TODO Parse ALL info returned by IDENTIFY https://wiki.osdev.org/ATA_PIO_Mode
+        match i {
+            83 => if identify[i+1] & 0b100 == 0x01 {
+                trace!("Drive supports LBA48 mode");
+                lba48 = true;
+            }
+            _ => {}
+        }
+    }
+    log!("Found {:?} drive in {:?} channel", drive, channel);
+    let disk = Some(Disk {
+        base_address:base,
+        addressing_modes: AddressingModes { chs, lba28, lba48 },
+        size: 0,
+        is_hardisk
+    });
+    dbg!("Disk: {:?}\nIdentify: {:?}", disk, identify);
+    disk
+}
+
+fn identify_drive(command_port_addr:u16) -> [u8; 512] {
+    trace!("Reading identify data");
+    let mut data = [0u8; 512];
+    for i in (0..data.len()) {
+        data[i] = unsafe { inb(command_port_addr) };
+    }
+    data
 }
 
 /*
@@ -148,8 +175,9 @@ enum DriveError {
 unsafe fn check_drq_or_err(base: u16) -> Result<(), DriveError> {
     trace!("Waiting DRQ flag to set at base: {:X}", base);
     let mut status = inb(base+7);
-    while status & 0x08 == 0x00 {
+    loop {
         if status & 0x01 == 0x01 {return Err(DriveError::Err)} //TODO Make better error handling... Or make error handling in top level function
+        if status & 0x08 != 0x00 {break} //TODO When doing binary operations with ==, find a way to always do it the same way (see this line and line on top)
         status = inb(base+7);
     }
     Ok(())

@@ -9,7 +9,7 @@ use x86_64::{structures::paging::{PageTableFlags, PhysFrame, Size4KiB, Mapper, P
 
 static ACPI_HEAD_SIZE:usize = core::mem::size_of::<ACPISDTHeader>();
 
-use crate::{println, find_string, serial_println, serial_print, serial_print_all_bits, memory::read_memory, print, trace};
+use crate::{println, find_string, serial_println, serial_print, serial_print_all_bits, memory::read_memory, print, trace, u8_bytes_to_u32};
 /// This (usually!) contains the base address of the EBDA (Extended Bios Data Area), shifted right by 4
 const EBDA_START_SEGMENT_PTR: usize = 0x40e; // Base address in in 2 bytes
 /// The earliest (lowest) memory address an EBDA (Extended Bios Data Area) can start
@@ -307,13 +307,6 @@ pub struct AddressStructure {
 }
 
 
-// Make sure your data is 4 in length, more will be ignored
-fn u8_bytes_to_u32(bytes: &[u8]) -> u32 {
-    (bytes[0] as u32) |
-    ((bytes[1] as u32) << 8) |
-    ((bytes[2] as u32) << 16) |
-    ((bytes[3] as u32) << 24)
-}
 // Make sure your data is 2 in length, more will be ignored
 fn u8_bytes_to_u16(bytes: &[u8]) -> u16 {
     let mut result = 0;
@@ -336,20 +329,6 @@ fn u8_bytes_to_u64(bytes: &[u8]) -> u64 {
 }
 
 
-fn u8_to_u32(u8_data: &[u8]) -> Vec<u32> {
-    let mut u32_data = Vec::new();
-
-    for i in (0..u8_data.len()).step_by(4) {
-        let mut sum = 0;
-        for &byte in &u8_data[i..i + 4] {
-            // Perform the conversion by combining four consecutive u8 values into a u32
-            sum = (sum << 8) | u32::from(byte);
-        }
-        u32_data.push(sum);
-    }
-
-    u32_data
-}
 
 fn get_rsdt(rsdt_addr: u64) -> RSDT {
     trace!("Getting RSDT at {}", rsdt_addr);

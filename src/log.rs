@@ -42,6 +42,8 @@ pub fn log(msg:impl core::fmt::Display, level: Level) {
     let fmsg = format!("{}{}: {} \x1b[;37m", color, get_ticks(), msg);
     if level == Level::Trace {
         TRACE.lock().push(msg.to_string());
+        #[cfg(feature = "print_trace")]
+        serial_println!("{}", fmsg);
     } 
     else {
         serial_println!("{}", fmsg);
