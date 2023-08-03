@@ -9,6 +9,8 @@
 #![feature(naked_functions)]
 #![allow(unused, dead_code)] //TODO: Only for debug (#[cfg(debug_assertions)])
 
+use alloc::format;
+use alloc::string::String;
 use alloc::vec::Vec;
 use x86_64::VirtAddr;
 
@@ -78,6 +80,48 @@ pub fn serial_print_all_bits<T: Into<u128>>(num: T) {
     serial_print!(" - ");
 }
 
+pub fn bytes<T: Into<u128>>(num: T) -> String {
+    let mut result = String::new();
+    let num = num.into();
+    let size = core::mem::size_of::<T>() * 8;
+
+    for i in (0..size).rev() {
+        let bit = (num >> i) & 1;
+        let str_bit = if bit == 0 {'0'} else {'1'};
+        result.push(str_bit);
+    }
+    result
+}
+pub fn numeric_to_char_vec<T>(value: T) -> String
+where
+    T: Into<u64>,
+{
+    let value_u64 = value.into();
+    let mut char_vec = String::new();
+
+    for shift in (0..(core::mem::size_of::<T>() * 8)).step_by(8) {
+        let byte: u8 = ((value_u64 >> shift) & 0xFF) as u8;
+        char_vec.push(char::from(byte));
+    }
+
+    char_vec
+}
+pub fn bytes_to_numeric<T>(bytes: &[u8]) -> T
+where
+    T: From<u64>,
+{
+    let mut result: u64 = 0;
+
+    for (i, &byte) in bytes.iter().enumerate() {
+        if i < core::mem::size_of::<T>() {
+            result |= (byte as u64) << (i * 8);
+        }
+    }
+
+    T::from(result)
+}
+
+
 // pub unsafe fn from_raw_parts_unchecked<T>(ptr:*mut T, len:usize) -> Vec<T>
 //     where T: Copy  {
 //     let mut v = Vec::new();
@@ -119,6 +163,25 @@ pub fn u8_bytes_to_u32(bytes: &[u8]) -> u32 { //TODO Change u32 to T
         result = (result << 8) | u32::from(byte);
     }
 
+    result
+}
+// trait U16sTo {}
+// impl U16to for u32 {}
+// impl U16to for u64 {}
+pub fn u16_bytes_to_u32(bytes: &[u16]) -> u32 { //TODO Change u32 to T
+    let mut result = 0;
+    for (i, &byte) in bytes.iter().rev().enumerate() {
+        if i > core::mem::size_of::<u32>() {break}
+        result = (result << core::mem::size_of::<u16>()) | u32::from(byte);
+    }
+    result
+}
+pub fn u16_bytes_to_u64(bytes: &[u16]) -> u64 {
+    let mut result = 0;
+    for (i, &byte) in bytes.iter().rev().enumerate() {
+        if i > core::mem::size_of::<u64>() {break}
+        result = (result << core::mem::size_of::<u16>()) | u64::from(byte);
+    }
     result
 }
 

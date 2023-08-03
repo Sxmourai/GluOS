@@ -1,7 +1,7 @@
 use alloc::{string::String, vec::Vec};
 use spin::Mutex;
 
-use crate::{writer::{outb, inb, inw}, println, serial_println, err, log, trace, serial_print_all_bits, dbg, u8_to_u32, u8_bytes_to_u32};
+use crate::{writer::{outb, inb, inw}, println, serial_println, err, log, trace, serial_print_all_bits, dbg, u8_to_u32, u8_bytes_to_u32, u16_bytes_to_u32, u16_bytes_to_u64, serial_print, bytes, numeric_to_char_vec};
 use lazy_static::lazy_static;
 
 const ATA_IDENT_DEVICETYPE: u8   = 0;
@@ -31,7 +31,7 @@ enum Drive {
 struct AddressingModes {
     chs: bool,
     lba28: u32, // total number of 28 bit LBA addressable sectors on the drive. (If non-zero, the drive supports LBA28.) 
-    lba48: bool
+    lba48: u64
 }
 #[derive(Debug)]
 pub struct Disk {
@@ -39,7 +39,7 @@ pub struct Disk {
     addressing_modes: AddressingModes,
     size: u64,
     is_hardisk:bool, 
-    //TODO UDMA modes
+    //TODO UDMA modes and store other infos...
 }
 
 lazy_static!{static ref DISKS: Mutex<Vec<Disk>> = Mutex::new(Vec::new());}
@@ -51,9 +51,78 @@ pub fn init() {
     detect(Channel::Primary, Drive::Slave);
     detect(Channel::Secondary, Drive::Master);
     detect(Channel::Secondary, Drive::Slave);
+    
+
+    
+    // for device in kernel::pci::pci_device_iter() {
+    //     if device.class == 1 && device.subclass == 1 {
+    //         let pi_reg = device.pci_read_32(9) as u8;
+    //             // Check the primary channel (bit 0) of the programming interface.
+    //         let primary_channel_supported = pi_reg & 0x01 == 0;
+
+    //         // Check the secondary channel (bit 1) of the programming interface.
+    //         let secondary_channel_supported = pi_reg & 0x02 == 0;
+
+    //         // Check bit 7 to determine if ATAPI is supported.
+    //         let atapi_supported = pi_reg & 0x80 != 0;
+    //         let r = device.prog_if;
+    //         serial_println!("{:?} {:b} {:b}", (primary_channel_supported, secondary_channel_supported, atapi_supported), r, pi_reg);
+    //         serial_println!("AA{:?}", device.pci_read_32(0x20));
+    //         let mode = if is_bit_set(r, 7) { "NATIVE" } else { "COMPATIBILITY" };
+    //         let can_modify_bit_0 = is_bit_set(r, 6);
+    //         let second_chan_mode = if is_bit_set(r, 5) { "NATIVE" } else { "COMPATIBILITY" };
+    //         let can_modify_bit_2 = is_bit_set(r, 4);
+    //         let dma_support = is_bit_set(r, 0); //When set, this is a bus master IDE controller
+    //         serial_println!("Mode: {}\tCan modify prim chan mode: {}\tSecond channel mode: {}\tCan modify second chan mode: {}\tDMA Supported: {}", mode, can_modify_bit_0, second_chan_mode, can_modify_bit_2, dma_support);
+    //         serial_println!("{:?}", device.bars);
+    //         // Assuming bar4_value contains the non-zero value from BAR4
+    //         let primary_port = (device.bars[4] & 0xFFFC) as u16; // Extract the primary I/O port address
+    //         let secondary_port = ((device.bars[4] >> 16) & 0xFFFC) as u16; // Extract the secondary I/O port address
+
+    //         println!("Primary Port: 0x{:X}", primary_port);
+
+    //         unsafe { outb(primary_port, 0xEC) };
+
+
+
+    //         println!("Secondary Port: 0x{:X}", secondary_port);
+
+    //         for (i,bar) in device.bars.iter().enumerate() {
+    //             if *bar != 0 {
+    //                 // Check if the BAR represents a memory-mapped address
+    //                 if bar & 0x1 == 0 {
+    //                     // Memory-mapped address
+    //                     let memory_address = bar & !0x3; // Mask out the two least significant bits
+    //                     // Read the size of the memory region from the device-specific register
+    //                     // For example, if it's a 32-bit BAR, the size will be 4 bytes (1 << 2).
+    //                     let memory_size = 1 << bar; // Replace `2` with the actual size of the BAR (depends on the device).
+
+    //                     // Use `memory_address` and `memory_size` to access the memory-mapped registers of the IDE controller.
+    //                     let p = device.determine_mem_base(i);
+    //                     let q = device.determine_mem_size(i);
+    //                     serial_println!("Memory: {:?}", (memory_address, memory_size));
+    //                     serial_println!("Memory lib: {:?}", (p,q));
+    //                 } else {
+    //                     // I/O port address
+    //                     // unsafe { outb((*bar).try_into().unwrap(), u8::MAX) };
+    //                     // hlt();
+    //                     let bar_size = unsafe { inb((*bar).try_into().unwrap()) }; // Send all ones
+    //                     let io_port_address = bar & !0x1; // Mask out the least significant bit
+    //                     // Read the size of the I/O port region from the device-specific register
+    //                     // For example, if it's a 16-bit BAR, the size will be 2 bytes (1 << 1).
+    //                     let io_port_size = 1 << bar_size; // Replace `1` with the actual size of the BAR (depends on the device).
+    //                     // Use `io_port_address` and `io_port_size` to access the I/O ports of the IDE controller.
+                        
+    //                     serial_println!("Size: {:b}\tAddress: {:b}\tPort size: {}", bar_size, io_port_address, io_port_size);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 }
 
-fn detect(channel: Channel, drive: Drive) -> Option<Disk> {
+//Detects a disk at specified channel and drive
+fn detect(channel: Channel, drive: Drive) -> () {
     let base = channel as u16;
     trace!("Drive: {:?} on channel: {:?} | Address: 0x{:X}", drive, &channel, base);
     // unsafe { outb(base+6, 0x80 | 0x40 | 0x20) }; // Send flags
@@ -63,58 +132,92 @@ fn detect(channel: Channel, drive: Drive) -> Option<Disk> {
     unsafe { outb(base+3, 0) }; //Clear lba's
     unsafe { outb(base+4, 0) };
     unsafe { outb(base+5, 0) };
-    
+    unsafe { outb(base+7, 0xE7); bsy(base);} //Clear cache
     unsafe { outb(base+7, 0xEC)}; // Send IDENTIFY to selected drive
     
     trace!("Reading drive status");
     if unsafe { inb(base+7) } == 0 {
         trace!("Drive does not exist !");
-        return None;
+        return;
     }
-    dbg!("{:b}", unsafe {inb(base+7)});
     unsafe { bsy(base); }
     if unsafe { inb(base+4) } != 0 || unsafe { inb(base+5) } != 0 {
         trace!("ATAPI drive detected !");
     } else if unsafe { check_drq_or_err(base) }.is_err() {
-        dbg!("{:b}", unsafe {inb(base+7)});
         err!("Drive {:?} in {:?} channel returned an error after IDENTIFY command", drive, channel);
         //TODO Try to handle the error
-        return None;
+        return;
     }
-    dbg!("W{:b}", unsafe {inb(base+7)});
-    let identify = identify_drive(base+0);
-    
-    let mut chs = true; // Assume chs is supported on all ATA drives...
-    let mut lba28 = u8_bytes_to_u32(&identify[120..124]);
-    let mut lba48 = false;
-    let mut is_hardisk = true; //TODO Parse if 'is hard disk'
+    let identify = read_identify(base+0);
 
-    
-    for i in 0..identify.len()/2 { //TODO Parse ALL info returned by IDENTIFY https://wiki.osdev.org/ATA_PIO_Mode
-        match i {
-            83 => if identify[i+1] & 0b100 == 0x01 {
-                trace!("Drive supports LBA48 mode");
-                lba48 = true;
-            }
-            _ => {}
-        }
-    }
+
+
+    let mut chs = true; // Assume chs is supported on all ATA drives...
+    let mut lba28 = u16_bytes_to_u32(&identify[60..61]);
+    let mut lba48 = u16_bytes_to_u64(&identify[100..103]);
+    let mut is_hardisk = true; //TODO Parse if 'is hard disk'
+    //TODO Parse ALL info returned by IDENTIFY https://wiki.osdev.org/ATA_PIO_Mode
+
+
     log!("Found {:?} drive in {:?} channel", drive, channel);
-    let disk = Some(Disk {
+    let disk = Disk {
         base_address:base,
         addressing_modes: AddressingModes { chs, lba28, lba48 },
         size: 0,
         is_hardisk
-    });
-    dbg!("Disk: {:?}\nIdentify: {:?}", disk, identify);
-    disk
+    };
+    let sec_count: u16 = 1; // 0 = 256 (128K)
+    unsafe {
+        //28Bit Lba PIO mode
+        
+        // let d = match drive {
+        //     Drive::Master => 0xE0,
+        //     Drive::Slave => 0xF0,
+        // };
+        // outb(base+6, (d | ((disk.addressing_modes.lba28 >> 24) & 0x0F)).try_into().unwrap());
+        // outb(base+1, 0x00);
+        // outb(base+2, sec_count);
+        // outb(base+3, (disk.addressing_modes.lba28 & 0xFF).try_into().unwrap());
+        // outb(base+4, ((disk.addressing_modes.lba28 >> 8) & 0xFF).try_into().unwrap());
+        // outb(base+5, ((disk.addressing_modes.lba28 >> 16) & 0xFF).try_into().unwrap());
+        // outb(base+7, 0x20);
+        let d = match drive {
+            Drive::Master => 0x40,
+            Drive::Slave => 0x50,
+        };
+        let lba: u64 = 0; 
+
+        outb(base+6, d);                     // Select master
+        outb(base+2, ((sec_count >> 8) & 0xFF).try_into().unwrap() ); // sec_count high
+        outb(base+3, ((lba >> 24) & 0xFF).try_into().unwrap());           // LBA4
+        outb(base+4, ((lba >> 32) & 0xFF).try_into().unwrap());          // LBA5
+        outb(base+5, ((lba >> 40) & 0xFF).try_into().unwrap());           // LBA6
+        outb(base+2, (sec_count & 0xFF).try_into().unwrap());         // sec_count low
+        outb(base+3, (lba & 0xFF).try_into().unwrap());                   // LBA1
+        outb(base+4, ((lba >> 8) & 0xFF).try_into().unwrap());           // LBA2
+        outb(base+5, ((lba >> 16) & 0xFF).try_into().unwrap());           // LBA3
+        outb(base+7, 0x24);                   // READ SECTORS EXT
+    }
+    for i in 0..sec_count {
+        let mut buffer = [0u16; 256];
+        unsafe {check_drq_or_err(base);}
+        for j in 0..256 {
+            buffer[j] = unsafe { inw(base+0) };
+        }
+    }
+
+    DISKS.lock().push(disk);
+    let l = DISKS.lock().len();
+    dbg!("Disk: {:?}", DISKS.lock()[l-1]);
+
 }
 
-fn identify_drive(command_port_addr:u16) -> [u8; 512] {
+
+fn read_identify(command_port_addr:u16) -> [u16; 256] {
     trace!("Reading identify data");
-    let mut data = [0u8; 512];
+    let mut data = [0u16; 256];
     for i in (0..data.len()) {
-        data[i] = unsafe { inb(command_port_addr) };
+        data[i] = unsafe { inw(command_port_addr) };
     }
     data
 }
@@ -148,16 +251,7 @@ pub fn initialize_sata_controller() {
             identify_data[i] = (upper << 8) | lower;
         }
 
-        // Parse the IDENTIFY data and identify the device
-        // (Note: The parsing and identification process depends on the device and chipset)
-        let device_model = String::from_utf16_lossy(&identify_data[27..47]);
-        let serial_number = String::from_utf16_lossy(&identify_data[10..20]);
-        let firmware_revision = String::from_utf16_lossy(&identify_data[23..27]);
 
-        // Print information about the SATA device
-        println!("Device Model: {}", device_model);
-        println!("Serial Number: {}", serial_number);
-        println!("Firmware Revision: {}", firmware_revision);
     }
 }
 */
@@ -176,7 +270,10 @@ unsafe fn check_drq_or_err(base: u16) -> Result<(), DriveError> {
     trace!("Waiting DRQ flag to set at base: {:X}", base);
     let mut status = inb(base+7);
     loop {
-        if status & 0x01 == 0x01 {return Err(DriveError::Err)} //TODO Make better error handling... Or make error handling in top level function
+        if status & 0x01 == 0x01 {
+            err!("Error reading DRQ from drive: {}", bytes(inb(base+1)));
+            return Err(DriveError::Err);
+        } //TODO Make better error handling... Or make error handling in top level function
         if status & 0x08 != 0x00 {break} //TODO When doing binary operations with ==, find a way to always do it the same way (see this line and line on top)
         status = inb(base+7);
     }

@@ -81,9 +81,9 @@ impl Writer {
         }
         unsafe {
             outb(0x3D4, 0x0F);
-            outb16(0x3D5, (pos).try_into().unwrap());
+            outw(0x3D5, (pos).try_into().unwrap());
             outb(0x3D4, 0x0E);
-            outb16(0x3D5, (pos >> 8).try_into().unwrap());
+            outw(0x3D5, (pos >> 8).try_into().unwrap());
         }
     }
     pub fn get_at(&self, pos: &ScreenPos) -> ScreenChar {
@@ -319,34 +319,10 @@ pub unsafe fn outb(port: u16, data: u8) {
     // asm!("out dx, al", in("al") data, in("dx") port);
     // serial_println!("Ok");
 }
-pub unsafe fn outb16(port: u16, data: u16) {
+pub unsafe fn outw(port: u16, data: u16) {
     PortWrite::write_to_port(port, data)
 }
-
-pub unsafe fn inb(port: u16) -> u8 {
-    return PortRead::read_from_port(port);
-    // let value: u32;
-    //     asm!("in eax, dx", out("eax") value, in("dx") port);
-    // if (value != 0 && value.count_zeros() != 0) { // Check if it's not 0 // just ones
-    //     serial_println!("Read 0b{:b} from port 0x{:x}", value, port);
-    // }
-
-    // value
-}
-pub unsafe fn inw(mut port: u16) -> u16 {
-    let lower_byte: u8;
-    let upper_byte: u8;
-
-    // Read the lower byte (LSB) from the I/O port
-    asm!("in al, dx", inout("dx") port, out("al") lower_byte);
-
-    // Increment the port number to read the upper byte (MSB)
-    let mut port_upper = port + 1;
-
-    // Read the upper byte (MSB) from the incremented I/O port
-    asm!("in al, dx", inout("dx") port_upper, out("al") upper_byte);
-
-    // Combine the two bytes to form a 16-bit word (little-endian)
-    let value = ((upper_byte as u16) << 8) | lower_byte as u16;
-    value
-}
+// Alias for read_from_port
+pub unsafe fn inb(port: u16) -> u8 {PortRead::read_from_port(port)}
+pub unsafe fn inw(port: u16) -> u16 {PortRead::read_from_port(port)}
+pub unsafe fn indw(port: u16) -> u32 {PortRead::read_from_port(port)}
