@@ -38,8 +38,64 @@ pub struct Disk {
     base_address: u16,
     addressing_modes: AddressingModes,
     size: u64,
-    is_hardisk:bool, 
+    is_hardisk:bool,
+    channel: Channel,
+    pos: Drive,
     //TODO UDMA modes and store other infos...
+}
+impl Disk {
+    //28Bit Lba PIO mode
+    pub fn read28(&self, lba: u16, sector_count: u8) -> Vec<[u16; 256]> {
+        let drive_addr = match self.pos {
+            Drive::Master => 0xE0,
+            Drive::Slave => 0xF0,
+        };
+        let base = self.channel as u16;
+        unsafe {
+            outb(base+6, (drive_addr | ((self.addressing_modes.lba28 >> 24) & 0x0F)).try_into().unwrap());
+            outb(base+1, 0x00);
+            outb(base+2, sector_count);
+            outb(base+3, (self.addressing_modes.lba28 & 0xFF).try_into().unwrap());
+            outb(base+4, ((self.addressing_modes.lba28 >> 8) & 0xFF).try_into().unwrap());
+            outb(base+5, ((self.addressing_modes.lba28 >> 16) & 0xFF).try_into().unwrap());
+            outb(base+7, 0x20);
+        }
+        self.retrieve_read(sector_count as u64)
+    }
+    //48Bit Lba PIO mode
+    pub fn read48(&self, lba: u16, sector_count: u64) -> Vec<[u16; 256]> {
+        let drive_addr = match self.pos {
+            Drive::Master => 0x40,
+            Drive::Slave => 0x50,
+        };
+        let base = self.channel as u16;
+
+        unsafe {
+            outb(base+6, drive_addr);                     // Select master
+            outb(base+2, ((sector_count >> 8) & 0xFF).try_into().unwrap() ); // sec_count high
+            outb(base+3, ((lba >> 24) & 0xFF).try_into().unwrap());           // LBA4
+            outb(base+4, ((lba >> 32) & 0xFF).try_into().unwrap());          // LBA5
+            outb(base+5, ((lba >> 40) & 0xFF).try_into().unwrap());           // LBA6
+            outb(base+2, (sector_count & 0xFF).try_into().unwrap());         // sec_count low
+            outb(base+3, (lba & 0xFF).try_into().unwrap());                   // LBA1
+            outb(base+4, ((lba >> 8) & 0xFF).try_into().unwrap());           // LBA2
+            outb(base+5, ((lba >> 16) & 0xFF).try_into().unwrap());           // LBA3
+            outb(base+7, 0x24);                   // READ SECTORS EXT
+        }
+        self.retrieve_read(sector_count)
+    }
+    fn retrieve_read(&self, sector_count: u64) -> Vec<[u16; 256]> {
+        let mut buffer = Vec::new();
+        for i in 0..sector_count {
+            let mut inner_buffer = [0u16; 256];
+            unsafe {check_drq_or_err(self.channel as u16);}
+            for j in 0..256 {
+                inner_buffer[j] = unsafe { inw(self.channel as u16) };
+            }
+            buffer.push(inner_buffer);
+        }
+        buffer
+    }
 }
 
 lazy_static!{static ref DISKS: Mutex<Vec<Disk>> = Mutex::new(Vec::new());}
@@ -51,7 +107,66 @@ pub fn init() {
     detect(Channel::Primary, Drive::Slave);
     detect(Channel::Secondary, Drive::Master);
     detect(Channel::Secondary, Drive::Slave);
+}
+
+//Detects a disk at specified channel and drive
+fn detect(channel: Channel, drive: Drive) -> () {
+    let base = channel as u16;
+    trace!("Drive: {:?} on channel: {:?} | Address: 0x{:X}", drive, &channel, base);
+    // unsafe { outb(base+6, 0x80 | 0x40 | 0x20) }; // Send flags
+    unsafe { outb(base+6, drive as u8) }; // Select drive of channel
     
+    unsafe { outb(base+2, 0) }; //Clear sector count
+    unsafe { outb(base+3, 0) }; //Clear lba's
+    unsafe { outb(base+4, 0) };
+    unsafe { outb(base+5, 0) };
+    unsafe { outb(base+7, 0xE7); bsy(base);} //Clear cache
+    unsafe { outb(base+7, 0xEC)}; // Send IDENTIFY to selected drive
+    
+    trace!("Reading drive status");
+    if unsafe { inb(base+7) } == 0 {
+        trace!("Drive does not exist !");
+        return;
+    }
+    unsafe { bsy(base); }
+    if unsafe { inb(base+4) } != 0 || unsafe { inb(base+5) } != 0 {
+        trace!("ATAPI drive detected !");
+    } else if unsafe { check_drq_or_err(base) }.is_err() {
+        err!("Drive {:?} in {:?} channel returned an error after IDENTIFY command", drive, channel);
+        //TODO Try to handle the error
+        return;
+    }
+    let identify = read_identify(base+0);
+
+
+
+    let mut chs = true; // Assume chs is supported on all ATA drives...
+    let mut lba28 = u16_bytes_to_u32(&identify[60..61]);
+    let mut lba48 = u16_bytes_to_u64(&identify[100..103]);
+    let mut is_hardisk = true; //TODO Parse if 'is hard disk'
+    //TODO Parse ALL info returned by IDENTIFY https://wiki.osdev.org/ATA_PIO_Mode
+
+
+    log!("Found {:?} drive in {:?} channel", drive, channel);
+    let disk = Disk {
+        base_address:base,
+        addressing_modes: AddressingModes { chs, lba28, lba48 },
+        size: 0,
+        is_hardisk,
+        channel,
+        pos: drive,
+    };
+    DISKS.lock().push(disk);
+}
+
+fn read_identify(command_port_addr:u16) -> [u16; 256] {
+    trace!("Reading identify data");
+    let mut data = [0u16; 256];
+    for i in (0..data.len()) {
+        data[i] = unsafe { inw(command_port_addr) };
+    }
+    data
+}
 
     
     // for device in kernel::pci::pci_device_iter() {
@@ -119,108 +234,7 @@ pub fn init() {
     //         }
     //     }
     // }
-}
 
-//Detects a disk at specified channel and drive
-fn detect(channel: Channel, drive: Drive) -> () {
-    let base = channel as u16;
-    trace!("Drive: {:?} on channel: {:?} | Address: 0x{:X}", drive, &channel, base);
-    // unsafe { outb(base+6, 0x80 | 0x40 | 0x20) }; // Send flags
-    unsafe { outb(base+6, drive as u8) }; // Select drive of channel
-    
-    unsafe { outb(base+2, 0) }; //Clear sector count
-    unsafe { outb(base+3, 0) }; //Clear lba's
-    unsafe { outb(base+4, 0) };
-    unsafe { outb(base+5, 0) };
-    unsafe { outb(base+7, 0xE7); bsy(base);} //Clear cache
-    unsafe { outb(base+7, 0xEC)}; // Send IDENTIFY to selected drive
-    
-    trace!("Reading drive status");
-    if unsafe { inb(base+7) } == 0 {
-        trace!("Drive does not exist !");
-        return;
-    }
-    unsafe { bsy(base); }
-    if unsafe { inb(base+4) } != 0 || unsafe { inb(base+5) } != 0 {
-        trace!("ATAPI drive detected !");
-    } else if unsafe { check_drq_or_err(base) }.is_err() {
-        err!("Drive {:?} in {:?} channel returned an error after IDENTIFY command", drive, channel);
-        //TODO Try to handle the error
-        return;
-    }
-    let identify = read_identify(base+0);
-
-
-
-    let mut chs = true; // Assume chs is supported on all ATA drives...
-    let mut lba28 = u16_bytes_to_u32(&identify[60..61]);
-    let mut lba48 = u16_bytes_to_u64(&identify[100..103]);
-    let mut is_hardisk = true; //TODO Parse if 'is hard disk'
-    //TODO Parse ALL info returned by IDENTIFY https://wiki.osdev.org/ATA_PIO_Mode
-
-
-    log!("Found {:?} drive in {:?} channel", drive, channel);
-    let disk = Disk {
-        base_address:base,
-        addressing_modes: AddressingModes { chs, lba28, lba48 },
-        size: 0,
-        is_hardisk
-    };
-    let sec_count: u16 = 1; // 0 = 256 (128K)
-    unsafe {
-        //28Bit Lba PIO mode
-        
-        // let d = match drive {
-        //     Drive::Master => 0xE0,
-        //     Drive::Slave => 0xF0,
-        // };
-        // outb(base+6, (d | ((disk.addressing_modes.lba28 >> 24) & 0x0F)).try_into().unwrap());
-        // outb(base+1, 0x00);
-        // outb(base+2, sec_count);
-        // outb(base+3, (disk.addressing_modes.lba28 & 0xFF).try_into().unwrap());
-        // outb(base+4, ((disk.addressing_modes.lba28 >> 8) & 0xFF).try_into().unwrap());
-        // outb(base+5, ((disk.addressing_modes.lba28 >> 16) & 0xFF).try_into().unwrap());
-        // outb(base+7, 0x20);
-        let d = match drive {
-            Drive::Master => 0x40,
-            Drive::Slave => 0x50,
-        };
-        let lba: u64 = 0; 
-
-        outb(base+6, d);                     // Select master
-        outb(base+2, ((sec_count >> 8) & 0xFF).try_into().unwrap() ); // sec_count high
-        outb(base+3, ((lba >> 24) & 0xFF).try_into().unwrap());           // LBA4
-        outb(base+4, ((lba >> 32) & 0xFF).try_into().unwrap());          // LBA5
-        outb(base+5, ((lba >> 40) & 0xFF).try_into().unwrap());           // LBA6
-        outb(base+2, (sec_count & 0xFF).try_into().unwrap());         // sec_count low
-        outb(base+3, (lba & 0xFF).try_into().unwrap());                   // LBA1
-        outb(base+4, ((lba >> 8) & 0xFF).try_into().unwrap());           // LBA2
-        outb(base+5, ((lba >> 16) & 0xFF).try_into().unwrap());           // LBA3
-        outb(base+7, 0x24);                   // READ SECTORS EXT
-    }
-    for i in 0..sec_count {
-        let mut buffer = [0u16; 256];
-        unsafe {check_drq_or_err(base);}
-        for j in 0..256 {
-            buffer[j] = unsafe { inw(base+0) };
-        }
-    }
-
-    DISKS.lock().push(disk);
-    let l = DISKS.lock().len();
-    dbg!("Disk: {:?}", DISKS.lock()[l-1]);
-
-}
-
-
-fn read_identify(command_port_addr:u16) -> [u16; 256] {
-    trace!("Reading identify data");
-    let mut data = [0u16; 256];
-    for i in (0..data.len()) {
-        data[i] = unsafe { inw(command_port_addr) };
-    }
-    data
-}
 
 /*
 pub fn initialize_sata_controller() {
