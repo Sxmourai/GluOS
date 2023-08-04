@@ -1,18 +1,9 @@
 use alloc::string::{String, ToString};
 
 
-pub enum OpenError {
+pub enum DiskError {
     NotFound, 
     PermissionDenied, // Shouldn't happen... But keep this for rlib ?
-}
-pub enum ReadError {
-    NotFound, // This could happen with multithreading
-    //TODO Find a way to make sure that when a file is opened, it cannot be deleted
-    PermissionDenied, 
-}
-pub enum WriteError {
-    NotFound,
-    PermissionDenied,
 }
 
 pub struct File {
@@ -24,23 +15,23 @@ impl File {
             name,
         }
     }
-    pub fn read(&self) -> Result<String, ReadError> {
+    pub fn read(&self) -> Result<String, DiskError> {
         Ok(todo!("Read"))
     }
-    pub fn write(&self, content: String) -> Result<(), WriteError> {
+    pub fn write(&self, content: String) -> Result<(), DiskError> {
         Ok(())
     }
 }
 
-pub fn open(filename: &str) -> Result<File, OpenError> {
+pub fn open(filename: &str) -> Result<File, DiskError> {
     Ok(File::new(filename.to_string()))
 }
-pub fn read(filename: &str) -> Result<String, ReadError> {
+pub fn read(filename: &str) -> Result<String, DiskError> {
     open(filename)?.read()
 }
-pub fn write(filename: &str, content: &str) -> Result<(), WriteError> {
+pub fn write(filename: &str, content: &str) -> Result<(), DiskError> {
     open(filename).write(content.to_string())
 }
-pub fn delete(filename: &str) -> Result<(), WriteError> {
+pub fn delete(filename: &str) -> Result<(), DiskError> {
     open(filename).delete()
 }
