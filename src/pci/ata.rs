@@ -22,9 +22,9 @@ enum Channel {
     Secondary = 0x170,
 }
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq)]
-enum Drive {
-    Master = 0xA0,
-    Slave = 0xB0,
+pub enum Drive {
+    Master,
+    Slave,
 }
 
 #[derive(Debug)]
@@ -33,6 +33,7 @@ struct AddressingModes {
     lba28: u32, // total number of 28 bit LBA addressable sectors on the drive. (If non-zero, the drive supports LBA28.) 
     lba48: u64
 }
+
 #[derive(Debug)]
 pub struct Disk {
     base_address: u16,
@@ -40,13 +41,38 @@ pub struct Disk {
     size: u64,
     is_hardisk:bool,
     channel: Channel,
-    pos: Drive,
+    drive: Drive,
     //TODO UDMA modes and store other infos...
 }
 impl Disk {
+    pub fn new(base_address: u16, drive: Drive, lba28: u32, lba48: u64, size: u64, is_hardisk: bool) -> Self {
+        let channel = match base_address {
+            0x1F0 => Channel::Primary,
+            0x170 => Channel::Secondary,
+            _ => panic!("Provided invalid address: {:X}\n{:?}", base_address, (drive,lba28,lba48,size,is_hardisk))
+        };
+        Self {
+            base_address,
+            addressing_modes: AddressingModes { chs: true, lba28, lba48 }, // Assume chs is supported on all ATA drives...
+            size,
+            is_hardisk,
+            channel,
+            drive,
+        }
+    }
+    fn data_register(&self)         -> u16 {self.base_address+0}
+    fn error_register(&self)        -> u16 {self.base_address+1}
+    fn features_register(&self)     -> u16 {self.base_address+2}
+    fn sector_count_register(&self) -> u16 {self.base_address+3}
+    fn lbalo_register(&self)        -> u16 {self.base_address+4}
+    fn lbamid_register(&self)       -> u16 {self.base_address+5}
+    fn lbahi_register(&self)        -> u16 {self.base_address+6}
+    fn drive_head_register(&self)   -> u16 {self.base_address+7}
+    fn command_register(&self)      -> u16 {self.base_address+7}
+
     //28Bit Lba PIO mode
     pub fn read28(&self, lba: u16, sector_count: u8) -> Vec<[u16; 256]> {
-        let drive_addr = match self.pos {
+        let drive_addr = match self.drive {
             Drive::Master => 0xE0,
             Drive::Slave => 0xF0,
         };
@@ -64,7 +90,7 @@ impl Disk {
     }
     //48Bit Lba PIO mode
     pub fn read48(&self, lba: u16, sector_count: u64) -> Vec<[u16; 256]> {
-        let drive_addr = match self.pos {
+        let drive_addr = match self.drive {
             Drive::Master => 0x40,
             Drive::Slave => 0x50,
         };
@@ -114,7 +140,11 @@ fn detect(channel: Channel, drive: Drive) -> () {
     let base = channel as u16;
     trace!("Drive: {:?} on channel: {:?} | Address: 0x{:X}", drive, &channel, base);
     // unsafe { outb(base+6, 0x80 | 0x40 | 0x20) }; // Send flags
-    unsafe { outb(base+6, drive as u8) }; // Select drive of channel
+    let drive_addr = match drive {
+        Drive::Master => 0xA0,
+        Drive::Slave  => 0xB0
+    };
+    unsafe { outb(base+6, drive_addr) }; // Select drive of channel
     
     unsafe { outb(base+2, 0) }; //Clear sector count
     unsafe { outb(base+3, 0) }; //Clear lba's
@@ -140,22 +170,14 @@ fn detect(channel: Channel, drive: Drive) -> () {
 
 
 
-    let mut chs = true; // Assume chs is supported on all ATA drives...
-    let mut lba28 = u16_bytes_to_u32(&identify[60..61]);
-    let mut lba48 = u16_bytes_to_u64(&identify[100..103]);
-    let mut is_hardisk = true; //TODO Parse if 'is hard disk'
+    let lba28 = u16_bytes_to_u32(&identify[60..61]);
+    let lba48 = u16_bytes_to_u64(&identify[100..103]);
+    let is_hardisk = true; //TODO Parse if 'is hard disk'
     //TODO Parse ALL info returned by IDENTIFY https://wiki.osdev.org/ATA_PIO_Mode
 
 
     log!("Found {:?} drive in {:?} channel", drive, channel);
-    let disk = Disk {
-        base_address:base,
-        addressing_modes: AddressingModes { chs, lba28, lba48 },
-        size: 0,
-        is_hardisk,
-        channel,
-        pos: drive,
-    };
+    let disk = Disk::new(base, drive, lba28, lba48, 0, is_hardisk);
     DISKS.lock().push(disk);
 }
 

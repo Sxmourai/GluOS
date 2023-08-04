@@ -34,6 +34,7 @@ pub use boot::{boot, hlt_loop};
 pub mod cpu;
 pub mod pci;
 pub mod log;
+pub mod fs;
 //pub mod apic; //!causes compiler error
 
 
