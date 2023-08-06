@@ -1,7 +1,7 @@
 use alloc::{string::String, vec::Vec};
 use spin::Mutex;
 
-use crate::{writer::{outb, inb, inw}, println, serial_println, err, log, trace, serial_print_all_bits, dbg, u8_to_u32, u8_bytes_to_u32, u16_bytes_to_u32, u16_bytes_to_u64, serial_print, bytes, numeric_to_char_vec};
+use crate::{writer::{outb, inb, inw}, println, serial_println, err, log, trace, serial_print_all_bits, dbg, serial_print, bytes, numeric_to_char_vec, fs::{DiskError, unite_sectors}, u16_to_u8, CharArray, CharSlice, CharSlicePtr, list_to_num, ptrlist_to_num};
 use lazy_static::lazy_static;
 
 const ATA_IDENT_DEVICETYPE: u8   = 0;
@@ -16,8 +16,146 @@ const ATA_IDENT_FIELDVALID: u8   = 106;
 const ATA_IDENT_MAX_LBA_EXT: u8  = 200;
 const ATA_IDENT_COMMANDSETS: u8  = 164;
 
+//TODO Find real number
+pub const SECTOR_SIZE: u16 = 256; // Sometimes 500... 
+
+
+lazy_static!{static ref DISKS: Mutex<Vec<Disk>> = Mutex::new(Vec::new());}
+
+
+pub fn init() {
+    unsafe { outb(0x3f6, (1 << 1) | (1 << 2))}
+    unsafe { outb(0x376, (1 << 1) | (1 << 2))}
+    detect(Channel::Primary, Drive::Master);
+    detect(Channel::Primary, Drive::Slave);
+    detect(Channel::Secondary, Drive::Master);
+    detect(Channel::Secondary, Drive::Slave);
+}
+
+//Detects a disk at specified channel and drive
+fn detect(channel: Channel, drive: Drive) -> () {
+    let base = channel as u16;
+    trace!("Drive: {:?} on channel: {:?} | Address: 0x{:X}", drive, &channel, base);
+    // unsafe { outb(base+6, 0x80 | 0x40 | 0x20) }; // Send flags
+    let drive_addr = match drive {
+        Drive::Master => 0xA0,
+        Drive::Slave  => 0xB0
+    };
+    unsafe { outb(base+6, drive_addr) }; // Select drive of channel
+    
+    let drive_type = get_selected_drive_type(channel);
+    let identify_command = if drive_type == DriveType::PATAPI {0xA1} else {0xEC};
+
+    unsafe { outb(base+2, 0) }; //Clear sector count
+    unsafe { outb(base+3, 0) }; //Clear lba's
+    unsafe { outb(base+4, 0) };
+    unsafe { outb(base+5, 0) };
+    unsafe { outb(base+7, 0xE7); bsy(base);} //Clear cache
+    unsafe { outb(base+7, identify_command)}; // Send IDENTIFY to selected drive
+    
+    trace!("Reading drive status");
+    if unsafe { inb(base+7) } == 0 {
+        trace!("Drive does not exist !");
+        return;
+    }
+    unsafe { bsy(base); }
+    if unsafe { inb(base+4) } != 0 || unsafe { inb(base+5) } != 0 {
+        trace!("ATAPI drive detected !");
+    } else if unsafe { check_drq_or_err(base) }.is_err() {
+        err!("Drive {:?} in {:?} channel returned an error after IDENTIFY command", drive, channel);
+        //TODO Try to handle the error
+        return;
+    }
+    let mut identify = read_identify(base+0);
+    let mut u8_identify = [0u8; 512];
+    let mut char_identify = ['\0'; 512];
+    for i in 0..identify.len() {
+        let j = i*2;
+        (u8_identify[j],u8_identify[j+1]) = u16_to_u8(identify[i]);
+        let (byte0, byte1) = u16_to_u8(identify[i]);
+        char_identify[j] = byte0 as char;
+        char_identify[j+1] = byte1 as char;
+    }
+    // dbg!("Serial number: {}\tFirmware revision: {}\tModel number: {}", CharSlicePtr(&char_identify[20..40]), CharSlicePtr(&char_identify[46..52]), CharSlicePtr(&char_identify[54..92]));
+
+    // let rev = identify[60..61].iter().rev().collect::<Vec<u16>>();
+    let lba28 = ptrlist_to_num(&mut identify[60..61].into_iter());
+    let lba48: u64 = ptrlist_to_num(&mut identify[100..103].into_iter());
+    let is_hardisk = true; //TODO Parse if 'i24612s hard disk'
+    //TODO Parse ALL info returned by IDENTIFY https://wiki.osdev.org/ATA_PIO_Mode
+
+
+    log!("S{} {}", lba28, lba48);
+    log!("Found {:?} {:?} drive in {:?} channel of size: {}", drive, drive_type, channel, ((lba48.max(lba28 as u64)*512  )/1024));
+    let disk = Disk::new(base, drive, lba28, lba48, 0, is_hardisk);
+    DISKS.lock().push(disk);
+}
+
+fn read_identify(command_port_addr:u16) -> [u16; 256] {
+    trace!("Reading identify data");
+    let mut data = [0u16; 256];
+    for i in (0..data.len()) {
+        data[i] = unsafe { inw(command_port_addr) };
+    }
+    data
+}
+
+//Returns drive type, packet, nonpacket or ATA by default
+fn get_selected_drive_type(channel: Channel) -> DriveType {
+    //TODO Do proper waiting etc, working in qemu tho
+    let base = channel as u16;
+    unsafe { outb(base+7, 0x90) }; // Reset drive
+    let sector_count = unsafe { inb(base+2) };
+    let lba_low = unsafe { inb(base+3) };
+    let lba_mid = unsafe { inb(base+4) };
+    let lba_high = unsafe { inb(base+5) };
+    
+    // let signature = (sector_count, lba_low, lba_mid, lba_high);
+    let end_signature = (lba_mid, lba_high);
+    
+    if end_signature == (0,0) { return DriveType::PATA; }
+    if end_signature == (0x14, 0xEB) { return DriveType::PATAPI; }
+    if end_signature == (0x69, 0x96) { return DriveType::SATAPI; }
+    if end_signature == (0x3c, 0xc3) { return DriveType::SATA; }
+    else { dbg!("Found drive of unknown type: {:?}", end_signature);return DriveType::UNKNOWN; }
+}
+pub fn read_from_disk(channel: Channel, disk: Drive, start: u64, end:u64) -> String {
+    let base = channel as u16;let drive_addr = match disk {
+        Drive::Master => 0xA0,
+        Drive::Slave  => 0xB0
+    };
+    unsafe { outb(base+6, drive_addr) }; // Select drive of channel
+    unsafe { inb(base+0) }; // Wait a bit
+    unsafe { inb(base+0) }; // Wait a bit
+    unsafe { inb(base+0) }; // Wait a bit
+    unsafe { inb(base+0) }; // Wait a bit
+
+    
+    let offset_from_sector_start = start%SECTOR_SIZE as u64;
+    let start_sector = start/SECTOR_SIZE as u64;
+    let size = end-start;
+    let mut sector_count = (size/SECTOR_SIZE as u64).try_into().unwrap();
+    sector_count += 2;
+    
+    let sectors = read_sectors(start_sector.into(), sector_count).unwrap();
+    trace!("Read {} sectors", sectors.len());
+    let raw = unite_sectors(sectors);
+    
+    let start = start as usize;
+    let slice = &raw[offset_from_sector_start as usize..(offset_from_sector_start as usize + size as usize)];
+    // return String::from_utf16_lossy(slice);
+    let mut content = String::new();
+    for (i,w) in slice.iter().enumerate() {
+        content.push(((w & 0xFF) as u8) as char);// Interpreted as chars
+        content.push(((w >> 8) as u8) as char); //Transforms the word into two bytes
+    }
+    content
+}
+
+
+
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq)]
-enum Channel {
+pub enum Channel {
     Primary = 0x1F0,
     Secondary = 0x170,
 }
@@ -26,6 +164,17 @@ pub enum Drive {
     Master,
     Slave,
 }
+
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq)]
+pub enum DriveType {
+    PATA,
+    PATAPI,
+    SATAPI,
+    SATA,
+    UNKNOWN,
+}
+
+
 
 #[derive(Debug)]
 struct AddressingModes {
@@ -71,7 +220,7 @@ impl Disk {
     fn command_register(&self)      -> u16 {self.base_address+7}
 
     //28Bit Lba PIO mode
-    pub fn read28(&self, lba: u16, sector_count: u8) -> Vec<[u16; 256]> {
+    pub fn read28(&self, lba: u32, sector_count: u8) -> Vec<[u16; 256]> {
         let drive_addr = match self.drive {
             Drive::Master => 0xE0,
             Drive::Slave => 0xF0,
@@ -86,10 +235,10 @@ impl Disk {
             outb(base+5, ((self.addressing_modes.lba28 >> 16) & 0xFF).try_into().unwrap());
             outb(base+7, 0x20);
         }
-        self.retrieve_read(sector_count as u64)
+        self.retrieve_read(sector_count.into())
     }
     //48Bit Lba PIO mode
-    pub fn read48(&self, lba: u16, sector_count: u64) -> Vec<[u16; 256]> {
+    pub fn read48(&self, lba: u64, sector_count: u16) -> Vec<[u16; 256]> {
         let drive_addr = match self.drive {
             Drive::Master => 0x40,
             Drive::Slave => 0x50,
@@ -110,7 +259,7 @@ impl Disk {
         }
         self.retrieve_read(sector_count)
     }
-    fn retrieve_read(&self, sector_count: u64) -> Vec<[u16; 256]> {
+    fn retrieve_read(&self, sector_count: u16) -> Vec<[u16; 256]> {
         let mut buffer = Vec::new();
         for i in 0..sector_count {
             let mut inner_buffer = [0u16; 256];
@@ -122,74 +271,25 @@ impl Disk {
         }
         buffer
     }
-}
-
-lazy_static!{static ref DISKS: Mutex<Vec<Disk>> = Mutex::new(Vec::new());}
-
-pub fn init() {
-    unsafe { outb(0x3f6, (1 << 1) | (1 << 2))}
-    unsafe { outb(0x376, (1 << 1) | (1 << 2))}
-    detect(Channel::Primary, Drive::Master);
-    detect(Channel::Primary, Drive::Slave);
-    detect(Channel::Secondary, Drive::Master);
-    detect(Channel::Secondary, Drive::Slave);
-}
-
-//Detects a disk at specified channel and drive
-fn detect(channel: Channel, drive: Drive) -> () {
-    let base = channel as u16;
-    trace!("Drive: {:?} on channel: {:?} | Address: 0x{:X}", drive, &channel, base);
-    // unsafe { outb(base+6, 0x80 | 0x40 | 0x20) }; // Send flags
-    let drive_addr = match drive {
-        Drive::Master => 0xA0,
-        Drive::Slave  => 0xB0
-    };
-    unsafe { outb(base+6, drive_addr) }; // Select drive of channel
-    
-    unsafe { outb(base+2, 0) }; //Clear sector count
-    unsafe { outb(base+3, 0) }; //Clear lba's
-    unsafe { outb(base+4, 0) };
-    unsafe { outb(base+5, 0) };
-    unsafe { outb(base+7, 0xE7); bsy(base);} //Clear cache
-    unsafe { outb(base+7, 0xEC)}; // Send IDENTIFY to selected drive
-    
-    trace!("Reading drive status");
-    if unsafe { inb(base+7) } == 0 {
-        trace!("Drive does not exist !");
-        return;
+    pub fn read_sectors(&self, sector_address: u64, sector_count: u16) -> Result<Vec<[u16; 256]>, DiskError> {
+        //TODO Move from vecs to slices
+        if self.addressing_modes.lba48 != 0 {
+            Ok(self.read48(sector_address, sector_count))
+        } else if self.addressing_modes.lba28 != 0 {
+            let sector_address = sector_address.try_into()?;
+            let sector_count    =   sector_count.try_into()?;
+            Ok(self.read28(sector_address, sector_count))
+        } else if self.addressing_modes.chs == true {
+            todo!("Implement CHS pio mode");
+            // return self.readchs(sector_address.try_into()?, sector_count.try_into()?)
+        } else {
+            Err(DiskError::NoReadModeAvailable)
+        }
     }
-    unsafe { bsy(base); }
-    if unsafe { inb(base+4) } != 0 || unsafe { inb(base+5) } != 0 {
-        trace!("ATAPI drive detected !");
-    } else if unsafe { check_drq_or_err(base) }.is_err() {
-        err!("Drive {:?} in {:?} channel returned an error after IDENTIFY command", drive, channel);
-        //TODO Try to handle the error
-        return;
-    }
-    let identify = read_identify(base+0);
-
-
-
-    let lba28 = u16_bytes_to_u32(&identify[60..61]);
-    let lba48 = u16_bytes_to_u64(&identify[100..103]);
-    let is_hardisk = true; //TODO Parse if 'is hard disk'
-    //TODO Parse ALL info returned by IDENTIFY https://wiki.osdev.org/ATA_PIO_Mode
-
-
-    log!("Found {:?} drive in {:?} channel", drive, channel);
-    let disk = Disk::new(base, drive, lba28, lba48, 0, is_hardisk);
-    DISKS.lock().push(disk);
 }
-
-fn read_identify(command_port_addr:u16) -> [u16; 256] {
-    trace!("Reading identify data");
-    let mut data = [0u16; 256];
-    for i in (0..data.len()) {
-        data[i] = unsafe { inw(command_port_addr) };
-    }
-    data
+pub fn read_sectors(sector_address: u64, sector_count: u16) -> Result<Vec<[u16; 256]>, DiskError> {
+    DISKS.lock().get(0).unwrap().read_sectors(sector_address, sector_count)
 }
-
     
     // for device in kernel::pci::pci_device_iter() {
     //     if device.class == 1 && device.subclass == 1 {

@@ -9,7 +9,7 @@ use x86_64::{structures::paging::{PageTableFlags, PhysFrame, Size4KiB, Mapper, P
 
 static ACPI_HEAD_SIZE:usize = core::mem::size_of::<ACPISDTHeader>();
 
-use crate::{println, find_string, serial_println, serial_print, serial_print_all_bits, memory::read_memory, print, trace, u8_bytes_to_u32};
+use crate::{println, find_string, serial_println, serial_print, serial_print_all_bits, memory::read_memory, print, trace, list_to_num, ptrlist_to_num, dbg, bytes};
 /// This (usually!) contains the base address of the EBDA (Extended Bios Data Area), shifted right by 4
 const EBDA_START_SEGMENT_PTR: usize = 0x40e; // Base address in in 2 bytes
 /// The earliest (lowest) memory address an EBDA (Extended Bios Data Area) can start
@@ -307,27 +307,6 @@ pub struct AddressStructure {
 }
 
 
-// Make sure your data is 2 in length, more will be ignored
-fn u8_bytes_to_u16(bytes: &[u8]) -> u16 {
-    let mut result = 0;
-    result |= (bytes[0] as u16) << 8;
-    result |=  bytes[1] as u16;
-    result
-}
-// Make sure your data is 8 in length, more will be ignored
-fn u8_bytes_to_u64(bytes: &[u8]) -> u64 {
-    let mut result = 0;
-    result |= (bytes[0] as u64) << 56;
-    result |= (bytes[1] as u64) << 48;
-    result |= (bytes[2] as u64) << 40;
-    result |= (bytes[3] as u64) << 32;
-    result |= (bytes[4] as u64) << 24;
-    result |= (bytes[5] as u64) << 16;
-    result |= (bytes[6] as u64) << 8;
-    result |=  bytes[7] as u64;
-    result
-}
-
 
 
 fn get_rsdt(rsdt_addr: u64) -> RSDT {
@@ -341,7 +320,8 @@ fn get_rsdt(rsdt_addr: u64) -> RSDT {
     let sdts = unsafe { from_raw_parts(ptr_addr as *const u8, sdts_size) };
     let mut pointer_to_other_sdt = Vec::new();
     for i in (0..sdts.len()).step_by(4) {
-        pointer_to_other_sdt.push(u8_bytes_to_u32(&sdts[i..i+4]));
+        let addr = ptrlist_to_num(&mut sdts[i..i+4].into_iter());
+        pointer_to_other_sdt.push(addr);
     }
     RSDT { h: rsdt_header, pointer_to_other_sdt }
 }

@@ -38,6 +38,7 @@ pub mod fs;
 //pub mod apic; //!causes compiler error
 
 
+use core::fmt::Display;
 //-----------TESTS HANDLING-----------
 use core::panic::PanicInfo;
 #[cfg(test)]
@@ -134,57 +135,65 @@ where
 //     v
 // }
 
-
-pub fn is_bit_set(byte: u8, bit_position: u8) -> bool {
-    // Create a mask with only the bit at the specified position set to 1
-    let mask = 1 << bit_position;
-    // Perform a bitwise AND operation with the mask
-    // If the result is non-zero, the bit is set to 1; otherwise, the bit is 0.
-    byte & mask != 0
+///! DANGER ZONE DONT GO THERE 🤣
+pub fn list_to_num<T,R>(mut content: impl Iterator<Item = T> + core::iter::DoubleEndedIterator) -> R 
+where T: Into<R>,
+      R: core::ops::BitOr<Output = R> + core::ops::Shl<usize> + core::convert::From<<R as core::ops::Shl<usize>>::Output> + Default{
+  let mut result = R::default();
+  for (i, byte) in content.into_iter().rev().enumerate() {
+      if i >= core::mem::size_of::<R>()/core::mem::size_of::<T>() {break}
+      result = Into::<R>::into((result << core::mem::size_of::<T>()*8)) | byte.into();
+  }
+  result
+}
+pub fn ptrlist_to_num<'a, T,R>(mut content: &mut (impl Iterator<Item = &'a T> + ?Sized + core::iter::DoubleEndedIterator)) -> R 
+where T: Into<R> + 'a + Clone,
+      R: core::ops::BitOr<Output = R> + core::ops::Shl<usize> + core::convert::From<<R as core::ops::Shl<usize>>::Output> + Default{
+  let mut result = R::default();
+  for (i, byte) in content.into_iter().rev().enumerate() {
+      if i >= core::mem::size_of::<R>()/core::mem::size_of::<T>() {break}
+      result = Into::<R>::into((result << core::mem::size_of::<T>()*8)) | Into::<R>::into(byte.clone());
+  }
+  result
 }
 
-fn u8_to_u32(u8_data: &[u8]) -> Vec<u32> {
-    let mut u32_data = Vec::new();
+pub fn u16_to_u8(w: u16) -> (u8, u8) {
+    (((w >> 8) as u8), (w & 0xFF) as u8)
+}
+struct CharArray<const N: usize> ([char; N]);
 
-    for i in (0..u8_data.len()).step_by(4) {
-        let mut sum = 0;
-        for &byte in &u8_data[i..i + 4] {
-            // Perform the conversion by combining four consecutive u8 values into a u32
-            sum = (sum << 8) | u32::from(byte);
+impl<const N: usize> Display for CharArray<N> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut s = String::new();
+        for element in &self.0 {
+            s.push(*element);
         }
-        u32_data.push(sum);
+        write!(f, "[{}]", s)
     }
+}//TODO implement debugging
+struct CharSlice ([char]);
 
-    u32_data
-}
-pub fn u8_bytes_to_u32(bytes: &[u8]) -> u32 { //TODO Change u32 to T
-    let mut result = 0u32;
-    for (i, &byte) in bytes.iter().rev().enumerate() {
-        if i > core::mem::size_of::<u32>() {break}
-        result = (result << 8) | u32::from(byte);
+impl Display for CharSlice {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut s = String::new();
+        for element in &self.0 {
+            s.push(*element);
+        }
+        write!(f, "[{}]", s)
     }
+}//TODO implement debugging
+struct CharSlicePtr<'a> (&'a [char]);
 
-    result
-}
-// trait U16sTo {}
-// impl U16to for u32 {}
-// impl U16to for u64 {}
-pub fn u16_bytes_to_u32(bytes: &[u16]) -> u32 { //TODO Change u32 to T
-    let mut result = 0;
-    for (i, &byte) in bytes.iter().rev().enumerate() {
-        if i > core::mem::size_of::<u32>() {break}
-        result = (result << core::mem::size_of::<u16>()) | u32::from(byte);
+impl Display for CharSlicePtr<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut s = String::new();
+        for element in self.0 {
+            s.push(*element);
+        }
+        write!(f, "[{}]", s)
     }
-    result
-}
-pub fn u16_bytes_to_u64(bytes: &[u16]) -> u64 {
-    let mut result = 0;
-    for (i, &byte) in bytes.iter().rev().enumerate() {
-        if i > core::mem::size_of::<u64>() {break}
-        result = (result << core::mem::size_of::<u16>()) | u64::from(byte);
-    }
-    result
-}
+}//TODO implement debugging
+
 
 
 //TODO: Remove the need for these

@@ -27,7 +27,7 @@ use kernel::{
         console::{pretty_print, CONSOLE},
         shell::Shell,
     },
-    writer::{inb, outb, inw}, pci::pci_data::print_all_pci_devices, is_bit_set, memory::read_phys_memory_and_map, serial_print_all_bits, err, log::{self, print_trace}, dbg,
+    writer::{inb, outb, inw}, pci::{pci_data::print_all_pci_devices, ata::{read_from_disk,self}}, memory::read_phys_memory_and_map, serial_print_all_bits, err, log::{self, print_trace}, dbg,
 };
 use pci_ids::SubSystem;
 use x86_64::{instructions::hlt, VirtAddr};
@@ -37,7 +37,9 @@ entry_point!(kernel_main);
 // Main function of our kernel (1 func to start when boot if not in test mode). Never returns, because kernel runs until machine poweroff
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     kernel::boot(boot_info);
-    kernel::pci::ata::init();
+    // dbg!("Read content: {}", read_from_disk(ata::Channel::Primary, ata::Drive::Slave, 10000, 13000));
+    // dbg!("{}", kernel::fs::read("Any filename for now").unwrap());
+    
 
     serial_println!("Done booting !");
     hlt_loop()
