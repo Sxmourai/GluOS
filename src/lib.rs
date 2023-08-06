@@ -39,6 +39,9 @@ pub mod fs;
 
 
 use core::fmt::Display;
+use core::mem::size_of;
+use core::ops::BitOr;
+use core::ops::Shl;
 //-----------TESTS HANDLING-----------
 use core::panic::PanicInfo;
 #[cfg(test)]
@@ -136,23 +139,23 @@ where
 // }
 
 ///! DANGER ZONE DONT GO THERE 🤣
-pub fn list_to_num<T,R>(mut content: impl Iterator<Item = T> + core::iter::DoubleEndedIterator) -> R 
+pub fn list_to_num<T,R>(mut content: impl Iterator<Item = T> + DoubleEndedIterator) -> R 
 where T: Into<R>,
-      R: core::ops::BitOr<Output = R> + core::ops::Shl<usize> + core::convert::From<<R as core::ops::Shl<usize>>::Output> + Default{
+      R: BitOr<Output = R> + Shl<usize> + From<<R as Shl<usize>>::Output> + Default{
   let mut result = R::default();
   for (i, byte) in content.into_iter().rev().enumerate() {
-      if i >= core::mem::size_of::<R>()/core::mem::size_of::<T>() {break}
-      result = Into::<R>::into((result << core::mem::size_of::<T>()*8)) | byte.into();
+      if i >= size_of::<R>()/size_of::<T>() {break}
+      result = Into::<R>::into((result << size_of::<T>()*8)) | byte.into();
   }
   result
 }
-pub fn ptrlist_to_num<'a, T,R>(mut content: &mut (impl Iterator<Item = &'a T> + ?Sized + core::iter::DoubleEndedIterator)) -> R 
+pub fn ptrlist_to_num<'a, T,R>(mut content: &mut (impl Iterator<Item = &'a T> + ?Sized + DoubleEndedIterator)) -> R 
 where T: Into<R> + 'a + Clone,
-      R: core::ops::BitOr<Output = R> + core::ops::Shl<usize> + core::convert::From<<R as core::ops::Shl<usize>>::Output> + Default{
+      R: BitOr<Output = R> + Shl<usize> + From<<R as Shl<usize>>::Output> + Default{
   let mut result = R::default();
   for (i, byte) in content.into_iter().rev().enumerate() {
-      if i >= core::mem::size_of::<R>()/core::mem::size_of::<T>() {break}
-      result = Into::<R>::into((result << core::mem::size_of::<T>()*8)) | Into::<R>::into(byte.clone());
+      if i >= size_of::<R>()/size_of::<T>() {break}
+      result = Into::<R>::into((result << size_of::<T>()*8)) | Into::<R>::into(byte.clone());
   }
   result
 }

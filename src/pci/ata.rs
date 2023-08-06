@@ -85,7 +85,6 @@ fn detect(channel: Channel, drive: Drive) -> () {
     //TODO Parse ALL info returned by IDENTIFY https://wiki.osdev.org/ATA_PIO_Mode
 
 
-    log!("S{} {}", lba28, lba48);
     log!("Found {:?} {:?} drive in {:?} channel of size: {}", drive, drive_type, channel, ((lba48.max(lba28 as u64)*512  )/1024));
     let disk = Disk::new(base, drive, lba28, lba48, 0, is_hardisk);
     DISKS.lock().push(disk);
