@@ -37,9 +37,9 @@ entry_point!(kernel_main);
 // Main function of our kernel (1 func to start when boot if not in test mode). Never returns, because kernel runs until machine poweroff
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     kernel::boot(boot_info);
-    // dbg!("Read content: {}", read_from_disk(ata::Channel::Primary, ata::Drive::Slave, 10000, 13000));
+    dbg!("Read content: {}", read_from_disk(ata::Channel::Primary, ata::Drive::Slave, 10000, 13000));
     // dbg!("{}", kernel::fs::read("Any filename for now").unwrap());
-    
+
 
     serial_println!("Done booting !");
     hlt_loop()

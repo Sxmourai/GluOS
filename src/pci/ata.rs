@@ -1,3 +1,5 @@
+use core::cell::{RefCell, RefMut};
+
 use alloc::{string::String, vec::Vec};
 use spin::Mutex;
 
@@ -17,10 +19,10 @@ const ATA_IDENT_MAX_LBA_EXT: u8  = 200;
 const ATA_IDENT_COMMANDSETS: u8  = 164;
 
 //TODO Find real number
-pub const SECTOR_SIZE: u16 = 256; // Sometimes 500... 
+pub const SECTOR_SIZE: u16 = 512; // Sometimes 500... 
+pub const SSECTOR_SIZE: usize = SECTOR_SIZE as usize; // Sometimes 500... 
 
-
-lazy_static!{static ref DISKS: Mutex<Vec<Disk>> = Mutex::new(Vec::new());}
+lazy_static!{static ref DISKS: Mutex<Vec<RefCell<Disk>>> = Mutex::new(Vec::new());}
 
 
 pub fn init() {
@@ -85,9 +87,9 @@ fn detect(channel: Channel, drive: Drive) -> () {
     //TODO Parse ALL info returned by IDENTIFY https://wiki.osdev.org/ATA_PIO_Mode
 
 
-    log!("Found {:?} {:?} drive in {:?} channel of size: {}", drive, drive_type, channel, ((lba48.max(lba28 as u64)*512  )/1024));
+    log!("Found {:?} {:?} drive in {:?} channel of size: {}Mo", drive, drive_type, channel, ((lba48.max(lba28 as u64)*512  )/1024/1024));
     let disk = Disk::new(base, drive, lba28, lba48, 0, is_hardisk);
-    DISKS.lock().push(disk);
+    DISKS.lock().push(RefCell::new(disk));
 }
 
 fn read_identify(command_port_addr:u16) -> [u16; 256] {
@@ -118,8 +120,9 @@ fn get_selected_drive_type(channel: Channel) -> DriveType {
     if end_signature == (0x3c, 0xc3) { return DriveType::SATA; }
     else { dbg!("Found drive of unknown type: {:?}", end_signature);return DriveType::UNKNOWN; }
 }
-pub fn read_from_disk(channel: Channel, disk: Drive, start: u64, end:u64) -> String {
-    let base = channel as u16;let drive_addr = match disk {
+//TODO Return a result, but for now it's for debugging so...
+pub fn read_from_disk(channel: Channel, drive: Drive, start: u64, end:u64) -> String {
+    let base = channel as u16;let drive_addr = match drive {
         Drive::Master => 0xA0,
         Drive::Slave  => 0xB0
     };
@@ -130,18 +133,20 @@ pub fn read_from_disk(channel: Channel, disk: Drive, start: u64, end:u64) -> Str
     unsafe { inb(base+0) }; // Wait a bit
 
     
-    let offset_from_sector_start = start%SECTOR_SIZE as u64;
     let start_sector = start/SECTOR_SIZE as u64;
-    let size = end-start;
-    let mut sector_count = (size/SECTOR_SIZE as u64).try_into().unwrap();
-    sector_count += 2;
+    let offset_from_sector_start = start%SECTOR_SIZE as u64;
+    let mut sector_count = (end.div_ceil(SSECTOR_SIZE as u64)-start_sector).try_into().unwrap();
+    // if sector_count ==0 {sector_count = 1;}
     
-    let sectors = read_sectors(start_sector.into(), sector_count).unwrap();
+    let sectors = get_disk(channel, drive).unwrap().read_sectors(start_sector, sector_count).unwrap();
     trace!("Read {} sectors", sectors.len());
     let raw = unite_sectors(sectors);
     
     let start = start as usize;
-    let slice = &raw[offset_from_sector_start as usize..(offset_from_sector_start as usize + size as usize)];
+    let size = end as usize-start as usize;
+    dbg!("{} a {}", offset_from_sector_start, offset_from_sector_start as usize + size);
+    dbg!("{} b {} c {}", raw.len(), sector_count, start_sector);
+    let slice = &raw[(offset_from_sector_start as usize) .. (offset_from_sector_start as usize + size)];
     // return String::from_utf16_lossy(slice);
     let mut content = String::new();
     for (i,w) in slice.iter().enumerate() {
@@ -188,8 +193,8 @@ pub struct Disk {
     addressing_modes: AddressingModes,
     size: u64,
     is_hardisk:bool,
-    channel: Channel,
-    drive: Drive,
+    pub channel: Channel,
+    pub drive: Drive,
     //TODO UDMA modes and store other infos...
 }
 impl Disk {
@@ -219,7 +224,7 @@ impl Disk {
     fn command_register(&self)      -> u16 {self.base_address+7}
 
     //28Bit Lba PIO mode
-    pub fn read28(&self, lba: u32, sector_count: u8) -> Vec<[u16; 256]> {
+    pub fn read28(&self, lba: u32, sector_count: u8) -> Vec<[u16; SSECTOR_SIZE]> {
         let drive_addr = match self.drive {
             Drive::Master => 0xE0,
             Drive::Slave => 0xF0,
@@ -237,40 +242,23 @@ impl Disk {
         self.retrieve_read(sector_count.into())
     }
     //48Bit Lba PIO mode
-    pub fn read48(&self, lba: u64, sector_count: u16) -> Vec<[u16; 256]> {
-        let drive_addr = match self.drive {
-            Drive::Master => 0x40,
-            Drive::Slave => 0x50,
-        };
-        let base = self.channel as u16;
-
-        unsafe {
-            outb(base+6, drive_addr);                     // Select master
-            outb(base+2, ((sector_count >> 8) & 0xFF).try_into().unwrap() ); // sec_count high
-            outb(base+3, ((lba >> 24) & 0xFF).try_into().unwrap());           // LBA4
-            outb(base+4, ((lba >> 32) & 0xFF).try_into().unwrap());          // LBA5
-            outb(base+5, ((lba >> 40) & 0xFF).try_into().unwrap());           // LBA6
-            outb(base+2, (sector_count & 0xFF).try_into().unwrap());         // sec_count low
-            outb(base+3, (lba & 0xFF).try_into().unwrap());                   // LBA1
-            outb(base+4, ((lba >> 8) & 0xFF).try_into().unwrap());           // LBA2
-            outb(base+5, ((lba >> 16) & 0xFF).try_into().unwrap());           // LBA3
-            outb(base+7, 0x24);                   // READ SECTORS EXT
-        }
+    pub fn read48(&self, lba: u64, sector_count: u16) -> Vec<[u16; SSECTOR_SIZE]> {
+        // send_read_request(self.channel, self.drive, lba, sector_count);
         self.retrieve_read(sector_count)
     }
-    fn retrieve_read(&self, sector_count: u16) -> Vec<[u16; 256]> {
+    fn retrieve_read(&self, sector_count: u16) -> Vec<[u16; SSECTOR_SIZE]> {
         let mut buffer = Vec::new();
         for i in 0..sector_count {
-            let mut inner_buffer = [0u16; 256];
+            let mut inner_buffer = [0u16; SSECTOR_SIZE];
             unsafe {check_drq_or_err(self.channel as u16);}
-            for j in 0..256 {
+            for j in 0..SSECTOR_SIZE {
                 inner_buffer[j] = unsafe { inw(self.channel as u16) };
             }
             buffer.push(inner_buffer);
         }
         buffer
     }
-    pub fn read_sectors(&self, sector_address: u64, sector_count: u16) -> Result<Vec<[u16; 256]>, DiskError> {
+    pub fn read_sectors(&self, sector_address: u64, sector_count: u16) -> Result<Vec<[u16; SSECTOR_SIZE]>, DiskError> {
         //TODO Move from vecs to slices
         if self.addressing_modes.lba48 != 0 {
             Ok(self.read48(sector_address, sector_count))
@@ -286,8 +274,17 @@ impl Disk {
         }
     }
 }
-pub fn read_sectors(sector_address: u64, sector_count: u16) -> Result<Vec<[u16; 256]>, DiskError> {
-    DISKS.lock().get(0).unwrap().read_sectors(sector_address, sector_count)
+// pub fn read_sectors(sector_address: u64, sector_count: u16) -> Result<Vec<[u16; SSECTOR_SIZE]>, DiskError> {
+//     DISKS.lock().get(0).unwrap().read_sectors(sector_address, sector_count)
+// }
+pub fn get_disk(channel: Channel, drive: Drive) -> Option<RefMut<'static, Disk>> {
+    for disk in DISKS.lock().iter_mut() {
+        let disk_ptr = disk.get_mut();
+        if disk_ptr.channel == channel && drive == disk_ptr.drive {
+            return Some(disk.borrow_mut())
+        }
+    }
+    None
 }
     
     // for device in kernel::pci::pci_device_iter() {

@@ -2,7 +2,7 @@ use core::num::TryFromIntError;
 
 use alloc::{string::{String, ToString}, vec::Vec};
 
-use crate::{pci::ata::{self, SECTOR_SIZE, read_sectors}, dbg, serial_print_all_bits, serial_print, serial_println};
+use crate::{pci::ata::{self, SECTOR_SIZE, SSECTOR_SIZE, Channel, Drive, get_disk}, dbg, serial_print_all_bits, serial_print, serial_println};
 
 #[derive(Debug)]
 pub enum DiskError {
@@ -38,7 +38,8 @@ impl File {
         let mut sector_count = (size/SECTOR_SIZE as u64).try_into()?;
         if sector_count == 0 {sector_count = 1}
 
-        let sectors = read_sectors(sector_address.into(), sector_count)?;
+        let disk = get_disk(Channel::Primary, Drive::Master).unwrap();
+        let sectors = disk.read_sectors(sector_address.into(), sector_count)?;
         let raw = unite_sectors(sectors);
         
         let start64 = start as usize;
@@ -71,7 +72,7 @@ pub fn delete(filename: &str) -> Result<(), DiskError> {
     open(filename)?.delete()
 }
 
-pub fn unite_sectors(sectors: Vec<[u16;256]>) -> Vec<u16> {
+pub fn unite_sectors(sectors: Vec<[u16;SSECTOR_SIZE]>) -> Vec<u16> {
     let mut united = Vec::new();
     for sector in sectors {
         for word in sector {

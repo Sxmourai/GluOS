@@ -8,6 +8,7 @@
 #![feature(linkage)]
 #![feature(naked_functions)]
 #![allow(unused, dead_code)] //TODO: Only for debug (#[cfg(debug_assertions)])
+#![feature(int_roundings)] // To use div_ceil and other utilities... Not in stable because breaks num-bigint crate, but fixed now, no worries =)
 
 use alloc::format;
 use alloc::string::String;
