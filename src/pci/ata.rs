@@ -284,7 +284,7 @@ pub fn get_disk(channel: Channel, drive: Drive) -> Option<RefMut<'static, Disk>>
             return Some(disk.borrow_mut())
         }
     }
-    None
+    None 
 }
     
     // for device in kernel::pci::pci_device_iter() {
