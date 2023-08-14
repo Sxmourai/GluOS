@@ -222,7 +222,7 @@ impl DiskManager {
         assert!(start_sector <= end_sector, "start sector is less than end sector !");
         if let Some(disk) = &self.disks[self.selected_disk] {
             let mut sectors = Vec::new();
-            for i in (0..u64::MAX).step_by(u16::MAX as usize) {
+            for i in (0..end_sector).step_by(u16::MAX as usize) {
                 dbg!("A{} {:?}", i, (start_sector, end_sector));
                 let c_sectors = disk.read_sectors(start_sector+i, (end_sector-(start_sector+i)).min(u16::MAX.into()).try_into().unwrap())?;
                 for sector in c_sectors {
