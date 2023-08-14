@@ -9,7 +9,7 @@ extern crate alloc;
 extern crate bootloader;
 extern crate kernel;
 extern crate x86_64;
-
+extern crate log;
 use crate::kernel::{hlt_loop, serial_println};
 use alloc::{vec::Vec, string::String};
 use bootloader::{entry_point, BootInfo};
@@ -27,19 +27,18 @@ use kernel::{
         console::{pretty_print, CONSOLE},
         shell::Shell,
     },
-    writer::{inb, outb, inw}, pci::{pci_data::print_all_pci_devices, ata::{read_from_disk,self}}, memory::read_phys_memory_and_map, serial_print_all_bits, err, log::{self, print_trace}, dbg,
+    writer::{inb, outb, inw}, pci::{pci_data::print_all_pci_devices, ata::{read_from_disk,self, iter_from_disk}}, memory::read_phys_memory_and_map, serial_print_all_bits, err, log::print_trace, dbg,
 };
 use pci_ids::SubSystem;
 use x86_64::{instructions::hlt, VirtAddr};
+
 
 // Sets the entry point of our kernel for the bootloader. This means we can have the 'boot_info' variable which stores some crucial info
 entry_point!(kernel_main);
 // Main function of our kernel (1 func to start when boot if not in test mode). Never returns, because kernel runs until machine poweroff
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     kernel::boot(boot_info);
-    dbg!("Read content: {}", read_from_disk(1u8, 0, 10000));
-    // dbg!("{}", kernel::fs::read("Any filename for now").unwrap());
-
+    
 
     serial_println!("Done booting !");
     hlt_loop()

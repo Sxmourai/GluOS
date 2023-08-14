@@ -126,7 +126,14 @@ where
 
     T::from(result)
 }
-
+pub fn slice16_to_str(slice: &[u16]) -> String {    // return String::from_utf16_lossy(slice);
+    let mut content = String::new();
+    for (i,w) in slice.iter().enumerate() {
+        content.push(((w & 0xFF) as u8) as char);// Interpreted as chars
+        content.push(((w >> 8) as u8) as char); //Transforms the word into two bytes
+    }
+    content
+}
 
 // pub unsafe fn from_raw_parts_unchecked<T>(ptr:*mut T, len:usize) -> Vec<T>
 //     where T: Copy  {
