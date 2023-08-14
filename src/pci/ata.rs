@@ -1,10 +1,11 @@
-use core::cell::{RefCell, RefMut};
+use core::{cell::{RefCell, RefMut}, panic};
 
 use alloc::{string::String, vec::Vec};
-use spin::Mutex;
+use spin::{Mutex, MutexGuard};
 
-use crate::{writer::{outb, inb, inw}, println, serial_println, err, log, trace, serial_print_all_bits, dbg, serial_print, bytes, numeric_to_char_vec, fs::{DiskError, unite_sectors}, u16_to_u8, CharArray, CharSlice, CharSlicePtr, list_to_num, ptrlist_to_num};
+use crate::{writer::{outb, inb, inw}, println, serial_println, err, log, trace, serial_print_all_bits, dbg, serial_print, bytes, numeric_to_char_vec, fs::{DiskError, unite_sectors}, u16_to_u8, CharArray, CharSlice, CharSlicePtr, list_to_num, ptrlist_to_num, log::point};
 use lazy_static::lazy_static;
+
 
 const ATA_IDENT_DEVICETYPE: u8   = 0;
 const ATA_IDENT_CYLINDERS: u8    = 2;
@@ -22,20 +23,19 @@ const ATA_IDENT_COMMANDSETS: u8  = 164;
 pub const SECTOR_SIZE: u16 = 512; // Sometimes 500... 
 pub const SSECTOR_SIZE: usize = SECTOR_SIZE as usize; // Sometimes 500... 
 
-lazy_static!{static ref DISKS: Mutex<Vec<RefCell<Disk>>> = Mutex::new(Vec::new());}
+static mut DISK_MANAGER: Mutex<Option<DiskManager>> = Mutex::new(None); // Uninitialised
+// Don't call before disk_manager is initialised
+pub fn disk_manager() -> MutexGuard<'static, Option<DiskManager>> {
+    unsafe { DISK_MANAGER.lock() }
+}
 
 
 pub fn init() {
-    unsafe { outb(0x3f6, (1 << 1) | (1 << 2))}
-    unsafe { outb(0x376, (1 << 1) | (1 << 2))}
-    detect(Channel::Primary, Drive::Master);
-    detect(Channel::Primary, Drive::Slave);
-    detect(Channel::Secondary, Drive::Master);
-    detect(Channel::Secondary, Drive::Slave);
+    unsafe { DISK_MANAGER = Mutex::new( Some(DiskManager::new()) ) }
 }
 
 //Detects a disk at specified channel and drive
-fn detect(channel: Channel, drive: Drive) -> () {
+fn detect(channel: Channel, drive: Drive) -> Option<Disk> {
     let base = channel as u16;
     trace!("Drive: {:?} on channel: {:?} | Address: 0x{:X}", drive, &channel, base);
     // unsafe { outb(base+6, 0x80 | 0x40 | 0x20) }; // Send flags
@@ -58,7 +58,7 @@ fn detect(channel: Channel, drive: Drive) -> () {
     trace!("Reading drive status");
     if unsafe { inb(base+7) } == 0 {
         trace!("Drive does not exist !");
-        return;
+        return None;
     }
     unsafe { bsy(base); }
     if unsafe { inb(base+4) } != 0 || unsafe { inb(base+5) } != 0 {
@@ -66,7 +66,7 @@ fn detect(channel: Channel, drive: Drive) -> () {
     } else if unsafe { check_drq_or_err(base) }.is_err() {
         err!("Drive {:?} in {:?} channel returned an error after IDENTIFY command", drive, channel);
         //TODO Try to handle the error
-        return;
+        return None;
     }
     let mut identify = read_identify(base+0);
     let mut u8_identify = [0u8; 512];
@@ -87,9 +87,9 @@ fn detect(channel: Channel, drive: Drive) -> () {
     //TODO Parse ALL info returned by IDENTIFY https://wiki.osdev.org/ATA_PIO_Mode
 
 
-    log!("Found {:?} {:?} drive in {:?} channel of size: {}Mo", drive, drive_type, channel, ((lba48.max(lba28 as u64)*512  )/1024/1024));
+    log!("Found {:?} {:?} drive in {:?} channel of size: {}Ko", drive, drive_type, channel, ((lba48.max(lba28 as u64)*512  )/1024));
     let disk = Disk::new(base, drive, lba28, lba48, 0, is_hardisk);
-    DISKS.lock().push(RefCell::new(disk));
+    Some(disk)
 }
 
 fn read_identify(command_port_addr:u16) -> [u16; 256] {
@@ -114,32 +114,23 @@ fn get_selected_drive_type(channel: Channel) -> DriveType {
     // let signature = (sector_count, lba_low, lba_mid, lba_high);
     let end_signature = (lba_mid, lba_high);
     
-    if end_signature == (0,0) { return DriveType::PATA; }
-    if end_signature == (0x14, 0xEB) { return DriveType::PATAPI; }
-    if end_signature == (0x69, 0x96) { return DriveType::SATAPI; }
-    if end_signature == (0x3c, 0xc3) { return DriveType::SATA; }
-    else { dbg!("Found drive of unknown type: {:?}", end_signature);return DriveType::UNKNOWN; }
+    match end_signature {
+        (0,0) => DriveType::PATA,
+        (0x14, 0xEB) => DriveType::PATAPI,
+        (0x69, 0x96) => DriveType::SATAPI,
+        (0x3c, 0xc3) => DriveType::SATA,
+        _ => { dbg!("Found drive of unknown type: {:?}", end_signature); DriveType::UNKNOWN }
+    }
 }
 //TODO Return a result, but for now it's for debugging so...
-pub fn read_from_disk(channel: Channel, drive: Drive, start: u64, end:u64) -> String {
-    let base = channel as u16;let drive_addr = match drive {
-        Drive::Master => 0xA0,
-        Drive::Slave  => 0xB0
-    };
-    unsafe { outb(base+6, drive_addr) }; // Select drive of channel
-    unsafe { inb(base+0) }; // Wait a bit
-    unsafe { inb(base+0) }; // Wait a bit
-    unsafe { inb(base+0) }; // Wait a bit
-    unsafe { inb(base+0) }; // Wait a bit
-
-    
+pub fn read_from_disk(addr: impl DiskAddress, start: u64, end:u64) -> String {
     let start_sector = start/SECTOR_SIZE as u64;
     let offset_from_sector_start = start%SECTOR_SIZE as u64;
-    let mut sector_count = (end.div_ceil(SSECTOR_SIZE as u64)-start_sector).try_into().unwrap();
+    let mut sector_count: u64 = (end.div_ceil(SSECTOR_SIZE as u64)-start_sector).try_into().unwrap();
     // if sector_count ==0 {sector_count = 1;}
-    
-    let sectors = get_disk(channel, drive).unwrap().read_sectors(start_sector, sector_count).unwrap();
-    trace!("Read {} sectors", sectors.len());
+    point();
+    let sectors = disk_manager().as_mut().unwrap().read_disk(addr, start_sector, start_sector+sector_count).unwrap();
+    dbg!("Read {} sectors", sectors.len());
     let raw = unite_sectors(sectors);
     
     let start = start as usize;
@@ -154,6 +145,78 @@ pub fn read_from_disk(channel: Channel, drive: Drive, start: u64, end:u64) -> St
         content.push(((w >> 8) as u8) as char); //Transforms the word into two bytes
     }
     content
+}
+
+pub trait DiskAddress {
+    fn as_index(&self) -> usize;
+    fn channel(&self) -> Channel {
+        match self.as_index() {
+            0 => Channel::Primary,
+            1 => Channel::Primary,
+            2 => Channel::Secondary,
+            3 => Channel::Secondary,
+            _ => panic!("Invalid channel address")
+        }
+    }
+    fn drive(&self) -> Drive {
+        match self.as_index() {
+            0 => Drive::Master,
+            1 => Drive::Slave,
+            2 => Drive::Master,
+            3 => Drive::Slave,
+            _ => panic!("Invalid drive address")
+        }
+    }
+    fn channel_addr(&self) -> u16 {
+        self.channel() as u16
+    }
+    fn drive_select_addr(&self) -> u8 {
+        match self.drive() {
+            Drive::Master => 0xA0,
+            Drive::Slave  => 0xB0
+        }
+    }
+}
+impl DiskAddress for u8  {fn as_index(&self) -> usize { assert!(*self <= 4); (*self).try_into().expect("Disk address is unrecognised") }}
+impl DiskAddress for u16 {fn as_index(&self) -> usize { assert!(*self <= 4); (*self).try_into().expect("Disk address is unrecognised") }}
+impl DiskAddress for u32 {fn as_index(&self) -> usize { assert!(*self <= 4); (*self).try_into().expect("Disk address is unrecognised") }}
+impl DiskAddress for u64 {fn as_index(&self) -> usize { assert!(*self <= 4); (*self).try_into().expect("Disk address is unrecognised") }}
+
+#[derive(Debug)]
+pub struct DiskManager {
+    disks: [Option<Disk>; 4],
+    selected_disk: usize,
+}
+impl DiskManager {
+    pub fn new() -> Self {
+        unsafe { outb(0x3f6, (1 << 1) | (1 << 2))}
+        unsafe { outb(0x376, (1 << 1) | (1 << 2))}
+        Self {
+            disks: [detect(Channel::Primary, Drive::Master),detect(Channel::Primary, Drive::Slave),detect(Channel::Secondary, Drive::Master),detect(Channel::Secondary, Drive::Slave)],
+            selected_disk: 0,
+        }
+    }
+    fn select_disk(&mut self, disk_address: impl DiskAddress) {
+        let base = disk_address.channel_addr();
+        let drive = disk_address.drive_select_addr();
+        unsafe { outb(base+6, drive) }; // Select drive of channel
+        unsafe { inb(base+0) }; // Wait a bit
+        self.selected_disk = disk_address.as_index();
+    }
+    pub fn read_disk(&mut self, disk_address: impl DiskAddress, start_sector: u64, end_sector: u64) -> Result<Vec<[u16; SSECTOR_SIZE]>, DiskError> {
+        if let Some(disk) = &self.disks[self.selected_disk] {
+            let mut sectors = Vec::new();
+            for i in (0..u64::MAX).step_by(u16::MAX as usize) {
+                let c_sectors = disk.read_sectors(start_sector+i, (end_sector-(start_sector+i)).min(u16::MAX.into()).try_into().unwrap())?;
+                for sector in c_sectors {
+                    sectors.push(sector);
+                }
+            }
+            Ok(sectors)
+        } else {
+            Err(DiskError::DiskNotFound)
+        }
+    }
 }
 
 
@@ -275,17 +338,8 @@ impl Disk {
     }
 }
 // pub fn read_sectors(sector_address: u64, sector_count: u16) -> Result<Vec<[u16; SSECTOR_SIZE]>, DiskError> {
-//     DISKS.lock().get(0).unwrap().read_sectors(sector_address, sector_count)
-// }
-pub fn get_disk(channel: Channel, drive: Drive) -> Option<RefMut<'static, Disk>> {
-    for disk in DISKS.lock().iter_mut() {
-        let disk_ptr = disk.get_mut();
-        if disk_ptr.channel == channel && drive == disk_ptr.drive {
-            return Some(disk.borrow_mut())
-        }
-    }
-    None 
-}
+    //     DISKS.lock().get(0).unwrap().read_sectors(sector_address, sector_count)
+    // }
     
     // for device in kernel::pci::pci_device_iter() {
     //     if device.class == 1 && device.subclass == 1 {

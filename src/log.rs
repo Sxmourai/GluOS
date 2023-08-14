@@ -77,3 +77,7 @@ macro_rules! dbg {
     ($fmt:expr)              => ($crate::log::log($fmt, $crate::log::Level::Debug));
     ($fmt:expr, $($arg:tt)*) => ($crate::log::log(alloc::format!($fmt, $($arg)*), $crate::log::Level::Debug));
 }
+
+pub fn point() {
+    log("Code went all the way there !", Level::Debug);
+}
