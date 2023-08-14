@@ -1,9 +1,10 @@
 use core::{cell::{RefCell, RefMut}, panic};
 
 use alloc::{string::String, vec::Vec, boxed::Box};
+use log::{trace, error, info, debug};
 use spin::{Mutex, MutexGuard};
 
-use crate::{writer::{outb, inb, inw}, println, serial_println, err, log, trace, serial_print_all_bits, dbg, serial_print, bytes, numeric_to_char_vec, fs::{DiskError, unite_sectors}, u16_to_u8, CharArray, CharSlice, CharSlicePtr, list_to_num, ptrlist_to_num, log::point, slice16_to_str};
+use crate::{writer::{outb, inb, inw}, println, serial_println, serial_print_all_bits, serial_print, bytes, numeric_to_char_vec, fs::{DiskError, unite_sectors}, u16_to_u8, CharArray, CharSlice, CharSlicePtr, list_to_num, ptrlist_to_num, log::point, slice16_to_str};
 use lazy_static::lazy_static;
 
 
@@ -62,7 +63,7 @@ fn detect(addr: impl DiskAddress) -> Option<Disk> {
     if unsafe { inb(base+4) } != 0 || unsafe { inb(base+5) } != 0 {
         trace!("ATAPI drive detected !");
     } else if unsafe { check_drq_or_err(base) }.is_err() {
-        err!("Drive {:?} in {:?} channel returned an error after IDENTIFY command", addr.drive(), channel);
+        error!("Drive {:?} in {:?} channel returned an error after IDENTIFY command", addr.drive(), channel);
         //TODO Try to handle the error
         return None;
     }
@@ -76,7 +77,7 @@ fn detect(addr: impl DiskAddress) -> Option<Disk> {
         char_identify[j] = byte0 as char;
         char_identify[j+1] = byte1 as char;
     }
-    // dbg!("Serial number: {}\tFirmware revision: {}\tModel number: {}", CharSlicePtr(&char_identify[20..40]), CharSlicePtr(&char_identify[46..52]), CharSlicePtr(&char_identify[54..92]));
+    // debug!("Serial number: {}\tFirmware revision: {}\tModel number: {}", CharSlicePtr(&char_identify[20..40]), CharSlicePtr(&char_identify[46..52]), CharSlicePtr(&char_identify[54..92]));
 
     // let rev = identify[60..61].iter().rev().collect::<Vec<u16>>();
     let lba28 = ptrlist_to_num(&mut identify[60..61].into_iter());
@@ -85,7 +86,7 @@ fn detect(addr: impl DiskAddress) -> Option<Disk> {
     //TODO Parse ALL info returned by IDENTIFY https://wiki.osdev.org/ATA_PIO_Mode
 
 
-    log!("Found {:?} {:?} drive in {:?} channel of size: {}Ko", addr.drive(), drive_type, channel, ((lba48.max(lba28 as u64)*512  )/1024));
+    info!("Found {:?} {:?} drive in {:?} channel of size: {}Ko", addr.drive(), drive_type, channel, ((lba48.max(lba28 as u64)*512  )/1024));
     let disk = Disk::new(addr, lba28, lba48, 0, is_hardisk);
     Some(disk)
 }
@@ -117,7 +118,7 @@ fn get_selected_drive_type(channel: Channel) -> DriveType {
         (0x14, 0xEB) => DriveType::PATAPI,
         (0x69, 0x96) => DriveType::SATAPI,
         (0x3c, 0xc3) => DriveType::SATA,
-        _ => { dbg!("Found drive of unknown type: {:?}", end_signature); DriveType::UNKNOWN }
+        _ => { debug!("Found drive of unknown type: {:?}", end_signature); DriveType::UNKNOWN }
     }
 }
 //TODO Return a result, but for now it's for debugging so...
@@ -498,17 +499,14 @@ unsafe fn bsy(base: u16) {
     // 0x80 = 0b10000000
 }
 
-enum DriveError {
-    Err
-}
 /// wait for DRQ to be ready or ERR to set
-unsafe fn check_drq_or_err(base: u16) -> Result<(), DriveError> {
+unsafe fn check_drq_or_err(base: u16) -> Result<(), DiskError> {
     trace!("Waiting DRQ flag to set at base: {:X}", base);
     let mut status = inb(base+7);
     loop {
         if status & 0x01 == 0x01 {
-            err!("Error reading DRQ from drive: {}", bytes(inb(base+1)));
-            return Err(DriveError::Err);
+            error!("Error reading DRQ from drive: {}", bytes(inb(base+1)));
+            return Err(DiskError::DRQRead);
         } //TODO Make better error handling... Or make error handling in top level function
         if status & 0x08 != 0x00 {break} //TODO When doing binary operations with ==, find a way to always do it the same way (see this line and line on top)
         status = inb(base+7);

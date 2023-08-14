@@ -13,6 +13,7 @@ extern crate log;
 use crate::kernel::{hlt_loop, serial_println};
 use alloc::{vec::Vec, string::String};
 use bootloader::{entry_point, BootInfo};
+use log::{error, info};
 use core::{
     ffi::{c_uchar, c_ushort},
     panic::PanicInfo,
@@ -27,7 +28,7 @@ use kernel::{
         console::{pretty_print, CONSOLE},
         shell::Shell,
     },
-    writer::{inb, outb, inw}, pci::{pci_data::print_all_pci_devices, ata::{read_from_disk,self, iter_from_disk}}, memory::read_phys_memory_and_map, serial_print_all_bits, err, log::print_trace, dbg,
+    writer::{inb, outb, inw}, pci::{pci_data::print_all_pci_devices, ata::{read_from_disk,self, iter_from_disk}}, memory::read_phys_memory_and_map, serial_print_all_bits,
 };
 use pci_ids::SubSystem;
 use x86_64::{instructions::hlt, VirtAddr};
@@ -40,13 +41,13 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     kernel::boot(boot_info);
     
 
-    serial_println!("Done booting !");
+    info!("Done booting !");
     hlt_loop()
 }
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    err!("Error: {}", info);
-    print_trace();
+    error!("Error: {}", info);
+    // print_trace();
     hlt_loop()
 }

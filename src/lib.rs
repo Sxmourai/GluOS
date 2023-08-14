@@ -24,7 +24,6 @@ pub mod interrupts;
 pub use interrupts::timer;
 pub mod gdt;
 pub mod memory;
-use crate::log::print_trace;
 pub use crate::memory::handler::MemoryHandler;
 pub mod allocator;
 pub mod task;

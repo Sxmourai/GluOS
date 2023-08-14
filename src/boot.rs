@@ -7,7 +7,7 @@ use crate::{
     gdt, interrupts, serial_println, state::{self, STATE},
     task::executor::Executor,
     writer::{inb, outb, print_at},
-    MemoryHandler, memory::{read_phys_memory_and_map, rsdp::DescriptorTablesHandler, self}, serial_print, trace, log,
+    MemoryHandler, memory::{read_phys_memory_and_map, rsdp::DescriptorTablesHandler, self}, serial_print, log,
 };
 // Supress compiler warning about unused imports, but if removed, error
 #[allow(unused_imports)]

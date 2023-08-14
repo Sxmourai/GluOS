@@ -1,7 +1,7 @@
 use bootloader::bootinfo::MemoryMap;
 use x86_64::{structures::paging::OffsetPageTable, VirtAddr};
 
-use crate::trace;
+use log::trace;
 
 use super::{active_level_4_table, frame_allocator::BootInfoFrameAllocator};
 

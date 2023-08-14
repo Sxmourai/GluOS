@@ -1,6 +1,7 @@
 use x86_64::structures::idt::{InterruptStackFrame, PageFaultErrorCode};
 
-use crate::{hlt_loop, println, err};
+use crate::{hlt_loop, println};
+use log::error;
 
 pub extern "x86-interrupt" fn alignment_check(stack_frame: InterruptStackFrame, error_code: u64) {
     panic!(
@@ -9,35 +10,35 @@ pub extern "x86-interrupt" fn alignment_check(stack_frame: InterruptStackFrame, 
     );
 }
 pub extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
-    err!("EXCEPTION: BREAKPOINT\n{:#?}", stack_frame);
+    error!("EXCEPTION: BREAKPOINT\n{:#?}", stack_frame);
 }
 pub extern "x86-interrupt" fn divide_error(stack_frame: InterruptStackFrame) {
-    err!("EXCEPTION: DIVIDE ERROR (u bad sry)\n{:#?}", stack_frame);
+    error!("EXCEPTION: DIVIDE ERROR (u bad sry)\n{:#?}", stack_frame);
 }
 pub extern "x86-interrupt" fn device_not_available(stack_frame: InterruptStackFrame) {
-    err!("EXCEPTION: device_not_available\n{:#?}", stack_frame);
+    error!("EXCEPTION: device_not_available\n{:#?}", stack_frame);
 }
 pub extern "x86-interrupt" fn machine_check(stack_frame: InterruptStackFrame) -> ! {
-    err!("EXCEPTION: Machine Check\n{:#?}", stack_frame);
+    error!("EXCEPTION: Machine Check\n{:#?}", stack_frame);
     hlt_loop()
 }
 pub extern "x86-interrupt" fn non_maskable_interrupt(stack_frame: InterruptStackFrame) {
-    err!("EXCEPTION: non_maskable_interrupt\n{:#?}", stack_frame);
+    error!("EXCEPTION: non_maskable_interrupt\n{:#?}", stack_frame);
 }
 pub extern "x86-interrupt" fn bound_range_exceeded(stack_frame: InterruptStackFrame) {
-    err!("EXCEPTION: bound_range_exceeded\n{:#?}", stack_frame);
+    error!("EXCEPTION: bound_range_exceeded\n{:#?}", stack_frame);
 }
 pub extern "x86-interrupt" fn invalid_opcode(stack_frame: InterruptStackFrame) {
-    err!("EXCEPTION: invalid_opcode\n{:#?}", stack_frame);
+    error!("EXCEPTION: invalid_opcode\n{:#?}", stack_frame);
 }
 pub extern "x86-interrupt" fn overflow(stack_frame: InterruptStackFrame) {
-    err!("EXCEPTION: overflow\n{:#?}", stack_frame);
+    error!("EXCEPTION: overflow\n{:#?}", stack_frame);
 }
 pub extern "x86-interrupt" fn simd_floating_point(stack_frame: InterruptStackFrame) {
-    err!("EXCEPTION: simd_floating_point\n{:#?}", stack_frame);
+    error!("EXCEPTION: simd_floating_point\n{:#?}", stack_frame);
 }
 pub extern "x86-interrupt" fn x87_floating_point(stack_frame: InterruptStackFrame) {
-    err!("EXCEPTION: x87_floating_point\n{:#?}", stack_frame);
+    error!("EXCEPTION: x87_floating_point\n{:#?}", stack_frame);
 }
 pub extern "x86-interrupt" fn double_fault_handler(
     stack_frame: InterruptStackFrame,
@@ -76,7 +77,7 @@ pub extern "x86-interrupt" fn segment_not_present(
     stack_frame: InterruptStackFrame,
     error_code: u64,
 ) {
-    err!(
+    error!(
         "EXCEPTION: segment_not_present\n{:#?}\nError code: {}",
         stack_frame, error_code
     );

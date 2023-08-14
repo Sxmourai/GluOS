@@ -2,7 +2,7 @@ use core::num::TryFromIntError;
 
 use alloc::{string::{String, ToString}, vec::Vec};
 
-use crate::{pci::ata::{self, SECTOR_SIZE, SSECTOR_SIZE, Channel, Drive, disk_manager, read_from_disk}, dbg, serial_print_all_bits, serial_print, serial_println};
+use crate::{pci::ata::{self, SECTOR_SIZE, SSECTOR_SIZE, Channel, Drive, disk_manager, read_from_disk}, serial_print_all_bits, serial_print, serial_println};
 
 #[derive(Debug)]
 pub enum DiskError {
@@ -11,6 +11,7 @@ pub enum DiskError {
     SectorTooBig,
     NoReadModeAvailable,
     DiskNotFound,
+    DRQRead, //TODO Handle all errors from the register
 }
 
 impl From<TryFromIntError> for DiskError {
