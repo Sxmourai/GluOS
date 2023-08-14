@@ -35,14 +35,12 @@ pub fn init() {
 }
 
 //Detects a disk at specified channel and drive
-fn detect(channel: Channel, drive: Drive) -> Option<Disk> {
-    let base = channel as u16;
-    trace!("Drive: {:?} on channel: {:?} | Address: 0x{:X}", drive, &channel, base);
+fn detect(addr: impl DiskAddress) -> Option<Disk> {
+    let drive_addr = addr.drive_select_addr();
+    let channel = addr.channel();
+    let base = addr.base();
+    trace!("Identifying drive: {:?} on channel: {:?} | Address: 0x{:X}", addr.drive(), &channel, base);
     // unsafe { outb(base+6, 0x80 | 0x40 | 0x20) }; // Send flags
-    let drive_addr = match drive {
-        Drive::Master => 0xA0,
-        Drive::Slave  => 0xB0
-    };
     unsafe { outb(base+6, drive_addr) }; // Select drive of channel
     
     let drive_type = get_selected_drive_type(channel);
@@ -64,7 +62,7 @@ fn detect(channel: Channel, drive: Drive) -> Option<Disk> {
     if unsafe { inb(base+4) } != 0 || unsafe { inb(base+5) } != 0 {
         trace!("ATAPI drive detected !");
     } else if unsafe { check_drq_or_err(base) }.is_err() {
-        err!("Drive {:?} in {:?} channel returned an error after IDENTIFY command", drive, channel);
+        err!("Drive {:?} in {:?} channel returned an error after IDENTIFY command", addr.drive(), channel);
         //TODO Try to handle the error
         return None;
     }
@@ -87,8 +85,8 @@ fn detect(channel: Channel, drive: Drive) -> Option<Disk> {
     //TODO Parse ALL info returned by IDENTIFY https://wiki.osdev.org/ATA_PIO_Mode
 
 
-    log!("Found {:?} {:?} drive in {:?} channel of size: {}Ko", drive, drive_type, channel, ((lba48.max(lba28 as u64)*512  )/1024));
-    let disk = Disk::new(base, drive, lba28, lba48, 0, is_hardisk);
+    log!("Found {:?} {:?} drive in {:?} channel of size: {}Ko", addr.drive(), drive_type, channel, ((lba48.max(lba28 as u64)*512  )/1024));
+    let disk = Disk::new(addr, lba28, lba48, 0, is_hardisk);
     Some(disk)
 }
 
@@ -128,8 +126,10 @@ pub fn read_from_disk(addr: impl DiskAddress, start: u64, end:u64) -> String {
     let offset_from_sector_start = start%SECTOR_SIZE as u64;
     let mut sector_count: u64 = (end.div_ceil(SSECTOR_SIZE as u64)-start_sector).try_into().unwrap();
     // if sector_count ==0 {sector_count = 1;}
+    let mut binding = disk_manager();
+    let mut dism = binding.as_mut().unwrap();
     point();
-    let sectors = disk_manager().as_mut().unwrap().read_disk(addr, start_sector, start_sector+sector_count).unwrap();
+    let sectors = dism.read_disk(addr, start_sector, start_sector+sector_count).unwrap();
     dbg!("Read {} sectors", sectors.len());
     let raw = unite_sectors(sectors);
     
@@ -176,6 +176,21 @@ pub trait DiskAddress {
             Drive::Slave  => 0xB0
         }
     }
+    fn drive_lba28_addr(&self) -> u8 {
+        match self.drive() {
+            Drive::Master => 0xE0,
+            Drive::Slave => 0xF0,
+        }
+    }
+    fn drive_lba48_addr(&self) -> u8 {
+        match self.drive() {
+            Drive::Master => 0x40,
+            Drive::Slave  => 0x50
+        }
+    }
+    fn base(&self) -> u16 {
+        self.channel_addr()
+    }
 }
 impl DiskAddress for u8  {fn as_index(&self) -> usize { assert!(*self <= 4); (*self).try_into().expect("Disk address is unrecognised") }}
 impl DiskAddress for u16 {fn as_index(&self) -> usize { assert!(*self <= 4); (*self).try_into().expect("Disk address is unrecognised") }}
@@ -192,7 +207,7 @@ impl DiskManager {
         unsafe { outb(0x3f6, (1 << 1) | (1 << 2))}
         unsafe { outb(0x376, (1 << 1) | (1 << 2))}
         Self {
-            disks: [detect(Channel::Primary, Drive::Master),detect(Channel::Primary, Drive::Slave),detect(Channel::Secondary, Drive::Master),detect(Channel::Secondary, Drive::Slave)],
+            disks: [detect(0u8),detect(1u8),detect(2u8),detect(3u8)],
             selected_disk: 0,
         }
     }
@@ -204,14 +219,17 @@ impl DiskManager {
         self.selected_disk = disk_address.as_index();
     }
     pub fn read_disk(&mut self, disk_address: impl DiskAddress, start_sector: u64, end_sector: u64) -> Result<Vec<[u16; SSECTOR_SIZE]>, DiskError> {
+        assert!(start_sector <= end_sector, "start sector is less than end sector !");
         if let Some(disk) = &self.disks[self.selected_disk] {
             let mut sectors = Vec::new();
             for i in (0..u64::MAX).step_by(u16::MAX as usize) {
+                dbg!("A{} {:?}", i, (start_sector, end_sector));
                 let c_sectors = disk.read_sectors(start_sector+i, (end_sector-(start_sector+i)).min(u16::MAX.into()).try_into().unwrap())?;
                 for sector in c_sectors {
                     sectors.push(sector);
                 }
             }
+            point();
             Ok(sectors)
         } else {
             Err(DiskError::DiskNotFound)
@@ -250,49 +268,49 @@ struct AddressingModes {
     lba48: u64
 }
 
+
+#[derive(Debug)]
+pub struct DiskLoc(Channel, Drive);
+impl DiskAddress for DiskLoc {
+    fn as_index(&self) -> usize {
+        let mut i = 0;
+        if self.0 == Channel::Secondary {i += 2}
+        if self.1 == Drive::Slave {i += 1}
+        i
+    }
+}
 #[derive(Debug)]
 pub struct Disk {
-    base_address: u16,
     addressing_modes: AddressingModes,
     size: u64,
     is_hardisk:bool,
-    pub channel: Channel,
-    pub drive: Drive,
+    loc: DiskLoc
     //TODO UDMA modes and store other infos...
 }
 impl Disk {
-    pub fn new(base_address: u16, drive: Drive, lba28: u32, lba48: u64, size: u64, is_hardisk: bool) -> Self {
-        let channel = match base_address {
-            0x1F0 => Channel::Primary,
-            0x170 => Channel::Secondary,
-            _ => panic!("Provided invalid address: {:X}\n{:?}", base_address, (drive,lba28,lba48,size,is_hardisk))
-        };
+    pub fn new(addr: impl DiskAddress, lba28: u32, lba48: u64, size: u64, is_hardisk: bool) -> Self {
         Self {
-            base_address,
             addressing_modes: AddressingModes { chs: true, lba28, lba48 }, // Assume chs is supported on all ATA drives...
             size,
             is_hardisk,
-            channel,
-            drive,
+            loc: DiskLoc(addr.channel(),addr.drive())
         }
     }
-    fn data_register(&self)         -> u16 {self.base_address+0}
-    fn error_register(&self)        -> u16 {self.base_address+1}
-    fn features_register(&self)     -> u16 {self.base_address+2}
-    fn sector_count_register(&self) -> u16 {self.base_address+3}
-    fn lbalo_register(&self)        -> u16 {self.base_address+4}
-    fn lbamid_register(&self)       -> u16 {self.base_address+5}
-    fn lbahi_register(&self)        -> u16 {self.base_address+6}
-    fn drive_head_register(&self)   -> u16 {self.base_address+7}
-    fn command_register(&self)      -> u16 {self.base_address+7}
+    fn base(&self) -> u16 {self.loc.base()}
+    fn data_reg(&self)         -> u16 {self.base()+0}
+    fn error_reg(&self)        -> u16 {self.base()+1}
+    fn features_reg(&self)     -> u16 {self.base()+2}
+    fn sector_count_reg(&self) -> u16 {self.base()+3}
+    fn lbalo_reg(&self)        -> u16 {self.base()+4}
+    fn lbamid_reg(&self)       -> u16 {self.base()+5}
+    fn lbahi_reg(&self)        -> u16 {self.base()+6}
+    fn drive_head_reg(&self)   -> u16 {self.base()+7}
+    fn command_reg(&self)      -> u16 {self.base()+7}
 
     //28Bit Lba PIO mode
     pub fn read28(&self, lba: u32, sector_count: u8) -> Vec<[u16; SSECTOR_SIZE]> {
-        let drive_addr = match self.drive {
-            Drive::Master => 0xE0,
-            Drive::Slave => 0xF0,
-        };
-        let base = self.channel as u16;
+        let drive_addr = self.loc.drive_lba28_addr() as u32;
+        let base = self.loc.channel_addr();
         unsafe {
             outb(base+6, (drive_addr | ((self.addressing_modes.lba28 >> 24) & 0x0F)).try_into().unwrap());
             outb(base+1, 0x00);
@@ -305,20 +323,35 @@ impl Disk {
         self.retrieve_read(sector_count.into())
     }
     //48Bit Lba PIO mode
+    // 0 for sector_count is equals to u16::MAX
     pub fn read48(&self, lba: u64, sector_count: u16) -> Vec<[u16; SSECTOR_SIZE]> {
-        // send_read_request(self.channel, self.drive, lba, sector_count);
+        unsafe {
+            outb(self.drive_head_reg(),  self.loc.drive_lba48_addr());// Select drive
+            outb(self.sector_count_reg(),((sector_count >> 8) & 0xFF).try_into().unwrap() ); // sector_count high
+            outb(self.lbalo_reg(), ((lba >> 24) & 0xFF).try_into().unwrap());           // LBA4
+            outb(self.lbamid_reg(),((lba >> 32) & 0xFF).try_into().unwrap());          // LBA5
+            outb(self.lbahi_reg(), ((lba >> 40) & 0xFF).try_into().unwrap());           // LBA6
+            outb(self.sector_count_reg(),(sector_count & 0xFF).try_into().unwrap());         // sector_count low
+            outb(self.lbalo_reg(), (lba & 0xFF).try_into().unwrap());                   // LBA1
+            outb(self.lbamid_reg(), ((lba >> 8) & 0xFF).try_into().unwrap());           // LBA2
+            outb(self.lbahi_reg(), ((lba >> 16) & 0xFF).try_into().unwrap());           // LBA3
+            outb(self.command_reg(), 0x24);                   // READ SECTORS EXT
+        }
+
         self.retrieve_read(sector_count)
     }
     fn retrieve_read(&self, sector_count: u16) -> Vec<[u16; SSECTOR_SIZE]> {
+        trace!("Retrieving read !");
         let mut buffer = Vec::new();
         for i in 0..sector_count {
             let mut inner_buffer = [0u16; SSECTOR_SIZE];
-            unsafe {check_drq_or_err(self.channel as u16);}
+            unsafe {check_drq_or_err(self.base());}
             for j in 0..SSECTOR_SIZE {
-                inner_buffer[j] = unsafe { inw(self.channel as u16) };
+                inner_buffer[j] = unsafe { inw(self.data_reg()) };
             }
             buffer.push(inner_buffer);
         }
+        trace!("Finished read !");
         buffer
     }
     pub fn read_sectors(&self, sector_address: u64, sector_count: u16) -> Result<Vec<[u16; SSECTOR_SIZE]>, DiskError> {

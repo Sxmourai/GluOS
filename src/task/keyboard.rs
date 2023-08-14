@@ -11,7 +11,7 @@ use futures_util::task::AtomicWaker;
 use lazy_static::lazy_static;
 use pc_keyboard::{layouts, HandleControl, Keyboard, ScancodeSet1, KeyCode, DecodedKey, KeyState};
 
-use crate::{serial_println, prompt::KbInput, writer::WRITER};
+use crate::{serial_println, prompt::KbInput, writer::WRITER, log::print_trace};
 
 static WAKER: AtomicWaker = AtomicWaker::new();
 static SCANCODE_QUEUE: OnceCell<ArrayQueue<u8>> = OnceCell::uninit();
@@ -52,11 +52,13 @@ impl KeyboardHandler {
                         match k {
                             KeyCode::ArrowUp => if self.is_pressed(&KeyCode::LControl) {WRITER.lock().move_down()},
                             KeyCode::ArrowDown => if self.is_pressed(&KeyCode::LControl) {WRITER.lock().move_up()},
+                            KeyCode::T => print_trace(),
                             _ => {} //serial_println!("Unsupported key: {:?}", k),
                         }
                     },
                     DecodedKey::Unicode(k) => {
                         match k {
+                            't' => print_trace(),
                             _ => {serial_println!("This shouldn't happen because HandleControl is at ignore... {:?}", k);}
                         }
                     }
