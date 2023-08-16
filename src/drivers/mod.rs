@@ -1,4 +1,4 @@
-use core::fmt::Display;
+use core::{fmt::Display, cell::Cell};
 
 use alloc::{vec::Vec, string::String, vec};
 use hashbrown::HashMap;
@@ -42,8 +42,14 @@ impl DriverIdTrait for DriverId {
     }
 }
 enum DriverError {
-
+    AlreadyExists
 }
+pub fn add_driver(driver: Mutex<&'static mut dyn Driver>) -> Result<(), DriverError> {
+    let id = driver.lock().id();
+    DRIVERS.insert(id, driver);
+    Ok(())
+}
+
 
 //Initialises drivers in the right order 
 //Tries to handle errors
