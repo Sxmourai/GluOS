@@ -16,6 +16,7 @@ use alloc::vec::Vec;
 use x86_64::VirtAddr;
 
 pub mod state;
+pub mod drivers;
 pub use state::Kernel;
 pub mod terminal;
 pub use terminal::prompt;
