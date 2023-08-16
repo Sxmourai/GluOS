@@ -13,7 +13,7 @@ extern crate log;
 use crate::kernel::{hlt_loop, serial_println};
 use alloc::{vec::Vec, string::String};
 use bootloader::{entry_point, BootInfo};
-use log::{error, info};
+use log::{error, info, debug};
 use core::{
     ffi::{c_uchar, c_ushort},
     panic::PanicInfo,
@@ -28,7 +28,7 @@ use kernel::{
         console::{pretty_print, CONSOLE},
         shell::Shell,
     },
-    writer::{inb, outb, inw}, pci::{pci_data::print_all_pci_devices, ata::{read_from_disk,self, iter_from_disk}}, memory::read_phys_memory_and_map, serial_print_all_bits,
+    writer::{inb, outb, inw}, pci::{pci_data::print_all_pci_devices, ata::{read_from_disk,self, iter_from_disk, DiskLoc}}, memory::read_phys_memory_and_map, serial_print_all_bits, bytes_list,
 };
 use pci_ids::SubSystem;
 use x86_64::{instructions::hlt, VirtAddr};
@@ -39,8 +39,9 @@ entry_point!(kernel_main);
 // Main function of our kernel (1 func to start when boot if not in test mode). Never returns, because kernel runs until machine poweroff
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     kernel::boot(boot_info);
-    
+    // debug!("Read: {:?}", read_from_disk(DiskLoc(ata::Channel::Primary, ata::Drive::Master), 000, 600));
 
+    Shell::new();
     info!("Done booting !");
     hlt_loop()
 }

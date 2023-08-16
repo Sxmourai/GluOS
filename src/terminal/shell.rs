@@ -10,7 +10,7 @@ use hashbrown::HashMap;
 use lazy_static::lazy_static;
 use spin::Mutex;
 
-use crate::{print, println, prompt::input};
+use crate::{print, println, prompt::input, pci::ata::{Channel, Drive, read_from_disk, DiskLoc}};
 type Commands = HashMap<String, (Arc<dyn Fn(String) -> Result<(), String> + Send + Sync>, String)>;
 
 // Helper function to generate closures and convert them to Arc
@@ -42,6 +42,30 @@ fn inb(args:I) -> O{
     println!("{}", unsafe{crate::writer::inb(port)});
     Ok(())
 }
+fn read(args:I) -> O{
+    let mut args = args.split(" ");
+    let channel = match args.next().ok_or("Invalid argument: missing channel (Primary/0, Secondary/1)")? {
+        "Primary" => Channel::Primary,
+        "0" => Channel::Primary,
+        "Secondary" => Channel::Secondary,
+        "1" => Channel::Secondary,
+        _ => return Err("Wrong channel: Primary//0 or Secondary//1".to_string()),
+    };
+    let drive = match args.next().ok_or("Invalid argument: missing drive (Master/0, Slave/1)")? {
+        "Master" => Drive::Master,
+        "0" => Drive::Master,
+        "Slave" => Drive::Slave,
+        "1" => Drive::Slave,
+        _ => return Err("Wrong drive: Master//0 or Slave//1".to_string()),
+    };
+    let start = args.next().ok_or("Invalid argument: missing start address (u64)")?;
+    let end = args.next().ok_or("Invalid argument: missing end address (u64)")?;
+    let start = start.parse().map_err(|e| format!("Failed to parse start: {}", e))?;
+    let end = end.parse().map_err(|e| format!("Failed to parse end: {}", e))?;
+
+    println!("{}", read_from_disk(DiskLoc(channel, drive), start, end));
+    Ok(())
+}
 type I = String;
 type O = Result<(), String>;
 lazy_static! {
@@ -57,6 +81,7 @@ lazy_static! {
 
             f( "outb",  "Send data (u8) to a port (u16)", outb),
             f( "inb",   "Read data (u8) from a port (u16) and prints it",inb),
+            f( "read",  "Read raw data from a disk ()", read),
         ];
         for (prog, fun, desc) in CONSTANT_COMMANDS {
             c.insert(prog, (fun, desc));
@@ -91,11 +116,14 @@ impl CommandRunner {
             let mut c = b.split(" ");
             let program = c.next().unwrap(); //TODO Crash if user types nothing, handle error
             if let Some((fun, desc)) = self.commands.get(program) {
-                fun(c
-                    .into_iter()
-                    .map(|s| alloc::string::ToString::to_string(&s))
-                    .collect::<Vec<String>>()
-                    .join(" "));
+                let args = c
+                .into_iter()
+                .map(|s| alloc::string::ToString::to_string(&s))
+                .collect::<Vec<String>>()
+                .join(" ");
+                if let Err(error_message) = fun(args) {
+                    println!("Error: {}", error_message);
+                }
             } else {
                 print!("\nUnsupported command, mispelled ? These are the ");
                 self.print_help()

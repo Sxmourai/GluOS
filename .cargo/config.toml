@@ -7,5 +7,15 @@ build-std = ["core", "compiler_builtins", "alloc"]
 [build]
 target = "x86_64.json"
 
+
+# [target.x86_64-pc-windows-msvc]
+# rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
+# [target.x86_64-pc-windows-gnu]
+# rustflags = ["-C", "link-arg=-fuse-ld=lld"]
+
 [target.'cfg(target_os = "none")']
 runner = "bootimage runner"
+# rustflags = [
+#     "-C", "link-arg=-fuse-ld=lld",
+# ]

@@ -21,8 +21,10 @@ const ATA_IDENT_MAX_LBA_EXT: u8  = 200;
 const ATA_IDENT_COMMANDSETS: u8  = 164;
 
 //TODO Find real number
-pub const SECTOR_SIZE: u16 = 512; // Sometimes 500... 
-pub const SSECTOR_SIZE: usize = SECTOR_SIZE as usize; // Sometimes 500... 
+pub const SECTOR_SIZE: u16 = 512;
+pub const SSECTOR_SIZE: usize = SECTOR_SIZE as usize;
+pub const SECTOR_SIZEWORD: u16 = SECTOR_SIZE/2;
+pub const SSECTOR_SIZEWORD: usize = SECTOR_SIZEWORD as usize;
 
 static mut DISK_MANAGER: Mutex<Option<DiskManager>> = Mutex::new(None); // Uninitialised
 // Don't call before disk_manager is initialised
@@ -91,7 +93,7 @@ fn detect(addr: impl DiskAddress) -> Option<Disk> {
     Some(disk)
 }
 
-fn read_identify(command_port_addr:u16) -> [u16; 256] {
+fn read_identify(command_port_addr:u16) -> [u16; SSECTOR_SIZEWORD] {
     trace!("Reading identify data");
     let mut data = [0u16; 256];
     for i in (0..data.len()) {
@@ -123,13 +125,13 @@ fn get_selected_drive_type(channel: Channel) -> DriveType {
 }
 //TODO Return a result, but for now it's for debugging so...
 pub fn read_from_disk(addr: impl DiskAddress, start: u64, end:u64) -> String {
-    let start_sector = start/SECTOR_SIZE as u64;
-    let offset_from_sector_start = start%SECTOR_SIZE as u64;
-    let mut sector_count: u64 = (end.div_ceil(SSECTOR_SIZE as u64)-start_sector).try_into().unwrap();
+    let start_sector = start.div_ceil(SSECTOR_SIZE as u64);
+    let end_sector = end.div_ceil(SSECTOR_SIZE as u64);
+    let offset_from_sector_start = start%SSECTOR_SIZE as u64;
 
     let mut binding = disk_manager();
     let mut dism = binding.as_mut().unwrap();
-    let sectors = dism.read_disk(addr, start_sector, start_sector+sector_count).unwrap();
+    let sectors = dism.read_disk(addr, start_sector, end_sector).unwrap();
     let raw = unite_sectors(sectors);
     
     let start = start as usize;
@@ -228,18 +230,31 @@ impl DiskManager {
             selected_disk: 0,
         }
     }
-    fn select_disk(&mut self, disk_address: impl DiskAddress) {
+    fn get_selected_disk(&mut self) -> &mut Disk {
+        self.disks[self.selected_disk].as_mut().unwrap()
+    }
+    //TODO Return result
+    fn select_disk(&mut self, disk_address: impl DiskAddress) -> bool {
+        if disk_address.as_index() > 3 {return false;}
+        // if self.selected_disk == disk_address.as_index() {trace!("Drive is already selected: {:?}", self.get_selected_disk());return true;}
         let base = disk_address.channel_addr();
         let drive = disk_address.drive_select_addr();
+        unsafe { bsy(self.get_selected_disk().base()) };
+        // unsafe { check_drq_or_err(self.get_selected_disk().base()) };
         unsafe { outb(base+6, drive) }; // Select drive of channel
-        unsafe { inb(base+0) }; // Wait a bit
         self.selected_disk = disk_address.as_index();
+        for i in 0..14 {
+            unsafe { inb(self.get_selected_disk().command_reg()) };
+        }
+        unsafe { bsy(self.get_selected_disk().base()) };
+        unsafe { check_drq_or_err(self.get_selected_disk().base()) };
+        true
     }
-    pub fn read_disk(&mut self, disk_address: impl DiskAddress, start_sector: u64, end_sector: u64) -> Result<Vec<[u16; SSECTOR_SIZE]>, DiskError> {
+    pub fn read_disk(&mut self, disk_address: impl DiskAddress, start_sector: u64, end_sector: u64) -> Result<Vec<[u16; SSECTOR_SIZEWORD]>, DiskError> {
         assert!(start_sector <= end_sector, "start sector is less than end sector !");
-        self.select_disk(disk_address);
-        if let Some(disk) = &self.disks[self.selected_disk] {
-            let sectors = disk.read_sectors(start_sector, end_sector-start_sector)?;
+        
+        if self.select_disk(disk_address) {
+            let sectors = self.get_selected_disk().read_sectors(start_sector, (end_sector-start_sector)*2)?;
             Ok(sectors)
         } else {
             Err(DiskError::DiskNotFound)
@@ -280,7 +295,7 @@ struct AddressingModes {
 
 
 #[derive(Debug, Clone, Copy)]
-pub struct DiskLoc(Channel, Drive);
+pub struct DiskLoc(pub Channel, pub Drive);
 impl DiskAddress for DiskLoc {
     fn as_index(&self) -> usize {
         let mut i = 0;
@@ -318,7 +333,7 @@ impl Disk {
     fn command_reg(&self)      -> u16 {self.base()+7}
 
     //28Bit Lba PIO mode
-    pub fn read28(&self, lba: u32, sector_count: u8) -> Vec<[u16; SSECTOR_SIZE]> {
+    pub fn read28(&self, lba: u32, sector_count: u8) -> Vec<[u16; SSECTOR_SIZE/2]> {
         let drive_addr = self.loc.drive_lba28_addr() as u32;
         let base = self.loc.channel_addr();
         unsafe {
@@ -334,11 +349,12 @@ impl Disk {
     }
     //48Bit Lba PIO mode
     // 0 for sector_count is equals to u16::MAX
-    pub fn read48(&self, lba: u64, sector_count: u64) -> Vec<[u16; SSECTOR_SIZE]> {
+    pub fn read48(&self, lba: u64, sector_count: u64) -> Vec<[u16; SSECTOR_SIZEWORD]> {
         let mut sectors = Vec::new();
         for offset in (0..sector_count).step_by(u16::MAX as usize) {
             let current_lba = lba+offset;
             let current_sector_count: u16 = ((lba+sector_count)-current_lba).min(u16::MAX.into()).try_into().unwrap();
+            debug!("CUR{} {} {:?}", current_lba, current_sector_count, self);
             unsafe {
                 outb(self.drive_head_reg(),  self.loc.drive_lba48_addr());// Select drive
                 outb(self.sector_count_reg(),((current_sector_count >> 8) & 0xFF).try_into().unwrap() ); // sector_count high
@@ -351,20 +367,25 @@ impl Disk {
                 outb(self.lbahi_reg(), ((current_lba >> 16) & 0xFF).try_into().unwrap());           // LBA3
                 outb(self.command_reg(), 0x24);                   // READ SECTORS EXT
             }
-
+            unsafe {bsy(self.base());}
+            unsafe {check_drq_or_err(self.base());}
             for sector in self.retrieve_read(current_sector_count) {
                 sectors.push(sector);
             }
         }
         sectors
     }
-    fn retrieve_read(&self, sector_count: u16) -> Vec<[u16; SSECTOR_SIZE]> {
+    fn retrieve_read(&self, sector_count: u16) -> Vec<[u16; SSECTOR_SIZEWORD]> {
         trace!("Retrieving read !");
         let mut buffer = Vec::new();
         for i in 0..sector_count {
-            let mut inner_buffer = [0u16; SSECTOR_SIZE];
+            let mut inner_buffer = [0u16; SSECTOR_SIZEWORD];
+            for i in 0..14 {
+                unsafe { inb(self.command_reg()) };
+            }
+            unsafe {bsy(self.base())};
             unsafe {check_drq_or_err(self.base());}
-            for j in 0..SSECTOR_SIZE {
+            for j in 0..SSECTOR_SIZEWORD {
                 inner_buffer[j] = unsafe { inw(self.data_reg()) };
             }
             buffer.push(inner_buffer);
@@ -372,7 +393,7 @@ impl Disk {
         trace!("Finished read !");
         buffer
     }
-    pub fn read_sectors(&self, sector_address: u64, sector_count: u64) -> Result<Vec<[u16; SSECTOR_SIZE]>, DiskError> {
+    pub fn read_sectors(&self, sector_address: u64, sector_count: u64) -> Result<Vec<[u16; SSECTOR_SIZEWORD]>, DiskError> {
         //TODO Move from vecs to slices
         if self.addressing_modes.lba48 != 0 {
             Ok(self.read48(sector_address, sector_count))
@@ -503,13 +524,16 @@ unsafe fn bsy(base: u16) {
 unsafe fn check_drq_or_err(base: u16) -> Result<(), DiskError> {
     trace!("Waiting DRQ flag to set at base: {:X}", base);
     let mut status = inb(base+7);
+    let mut i = 0;
     loop {
-        if status & 0x01 == 0x01 {
+        if status & 0x01 != 0x00 {
             error!("Error reading DRQ from drive: {}", bytes(inb(base+1)));
             return Err(DiskError::DRQRead);
         } //TODO Make better error handling... Or make error handling in top level function
         if status & 0x08 != 0x00 {break} //TODO When doing binary operations with ==, find a way to always do it the same way (see this line and line on top)
+        if i > 10000000 {error!("Error reading DRQ from drive: TIMEOUT"); return Err(DiskError::TimeOut)}
         status = inb(base+7);
+        i += 1;
     }
     Ok(())
 }

@@ -97,6 +97,13 @@ pub fn bytes<T: Into<u128>>(num: T) -> String {
     }
     result
 }
+pub fn bytes_list<T: Into<u128> + Copy, I: IntoIterator<Item = T>>(list: I) -> String {
+    let mut result = String::new();
+    for ele in list.into_iter() {
+        result.push_str(bytes(ele).as_str());
+    }
+    result
+}
 pub fn numeric_to_char_vec<T>(value: T) -> String
 where
     T: Into<u64>,

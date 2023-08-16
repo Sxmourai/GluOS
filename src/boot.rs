@@ -17,13 +17,10 @@ use crate::println;
 
 // Boot the os, with the help of the 'boot_info' provided by the bootloader crate
 pub fn boot(boot_info: &'static bootloader::BootInfo) {
-    initialize_logger();
     //TODO Can't use vecs, Strings before heap init (in memoryHandler init), which means we can't do trace... Use a constant-size list ?
-    trace!("Initializing GDT");
     gdt::init();
-    trace!("Initializing Interrupts & CPU exceptions");
     interrupts::init();
-
+    
     let memory_handler = MemoryHandler::new(
         VirtAddr::new(boot_info.physical_memory_offset),
         &boot_info.memory_map,
@@ -32,6 +29,9 @@ pub fn boot(boot_info: &'static bootloader::BootInfo) {
         state::STATE.mem_handler = Some(memory_handler);
         state::STATE.boot_info = Some(boot_info);
     };
+    initialize_logger();
+    trace!("Initializing GDT");
+    trace!("Initializing Interrupts & CPU exceptions");
     let dth = DescriptorTablesHandler::new(boot_info.physical_memory_offset);
     crate::pci::ata::init();
 }

@@ -59,7 +59,7 @@ impl KeyboardHandler {
                     DecodedKey::Unicode(k) => {
                         match k {
                             // 't' => print_trace(),
-                            _ => {serial_println!("This shouldn't happen because HandleControl is at ignore... {:?}", k);}
+                            _ => {}//{serial_println!("This shouldn't happen because HandleControl is at ignore... {:?}", k);}}
                         }
                     }
                 }

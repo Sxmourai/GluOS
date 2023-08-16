@@ -11,6 +11,7 @@ pub enum DiskError {
     SectorTooBig,
     NoReadModeAvailable,
     DiskNotFound,
+    TimeOut,
     DRQRead, //TODO Handle all errors from the register
 }
 
@@ -57,7 +58,7 @@ pub fn delete(filename: &str) -> Result<(), DiskError> {
     open(filename)?.delete()
 }
 
-pub fn unite_sectors(sectors: Vec<[u16;SSECTOR_SIZE]>) -> Vec<u16> {
+pub fn unite_sectors(sectors: Vec<[u16;SSECTOR_SIZE/2]>) -> Vec<u16> {
     let mut united = Vec::new();
     for sector in sectors {
         for word in sector {
