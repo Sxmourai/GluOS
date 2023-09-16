@@ -8,31 +8,22 @@
 extern crate alloc;
 extern crate bootloader;
 extern crate kernel;
-extern crate x86_64;
 extern crate log;
+extern crate x86_64;
 use crate::kernel::{hlt_loop, serial_println};
-use alloc::{vec::Vec, string::String};
+use alloc::{string::String, vec::Vec};
 use bootloader::{entry_point, BootInfo};
-use log::{error, info, debug};
 use core::{
     ffi::{c_uchar, c_ushort},
     panic::PanicInfo,
 };
 use hashbrown::HashMap;
 use kernel::{
-    println,
-    prompt::input,
-    serial_print,
-    state::get_mem_handler,
-    terminal::{
-        console::{pretty_print, CONSOLE},
-        shell::Shell,
-    },
-    writer::{inb, outb, inw}, pci::{pci_data::print_all_pci_devices, ata::{read_from_disk,self, iter_from_disk, DiskLoc}}, memory::read_phys_memory_and_map, serial_print_all_bits, bytes_list,
+    bytes_list, serial_print_all_bits, terminal::shell::Shell,
 };
+use log::{debug, error, info};
 use pci_ids::SubSystem;
 use x86_64::{instructions::hlt, VirtAddr};
-
 
 // Sets the entry point of our kernel for the bootloader. This means we can have the 'boot_info' variable which stores some crucial info
 entry_point!(kernel_main);

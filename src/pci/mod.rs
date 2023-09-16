@@ -4,7 +4,6 @@
 // Usefull links: all of classes: https://pci-ids.ucw.cz/read/PD/
 // Intel devices : https://pci-ids.ucw.cz/read/PC/8086
 
-pub mod ata;
 pub mod pci_data;
 pub mod port;
 

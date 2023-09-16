@@ -10,7 +10,7 @@ use hashbrown::HashMap;
 use lazy_static::lazy_static;
 use spin::Mutex;
 
-use crate::{print, println, prompt::input, pci::ata::{Channel, Drive, read_from_disk, DiskLoc}};
+use crate::{print, println, prompt::input, drivers::disk::{ata::{Channel, Drive, read_from_disk, DiskLoc}, fs::parse_sectors}};
 type Commands = HashMap<String, (Arc<dyn Fn(String) -> Result<(), String> + Send + Sync>, String)>;
 
 // Helper function to generate closures and convert them to Arc
@@ -63,7 +63,9 @@ fn read(args:I) -> O{
     let start = start.parse().map_err(|e| format!("Failed to parse start: {}", e))?;
     let end = end.parse().map_err(|e| format!("Failed to parse end: {}", e))?;
 
-    println!("{}", read_from_disk(DiskLoc(channel, drive), start, end));
+
+    let sectors = read_from_disk(DiskLoc(channel, drive), start, end)?;
+    println!("{}", parse_sectors(sectors));
     Ok(())
 }
 type I = String;

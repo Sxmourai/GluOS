@@ -2,7 +2,7 @@
 
 This is a minimal, modular and lightweight kernel in rust
 For instance, based on phil-opp blog: <https://os.phil-opp.com>
-https://github.com/thepowersgang/rust_os
+<https://github.com/thepowersgang/rust_os>
 
 ## Features
 
@@ -31,16 +31,22 @@ https://github.com/thepowersgang/rust_os
 - File system
 
 ## TODO LIST
-- Multiprocessor, get rsdp https://docs.rs/rsdp/latest/src/rsdp/lib.rs.html#47-61, mapping
+
+- Multiprocessor, get rsdp <https://docs.rs/rsdp/latest/src/rsdp/lib.rs.html#47-61>, mapping
 
 ## Cool ressources
-- Phil opp blog
-- https://pages.cs.wisc.edu/~remzi/OSTEP/
 
-## To use C functions :
+- Phil opp blog
+- <https://pages.cs.wisc.edu/~remzi/OSTEP/>
+
+## To use C functions
+
 - First use the 'link' macro before using the 'extern' keyword :
+
+```rust
 #[link(name = "my_c_lib", kind = "static")]
 extern "C"
 {
     fn my_func(my_args) -> my_return_type; 
 }
+```

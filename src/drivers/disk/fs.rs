@@ -1,24 +1,18 @@
 use core::num::TryFromIntError;
 
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{string::{String, ToString, ParseError}, vec::Vec};
 
-use crate::{pci::ata::{self, SECTOR_SIZE, SSECTOR_SIZE, Channel, Drive, disk_manager, read_from_disk}, serial_print_all_bits, serial_print, serial_println};
+use crate::{serial_print_all_bits, serial_print, serial_println};
 
-#[derive(Debug)]
-pub enum DiskError {
-    NotFound, 
-    PermissionDenied, // Shouldn't happen... But keep this for rlib ?
-    SectorTooBig,
-    NoReadModeAvailable,
-    DiskNotFound,
-    TimeOut,
-    DRQRead, //TODO Handle all errors from the register
-}
+use super::{ata::{read_from_disk, SSECTOR_SIZE, SSECTOR_SIZEWORD}, DiskError};
 
-impl From<TryFromIntError> for DiskError {
-    fn from(original: TryFromIntError) -> Self {
-        DiskError::SectorTooBig
+
+pub fn parse_sectors(sectors: Vec<[u16; SSECTOR_SIZEWORD]>) -> String {
+    let mut content = String::new();
+    for sector in sectors {
+        content.push_str(String::from_utf16_lossy(&sector).as_str());
     }
+    content
 }
 
 pub struct File {
@@ -34,7 +28,8 @@ impl File {
     }
     pub fn read(&self) -> Result<String, DiskError> {
         let start = 0;
-        let content = read_from_disk(1u8, start, start+self.len);
+        let sectors = read_from_disk(1u8, start, start+self.len)?;
+        let content = parse_sectors(sectors);
         Ok(content)
     }
     pub fn write(&self, content: String) -> Result<(), DiskError> {

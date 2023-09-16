@@ -1,7 +1,6 @@
 //pub mod bump;
 //pub mod linked_list;
 pub mod fixed_size_block;
-use crate::memory::BootInfoFrameAllocator;
 use alloc::alloc::{GlobalAlloc, Layout};
 use core::ptr::null_mut;
 use x86_64::{
@@ -10,6 +9,8 @@ use x86_64::{
     },
     VirtAddr,
 };
+
+use crate::drivers::memory::BootInfoFrameAllocator;
 
 use self::fixed_size_block::FixedSizeBlockAllocator;
 

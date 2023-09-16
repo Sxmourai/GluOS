@@ -9,16 +9,15 @@ use lazy_static::lazy_static;
 use spin::Mutex;
 use x86_64::{structures::paging::OffsetPageTable, VirtAddr};
 
-use crate::memory::{BootInfoFrameAllocator, rsdp::DescriptorTablesHandler};
-use crate::MemoryHandler;
+use crate::drivers::{memory::{handler::MemoryHandler, rsdp::DescriptorTablesHandler}, DriverManager};
 
-// const MEM_HANDLER
 
 pub static mut STATE: Kernel = Kernel::new();
 pub struct Kernel {
-    pub mem_handler: Option<MemoryHandler>,
+    pub mem_handler: Option<Cell<MemoryHandler>>,
     pub boot_info: Option<&'static BootInfo>,
-    pub descriptor_tables: Option<DescriptorTablesHandler>
+    pub descriptor_tables: Option<Mutex<DescriptorTablesHandler>>,
+    pub driver_manager: Option<Cell<DriverManager>>,
 }
 impl Kernel {
     pub const fn new() -> Self {
@@ -26,29 +25,23 @@ impl Kernel {
             mem_handler: None,
             boot_info: None,
             descriptor_tables: None,
+            driver_manager: None,
         }
-    }
-    pub fn get_mem_handler(&mut self) -> Cell<&mut MemoryHandler> {
-        Cell::new(self.mem_handler.as_mut().unwrap())
-    }
-    pub fn boot_info(&self) -> &'static BootInfo {
-        self.boot_info.unwrap()
     }
 }
 // NOT USE BEFORE KERNEL INIT !!!
-pub fn get_mem_handler() -> Cell<&'static mut MemoryHandler> {
-    unsafe { STATE.get_mem_handler() }
+pub fn get_mem_handler() -> &'static mut Cell<MemoryHandler> {
+    unsafe { STATE.mem_handler.as_mut().unwrap() }
 }
-// pub fn get_mapper() -> Arc<Mutex<OffsetPageTable<'static>>> {
-//     get_mem_handler().mapper()
-// }
-// pub fn get_frame_allocator() -> Arc<BootInfoFrameAllocator> {
-//     get_mem_handler().frame_allocator()
-// }
 pub fn get_boot_info() -> &'static BootInfo {
-    unsafe { STATE.boot_info() }
+    unsafe { STATE.boot_info.unwrap() }
+}
+pub fn get_driver_manager() -> &'static mut Cell<DriverManager> {
+    unsafe { STATE.driver_manager.as_mut().unwrap() }
 }
 
+
+/*
 trait InKernel: Send {
     fn get_memory_handler(self: Box<Self>) -> MemoryHandler;
     fn get_boot_info(&self) -> &'static BootInfo;
@@ -75,3 +68,4 @@ impl InKernel for DummyInKernel {
         panic!("Dummy kernel can't return app state !")
     }
 }
+*/

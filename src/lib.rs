@@ -21,11 +21,6 @@ pub use state::Kernel;
 pub mod terminal;
 pub use terminal::prompt;
 pub use terminal::writer;
-pub mod interrupts;
-pub use interrupts::timer;
-pub mod gdt;
-pub mod memory;
-pub use crate::memory::handler::MemoryHandler;
 pub mod allocator;
 pub mod task;
 pub mod test;
@@ -35,8 +30,6 @@ pub use boot::{boot, hlt_loop};
 pub mod cpu;
 pub mod pci;
 pub mod log;
-pub mod fs;
-//pub mod apic; //!causes compiler error
 
 
 use core::fmt::Display;

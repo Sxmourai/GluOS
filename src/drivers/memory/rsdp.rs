@@ -10,7 +10,9 @@ use x86_64::{structures::paging::{PageTableFlags, PhysFrame, Size4KiB, Mapper, P
 
 static ACPI_HEAD_SIZE:usize = core::mem::size_of::<ACPISDTHeader>();
 
-use crate::{println, find_string, serial_println, serial_print, serial_print_all_bits, memory::read_memory, print, list_to_num, ptrlist_to_num, bytes};
+use crate::{println, find_string, serial_println, serial_print, serial_print_all_bits, print, list_to_num, ptrlist_to_num, bytes};
+
+use super::{read_memory, read_phys_memory_and_map};
 /// This (usually!) contains the base address of the EBDA (Extended Bios Data Area), shifted right by 4
 const EBDA_START_SEGMENT_PTR: usize = 0x40e; // Base address in in 2 bytes
 /// The earliest (lowest) memory address an EBDA (Extended Bios Data Area) can start
@@ -33,7 +35,7 @@ pub struct RSDPDescriptor {
 }
 
 fn search_rsdp_in_page(page:u64, physical_memory_offset:u64) -> Option<&'static RSDPDescriptor>{
-    let bytes_read = unsafe { crate::memory::read_memory((page+physical_memory_offset) as *const u8, 4096) };
+    let bytes_read = unsafe { read_memory((page+physical_memory_offset) as *const u8, 4096) };
     if let Some(offset) = find_string(&bytes_read, RSDP_SIGNATURE) {
         let sl: &[u8] = &bytes_read[offset..offset+core::mem::size_of::<RSDPDescriptor>()];
         // Check that the bytes_in_memory size matches the size of RSDPDescriptor
@@ -421,8 +423,8 @@ unsafe fn handle_waet(bytes: &[u8]) -> Option<&'static WAET> {
 
 
 fn read_sdt(ptr:u64, end_page:u64) -> (&'static ACPISDTHeader, &'static [u8]) {
-    let bytes = unsafe { crate::memory::read_phys_memory_and_map(ptr, ACPI_HEAD_SIZE, end_page) };
+    let bytes = unsafe { read_phys_memory_and_map(ptr, ACPI_HEAD_SIZE, end_page) };
     let entry: &ACPISDTHeader = unsafe { &*(bytes.as_ptr() as *const _) };
-    let bytes = unsafe { crate::memory::read_memory(bytes.as_ptr(), entry.length as usize) };
+    let bytes = unsafe { read_memory(bytes.as_ptr(), entry.length as usize) };
     (entry, bytes)
 }

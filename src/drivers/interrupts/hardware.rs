@@ -2,7 +2,7 @@ use alloc::{boxed::Box, string::String, vec::Vec};
 use pc_keyboard::{layouts::Us104Key, DecodedKey, HandleControl, KeyCode, Keyboard, ScancodeSet1};
 use pic8259::ChainedPics;
 use spin::Mutex;
-use crate::{boot::hlt_loop, prompt::KbInput, serial_println, writer::{WRITER, inb}, pci::port::Port};
+use crate::{boot::hlt_loop, prompt::KbInput, serial_println, writer::{WRITER, inb}, pci::port::Port, drivers::{get_driver, time}};
 use x86_64::structures::{idt::{InterruptStackFrame, PageFaultErrorCode}, port::PortRead};
 
 
@@ -37,7 +37,7 @@ fn notify_end_of_interrupt(interrupt:InterruptIndex) {
 }
 
 pub extern "x86-interrupt" fn timer(_stack_frame: InterruptStackFrame) {
-    crate::timer::tick();
+    time::tick();
 
     notify_end_of_interrupt(InterruptIndex::Timer);
 }

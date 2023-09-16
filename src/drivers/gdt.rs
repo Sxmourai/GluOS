@@ -3,6 +3,8 @@ use x86_64::structures::gdt::{Descriptor, GlobalDescriptorTable, SegmentSelector
 use x86_64::structures::tss::TaskStateSegment;
 use x86_64::VirtAddr;
 
+use super::Driver;
+
 pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;
 
 pub fn init() {
@@ -48,4 +50,28 @@ lazy_static! {
 struct Selectors {
     code_selector: SegmentSelector,
     tss_selector: SegmentSelector,
+}
+
+pub struct GDTDriver {
+
+}
+impl Driver for GDTDriver {
+    fn new() -> Self where Self: Sized {
+        Self {
+
+        }
+    }
+
+    fn name(&self) -> &str {
+        "GDT"
+    }
+
+    fn init(&mut self) -> Result<(), super::DriverError> {
+        init();
+        Ok(())
+    }
+
+    fn required(&self) -> &str {
+        ""
+    }
 }

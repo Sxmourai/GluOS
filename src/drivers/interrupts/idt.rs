@@ -1,6 +1,8 @@
 use x86_64::structures::idt::InterruptDescriptorTable;
 
-use crate::interrupts::hardware::InterruptIndex;
+
+use crate::drivers::gdt::DOUBLE_FAULT_IST_INDEX;
+use crate::drivers::interrupts::hardware::InterruptIndex;
 
 use super::exceptions::*;
 use super::hardware::{keyboard, timer};
@@ -17,7 +19,7 @@ lazy_static::lazy_static! {
         unsafe { // Double fault occurs when an exception occurs while an exception function is being called...
             // If double fault fails, a triple fault is invoked which, on most hardware, cause a system reboot
             idt.double_fault.set_handler_fn(double_fault_handler)
-                .set_stack_index(crate::gdt::DOUBLE_FAULT_IST_INDEX);
+                .set_stack_index(DOUBLE_FAULT_IST_INDEX);
         }
         idt.general_protection_fault.set_handler_fn(general_protection_fault);
         idt.invalid_opcode.set_handler_fn(invalid_opcode);

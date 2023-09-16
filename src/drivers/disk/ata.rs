@@ -4,8 +4,10 @@ use alloc::{string::String, vec::Vec, boxed::Box};
 use log::{trace, error, info, debug};
 use spin::{Mutex, MutexGuard};
 
-use crate::{writer::{outb, inb, inw}, println, serial_println, serial_print_all_bits, serial_print, bytes, numeric_to_char_vec, fs::{DiskError, unite_sectors}, u16_to_u8, CharArray, CharSlice, CharSlicePtr, list_to_num, ptrlist_to_num, log::point, slice16_to_str};
+use crate::{writer::{outb, inb, inw}, println, serial_println, serial_print_all_bits, serial_print, bytes, numeric_to_char_vec, u16_to_u8, CharArray, CharSlice, CharSlicePtr, list_to_num, ptrlist_to_num, log::point, slice16_to_str};
 use lazy_static::lazy_static;
+
+use super::DiskError;
 
 
 const ATA_IDENT_DEVICETYPE: u8   = 0;
@@ -124,7 +126,7 @@ fn get_selected_drive_type(channel: Channel) -> DriveType {
     }
 }
 //TODO Return a result, but for now it's for debugging so...
-pub fn read_from_disk(addr: impl DiskAddress, start: u64, end:u64) -> String {
+pub fn read_from_disk(addr: impl DiskAddress, start: u64, end:u64) -> Result<Vec<[u16; SSECTOR_SIZEWORD]>, DiskError> {
     let start_sector = start.div_ceil(SSECTOR_SIZE as u64);
     let end_sector = end.div_ceil(SSECTOR_SIZE as u64);
     let offset_from_sector_start = start%SSECTOR_SIZE as u64;
@@ -132,12 +134,7 @@ pub fn read_from_disk(addr: impl DiskAddress, start: u64, end:u64) -> String {
     let mut binding = disk_manager();
     let mut dism = binding.as_mut().unwrap();
     let sectors = dism.read_disk(addr, start_sector, end_sector).unwrap();
-    let raw = unite_sectors(sectors);
-    
-    let start = start as usize;
-    let size = end as usize-start as usize;
-    let slice = &raw[(offset_from_sector_start as usize) .. (offset_from_sector_start as usize + size)];
-    slice16_to_str(slice)
+    Ok(sectors)
 }
 pub struct ReadDiskIterator {
     step: u16,
@@ -146,7 +143,7 @@ pub struct ReadDiskIterator {
     addr: DiskLoc
 }
 impl Iterator for ReadDiskIterator {
-    type Item = String;
+    type Item = Result<Vec<[u16; SSECTOR_SIZEWORD]>, DiskError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.current_sector <= self.end_sector {
