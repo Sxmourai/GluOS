@@ -10,7 +10,7 @@ use hashbrown::HashMap;
 use lazy_static::lazy_static;
 use spin::Mutex;
 
-use crate::{print, println, prompt::input, drivers::disk::{ata::{Channel, Drive, read_from_disk, DiskLoc}, fs::parse_sectors}};
+use crate::{print, println, prompt::input, drivers::disk::{ata::{Channel, Drive, read_from_disk, DiskLoc}, fs::parse_sectors}, serial_println};
 type Commands = HashMap<String, (Arc<dyn Fn(String) -> Result<(), String> + Send + Sync>, String)>;
 
 // Helper function to generate closures and convert them to Arc
@@ -42,8 +42,8 @@ fn inb(args:I) -> O{
     println!("{}", unsafe{crate::writer::inb(port)});
     Ok(())
 }
-fn read(args:I) -> O{
-    let mut args = args.split(" ");
+fn read(raw_args:I) -> O{
+    let mut args = raw_args.split(" ");
     let channel = match args.next().ok_or("Invalid argument: missing channel (Primary/0, Secondary/1)")? {
         "Primary" => Channel::Primary,
         "0" => Channel::Primary,
@@ -65,7 +65,10 @@ fn read(args:I) -> O{
 
 
     let sectors = read_from_disk(DiskLoc(channel, drive), start, end)?;
-    println!("{}", parse_sectors(sectors));
+    if raw_args.contains("--serial") {
+        serial_println!("{:#?}", parse_sectors(&sectors));
+    }
+    println!("{:#?}", parse_sectors(&sectors));
     Ok(())
 }
 type I = String;
@@ -84,6 +87,10 @@ lazy_static! {
             f( "outb",  "Send data (u8) to a port (u16)", outb),
             f( "inb",   "Read data (u8) from a port (u16) and prints it",inb),
             f( "read",  "Read raw data from a disk ()", read),
+            f( "clear", "Clears screen", |v:I| -> O {
+                crate::terminal::console::clear_console();
+                Ok(())
+            })
         ];
         for (prog, fun, desc) in CONSTANT_COMMANDS {
             c.insert(prog, (fun, desc));

@@ -22,23 +22,6 @@ use super::{
     console::DEFAULT_CHAR,
 };
 
-#[derive(Debug)]
-pub struct Cursor {
-    blink_state: bool,
-    chr: ScreenChar,
-    previous: HashMap<ScreenPos, ScreenChar>,
-    pub pos: usize,
-}
-impl Cursor {
-    pub fn new() -> Cursor {
-        Cursor {
-            blink_state: false,
-            chr: ScreenChar::new(b' ', ColorCode::new(Color::White, Color::White)),
-            previous: HashMap::new(),
-            pos: 0,
-        }
-    }
-}
 pub trait KbInput: Send + Sync {
     fn run(self) -> String;
     fn get_origin(&self) -> ScreenPos;
@@ -147,6 +130,7 @@ impl KbInput for BlockingPrompt {
                     if self.pos > 0 {
                         //TODO: Fix the fact that we clear entire input every time we backspace
                         // Remove all chars of line
+                        serial_println!("Or{:?}", self.origin);
                         print_at(
                             self.origin.0,
                             self.origin.1,

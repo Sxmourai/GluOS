@@ -9,4 +9,5 @@
         "stdint.h": "c",
         "stdint-gcc.h": "c"
     },
+    "cmake.sourceDirectory": "E:/Documents/Code/Projets/GluOS/src/pci/c",
 }

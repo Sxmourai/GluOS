@@ -42,17 +42,18 @@ impl Buffer for VgaBuffer {
         if pos.0 < BUFFER_WIDTH && pos.1 < BUFFER_HEIGHT {
             self.chars[pos.1 as usize][pos.0 as usize].write(chr)
         } else {
-            panic!("Tried to write {:?} at {:?}",chr, pos)
+            log::error!("Tried to write {:?} at {:?}",chr, pos)
         }
     }
     fn get_screenchar_at(&self, pos: &ScreenPos) -> ScreenChar {
         if pos.0 < BUFFER_WIDTH && pos.1 < BUFFER_HEIGHT {
             self.chars[pos.1 as usize][pos.0 as usize].read()
         } else {
-            panic!("Tried to read {:?}",pos)
+            log::error!("Tried to read {:?}",pos);
+            return DEFAULT_CHAR
         }
     }
-    // Loop over all chars to check if they are DEFAULT_CHARS, so heavy function (O(1))
+    // Loop over all chars to check if they are DEFAULT_CHARS
     fn is_empty(&self) -> bool {
         for y in 0..BUFFER_HEIGHT {
             for x in 0..BUFFER_WIDTH {
@@ -87,6 +88,9 @@ impl ConsoleBuffer {
     }
     pub fn get_youngest_line(&self) -> Option<[ScreenChar; BUFFER_WIDTH as usize]> {
         self.inner.get(self.inner.len() - 1).copied()
+    }
+    pub fn remove_youngest_line(&mut self) -> [ScreenChar; BUFFER_WIDTH as usize] {
+        self.inner.remove(self.inner.len() - 1)
     }
     pub fn get_oldest_line(&self) -> Option<[ScreenChar; BUFFER_WIDTH as usize]> {
         self.inner.get(0).copied()

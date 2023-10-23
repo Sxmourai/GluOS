@@ -1,4 +1,4 @@
-use crate::{serial_println, terminal::buffer::VgaBuffer};
+use crate::{serial_println, terminal::buffer::VgaBuffer, writer::{print_screenchar_at, print_screenchars_atp}};
 use alloc::vec::Vec;
 use spin::Mutex;
 
@@ -7,10 +7,7 @@ use super::{
     writer::{Color, ColorCode, ScreenPos},
 };
 use lazy_static::lazy_static;
-lazy_static! {
-    pub static ref CONSOLE: Mutex<Console> =
-        Mutex::new(Console::new(unsafe { &mut *(0xb8000 as *mut VgaBuffer) }));
-}
+
 
 pub const DEFAULT_CHAR: ScreenChar = ScreenChar::new('\0' as u8, ColorCode(15)); // Black on black
 
@@ -37,15 +34,15 @@ impl Console {
     }
 
     pub fn clear(&mut self) {
-        for y in 0..self.size().0 {
-            for x in 0..self.size().1 {
+        for y in 0..self.size().1 {
+            for x in 0..self.size().0 {
                 self.remove(x, y);
             }
         }
         self.top_buffer = ConsoleBuffer::new(); // Don't use clear because the allocated size doesn't change
         self.bottom_buffer = ConsoleBuffer::new(); // Don't use clear because the allocated size doesn't change
-                                                   // Could use clear then shrink to fit I think
-                                                   //TODO: Find out which is faster (even tho I don't think it will be a gigantic improvement)
+        // Could use clear then shrink to fit I think
+        //TODO: Find out which is faster (even tho I don't think it will be a gigantic improvement)
     }
 
     pub fn remove(&mut self, x: u8, y: u8) {
@@ -65,7 +62,7 @@ impl Console {
         let (width, height) = self.buffer.size();
         for i in 0..len {
             buffer.push(self.get_at(
-                (pos.0 + (i % width as u16) as u8),
+                (pos.0 as u16 + i) as u8 % width,
                 ((i/width as u16) as u8 + pos.1),
             )); // Wrap around
         }
@@ -80,7 +77,7 @@ unsafe impl Sync for Console {}
 unsafe impl Send for Console {}
 
 pub fn clear_console() {
-    CONSOLE.lock().clear()
+    print_screenchars_atp(&ScreenPos(0, 0), [DEFAULT_CHAR; 80*25])
 }
 
 #[derive(Eq, PartialEq, Hash, Debug, Clone)]
@@ -98,36 +95,16 @@ pub struct ScreenChar {
     pub color_code: ColorCode,
 }
 impl ScreenChar {
-    pub const fn new(ascii_character: u8, color_code: ColorCode) -> ScreenChar {
-        ScreenChar {
+    pub const fn new(ascii_character: u8, color_code: ColorCode) -> Self {
+        Self {
             ascii_character,
             color_code,
         }
     }
-    pub const fn from(ascii_character: u8) -> ScreenChar {
-        ScreenChar {
-            ascii_character,
-            color_code: ColorCode::new(Color::White, Color::Black),
-        }
+    pub const fn from(ascii_character: u8) -> Self {
+        Self::new(ascii_character,ColorCode::new(Color::White, Color::Black))
     }
-}
-
-pub fn pretty_print() -> ! {
-    let buffer = &mut CONSOLE.lock().buffer;
-    let mut i: usize = 256;
-    loop {
-        i += 1;
-        for row in 0..buffer.size().1 {
-            for column in 0..buffer.size().0 {
-                buffer.write_screenchar_at(
-                    &ScreenPos(row, column),
-                    ScreenChar {
-                        ascii_character: (row as u8).wrapping_add(i as u8),
-                        color_code: ColorCode::newb((column as f32 * 2.7) as u8, 0),
-                    },
-                )
-            }
-        }
-        // x86_64::instructions::hlt();x86_64::instructions::hlt();x86_64::instructions::hlt();x86_64::instructions::hlt();
+    pub const fn default() -> Self {
+        Self::from(0x00)
     }
 }

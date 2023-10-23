@@ -36,7 +36,6 @@ fn test_println_many() {
 }
 
 // Heap allocation tests
-
 #[test_case]
 fn simple_allocation() {
     let heap_value_1 = Box::new(41);
@@ -80,3 +79,7 @@ fn test_breakpoint_exception() {
     // invoke a breakpoint exception
     x86_64::instructions::interrupts::int3();
 }
+
+// Disk
+#[test_case]
+fn test_disk_read() {}
