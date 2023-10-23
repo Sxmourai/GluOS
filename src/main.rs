@@ -35,8 +35,6 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     Shell::new();
     info!("Done booting !");
 
-
-
     hlt_loop()
 }
 

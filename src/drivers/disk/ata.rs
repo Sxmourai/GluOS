@@ -246,8 +246,8 @@ impl DiskManager {
     pub fn read_disk(&mut self, disk_address: impl DiskAddress, start_sector: u64, sector_count: u16) -> Result<Sectors, DiskError> {
         assert!(sector_count > 0, "Sector count is = 0 !");
         
-        let disk = self.select_disk(disk_address)?;
-        let sectors = disk.read_sectors(start_sector, sector_count)?;
+        // let disk = self.select_disk(disk_address)?;
+        let sectors = self.disks[disk_address.as_index()].as_mut().unwrap().read_sectors(start_sector, sector_count)?;
         Ok(sectors)
     }
 }
@@ -314,12 +314,12 @@ impl Disk {
     fn base(&self) -> u16 {self.loc.base()}
     fn data_reg(&self)         -> u16 {self.base()+0}
     fn error_reg(&self)        -> u16 {self.base()+1}
-    fn features_reg(&self)     -> u16 {self.base()+2}
-    fn sector_count_reg(&self) -> u16 {self.base()+3}
-    fn lbalo_reg(&self)        -> u16 {self.base()+4}
-    fn lbamid_reg(&self)       -> u16 {self.base()+5}
-    fn lbahi_reg(&self)        -> u16 {self.base()+6}
-    fn drive_head_reg(&self)   -> u16 {self.base()+7}
+    fn features_reg(&self)     -> u16 {self.base()+1}
+    fn sector_count_reg(&self) -> u16 {self.base()+2}
+    fn lbalo_reg(&self)        -> u16 {self.base()+3}
+    fn lbamid_reg(&self)       -> u16 {self.base()+4}
+    fn lbahi_reg(&self)        -> u16 {self.base()+5}
+    fn device_select_reg(&self)-> u16 {self.base()+6}
     fn command_reg(&self)      -> u16 {self.base()+7}
 
     //28Bit Lba PIO mode
@@ -345,22 +345,23 @@ impl Disk {
     // 0 for sector_count is equals to u16::MAX
     pub fn read48(&self, lba: u64, sector_count: u16) -> DResult<Sectors> {
         debug!("CUR{} {}", lba, sector_count);
+        
         unsafe {
-            outb(self.base(), inb(self.base()) | 0x80);
+        outb(self.device_select_reg(),  self.loc.drive_lba48_addr());// Select drive
+        outb(self.base(), inb(self.base()) | 0x80);
 
-            outb(self.drive_head_reg(),  self.loc.drive_lba48_addr());// Select drive
-            outb(self.sector_count_reg(),((sector_count >> 8)).try_into().unwrap() ); // sector_count high
-            outb(self.lbalo_reg(), ((lba >> 24)).try_into().unwrap());           // LBA4
-            outb(self.lbamid_reg(),((lba >> 32)).try_into().unwrap());          // LBA5
-            outb(self.lbahi_reg(), ((lba >> 40)).try_into().unwrap());           // LBA6
-            
-            outb(self.base(), inb(self.base()) & !0x80);
+        outb(self.sector_count_reg(),(sector_count >> 8) as u8 ); // sector_count high
+        outb(self.lbalo_reg(), (lba >> 24) as u8);           // LBA4
+        outb(self.lbamid_reg(),(lba >> 32) as u8);          // LBA5
+        outb(self.lbahi_reg(), (lba >> 40) as u8);           // LBA6
+        
+        outb(self.base(), inb(self.base()) & !0x80);
 
-            outb(self.sector_count_reg(),(sector_count).try_into().unwrap());         // sector_count low
-            outb(self.lbalo_reg(), (lba).try_into().unwrap());                   // LBA1
-            outb(self.lbamid_reg(), ((lba >> 8)).try_into().unwrap());           // LBA2
-            outb(self.lbahi_reg(), ((lba >> 16)).try_into().unwrap());           // LBA3
-            outb(self.command_reg(), 0x24);                   // READ SECTORS EXT
+        outb(self.sector_count_reg(),sector_count as u8);         // sector_count low
+        outb(self.lbalo_reg(), lba as u8);                   // LBA1
+        outb(self.lbamid_reg(), (lba >> 8) as u8);           // LBA2
+        outb(self.lbahi_reg(), (lba >> 16) as u8);           // LBA3
+        outb(self.command_reg(), 0x24);                   // READ SECTORS EXT
         }
         self.retrieve_read(sector_count)
     }
