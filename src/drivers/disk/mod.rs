@@ -34,6 +34,7 @@ impl Driver for DiskDriver {
 #[derive(Debug)]
 pub enum DiskError {
     NotFound,
+    ReadDataNotAvailable,
     PermissionDenied, // Shouldn't happen... But keep this for rlib ?
     SectorTooBig,
     NoReadModeAvailable,

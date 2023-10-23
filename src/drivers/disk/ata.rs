@@ -4,7 +4,7 @@ use alloc::{string::String, vec::Vec, boxed::Box};
 use log::{trace, error, info, debug};
 use spin::{Mutex, MutexGuard};
 
-use crate::{writer::{outb, inb, inw}, println, serial_println, serial_print_all_bits, serial_print, bytes, numeric_to_char_vec, u16_to_u8, CharArray, CharSlice, CharSlicePtr, list_to_num, ptrlist_to_num, log::point, slice16_to_str};
+use crate::{writer::{outb, inb, inw, indw}, println, serial_println, serial_print_all_bits, serial_print, bytes, numeric_to_char_vec, u16_to_u8, CharArray, CharSlice, CharSlicePtr, list_to_num, ptrlist_to_num, log::point, slice16_to_str};
 use lazy_static::lazy_static;
 
 use super::DiskError;
@@ -27,6 +27,9 @@ pub const SECTOR_SIZE: u16 = 512;
 pub const SSECTOR_SIZE: usize = SECTOR_SIZE as usize;
 pub const SECTOR_SIZEWORD: u16 = SECTOR_SIZE/2;
 pub const SSECTOR_SIZEWORD: usize = SECTOR_SIZEWORD as usize;
+pub type Sector = [u8; SSECTOR_SIZE];
+pub type Sectors = Vec<Sector>;
+pub type DResult<T> = Result<T, DiskError>;
 
 static mut DISK_MANAGER: Mutex<Option<DiskManager>> = Mutex::new(None); // Uninitialised
 // Don't call before disk_manager is initialised
@@ -126,16 +129,10 @@ fn get_selected_drive_type(channel: Channel) -> DriveType {
     }
 }
 //TODO Return a result, but for now it's for debugging so...
-pub fn read_from_disk(addr: impl DiskAddress, start: u64, end:u64) -> Result<Vec<[u16; SSECTOR_SIZEWORD]>, DiskError> {
-    let start_sector = start.div_ceil(SSECTOR_SIZE as u64);
-    let end_sector = end.div_ceil(SSECTOR_SIZE as u64);
-    let offset_from_sector_start = start%SSECTOR_SIZE as u64;
-
-    let mut binding = disk_manager();
-    let mut dism = binding.as_mut().unwrap();
-    let sectors = dism.read_disk(addr, start_sector, end_sector)?;
-    Ok(sectors)
+pub fn read_from_disk(addr: impl DiskAddress, start_sector: u64, sector_count:u16) -> Result<Sectors, DiskError> {
+    disk_manager().as_mut().unwrap().read_disk(addr, start_sector, sector_count)
 }
+// Read disk sectors by iterating on it. Usefull when you want to read a lot and can't store everything in memory
 pub struct ReadDiskIterator {
     step: u16,
     current_sector: u64,
@@ -143,22 +140,17 @@ pub struct ReadDiskIterator {
     addr: DiskLoc
 }
 impl Iterator for ReadDiskIterator {
-    type Item = Result<Vec<[u16; SSECTOR_SIZEWORD]>, DiskError>;
+    type Item = DResult<Sectors>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.current_sector <= self.end_sector {
-            let start = self.current_sector*SSECTOR_SIZE as u64;
-            let end = (self.current_sector+self.step as u64).min(self.end_sector)*SSECTOR_SIZE as u64;
-            let content = read_from_disk(self.addr, start, end);
-            self.current_sector += self.step as u64;
-            Some(content)
-        } else {
-            None
-        }
+        if self.current_sector - self.end_sector <= 0 {return None;}
+        let content = read_from_disk(self.addr, self.current_sector, self.step);
+        self.current_sector += self.step as u64;
+        Some(content)
     }
 }
-pub fn iter_from_disk(addr: impl DiskAddress, start: u64, end:u64, sectors_per_item: u16) -> ReadDiskIterator {
-    ReadDiskIterator { step: sectors_per_item, current_sector: start/SSECTOR_SIZE as u64, end_sector: end/SSECTOR_SIZE as u64, addr: addr.as_diskloc() }
+pub fn iter_from_disk(addr: impl DiskAddress, start_sector: u64, end_sector:u64, step: u16) -> ReadDiskIterator {
+    ReadDiskIterator { step,end_sector, current_sector: start_sector, addr: addr.as_diskloc() }
 }
 
 pub trait DiskAddress: Copy {
@@ -231,7 +223,7 @@ impl DiskManager {
         self.disks[self.selected_disk].as_mut().unwrap()
     }
     //TODO Return result
-    fn select_disk(&mut self, disk_address: impl DiskAddress) -> Result<(), DiskError> {
+    fn select_disk(&mut self, disk_address: impl DiskAddress) -> Result<&mut Disk, DiskError> {
         if disk_address.as_index() >= 4 ||
            self.disks[disk_address.as_index()].is_none() {return Err(DiskError::DiskNotFound);}
         // if self.selected_disk == disk_address.as_index() {trace!("Drive is already selected: {:?}", self.get_selected_disk());return true;}
@@ -249,13 +241,13 @@ impl DiskManager {
         // if unsafe { check_drq_or_err(self.get_selected_disk().base()) }.is_err() {
         //     return Err(DiskError::DRQRead);
         // }
-        Ok(())
+        Ok(self.get_selected_disk())
     }
-    pub fn read_disk(&mut self, disk_address: impl DiskAddress, start_sector: u64, end_sector: u64) -> Result<Vec<[u16; SSECTOR_SIZEWORD]>, DiskError> {
-        assert!(start_sector <= end_sector, "start sector is less than end sector !");
+    pub fn read_disk(&mut self, disk_address: impl DiskAddress, start_sector: u64, sector_count: u16) -> Result<Sectors, DiskError> {
+        assert!(sector_count > 0, "Sector count is = 0 !");
         
-        self.select_disk(disk_address)?;
-        let sectors = self.get_selected_disk().read_sectors(start_sector, (end_sector-start_sector))?;
+        let disk = self.select_disk(disk_address)?;
+        let sectors = disk.read_sectors(start_sector, sector_count)?;
         Ok(sectors)
     }
 }
@@ -331,7 +323,7 @@ impl Disk {
     fn command_reg(&self)      -> u16 {self.base()+7}
 
     //28Bit Lba PIO mode
-    pub fn read28(&self, lba: u32, sector_count: u8) -> Vec<[u16; SSECTOR_SIZE/2]> {
+    pub fn read28(&self, lba: u32, sector_count: u8) -> DResult<Sectors> {
         let drive_addr = self.loc.drive_lba28_addr() as u32;
         let base = self.loc.channel_addr();
         unsafe {
@@ -345,64 +337,105 @@ impl Disk {
         }
         self.retrieve_read(sector_count.into())
     }
-    //48Bit Lba PIO mode
-    // 0 for sector_count is equals to u16::MAX
-    pub fn read48(&self, lba: u64, sector_count: u64) -> Vec<[u16; SSECTOR_SIZEWORD]> {
-        let mut sectors = Vec::new();
-        debug!("Rea48 at {:?}", (self.loc, self.loc.drive_lba48_addr()));
+    fn flush_cache(&self) {
         unsafe { outb(self.command_reg(), 0xE7) };
         unsafe { check_drq_or_err(self.base()) };
-        for offset in (0..sector_count).step_by(u16::MAX as usize) {
-            let current_lba = lba+offset;
-            let current_sector_count: u16 = ((lba+sector_count)-current_lba).min(u16::MAX.into()).try_into().unwrap();
-            // debug!("CUR{} {} {:?}", current_lba, current_sector_count, self);
-            unsafe {
-                outb(self.drive_head_reg(),  self.loc.drive_lba48_addr());// Select drive
-                outb(self.sector_count_reg(),((current_sector_count >> 8) & 0xFF).try_into().unwrap() ); // sector_count high
-                outb(self.lbalo_reg(), ((current_lba >> 24) & 0xFF).try_into().unwrap());           // LBA4
-                outb(self.lbamid_reg(),((current_lba >> 32) & 0xFF).try_into().unwrap());          // LBA5
-                outb(self.lbahi_reg(), ((current_lba >> 40) & 0xFF).try_into().unwrap());           // LBA6
-                outb(self.sector_count_reg(),(current_sector_count & 0xFF).try_into().unwrap());         // sector_count low
-                outb(self.lbalo_reg(), (current_lba & 0xFF).try_into().unwrap());                   // LBA1
-                outb(self.lbamid_reg(), ((current_lba >> 8) & 0xFF).try_into().unwrap());           // LBA2
-                outb(self.lbahi_reg(), ((current_lba >> 16) & 0xFF).try_into().unwrap());           // LBA3
-                outb(self.command_reg(), 0x24);                   // READ SECTORS EXT
-            }
-            serial_println!("Finished r");
-            unsafe {bsy(self.base());}
-            unsafe {check_drq_or_err(self.base());}
-            for sector in self.retrieve_read(current_sector_count) {
-                sectors.push(sector);
-            }
-        }
-        sectors
     }
-    fn retrieve_read(&self, sector_count: u16) -> Vec<[u16; SSECTOR_SIZEWORD]> {
+    //48Bit Lba PIO mode
+    // 0 for sector_count is equals to u16::MAX
+    pub fn read48(&self, lba: u64, sector_count: u16) -> DResult<Sectors> {
+        debug!("CUR{} {}", lba, sector_count);
+        unsafe {
+            outb(self.base(), inb(self.base()) | 0x80);
+
+            outb(self.drive_head_reg(),  self.loc.drive_lba48_addr());// Select drive
+            outb(self.sector_count_reg(),((sector_count >> 8)).try_into().unwrap() ); // sector_count high
+            outb(self.lbalo_reg(), ((lba >> 24)).try_into().unwrap());           // LBA4
+            outb(self.lbamid_reg(),((lba >> 32)).try_into().unwrap());          // LBA5
+            outb(self.lbahi_reg(), ((lba >> 40)).try_into().unwrap());           // LBA6
+            
+            outb(self.base(), inb(self.base()) & !0x80);
+
+            outb(self.sector_count_reg(),(sector_count).try_into().unwrap());         // sector_count low
+            outb(self.lbalo_reg(), (lba).try_into().unwrap());                   // LBA1
+            outb(self.lbamid_reg(), ((lba >> 8)).try_into().unwrap());           // LBA2
+            outb(self.lbahi_reg(), ((lba >> 16)).try_into().unwrap());           // LBA3
+            outb(self.command_reg(), 0x24);                   // READ SECTORS EXT
+        }
+        self.retrieve_read(sector_count)
+    }
+    fn retrieve_read(&self, sector_count: u16) -> DResult<Sectors> {
         trace!("Retrieving read !");
         let mut buffer = Vec::new();
-        for i in 0..sector_count {
-            let mut inner_buffer = [0u16; SSECTOR_SIZEWORD];
-            for i in 0..14 {
-                unsafe { inb(self.command_reg()) };
+        for sector in 0..sector_count {
+            self.polling(true, line!())?;
+            let mut chunk = [0; SSECTOR_SIZE];
+            for i in 0..SSECTOR_SIZEWORD/2 {
+                let data = unsafe { indw(self.data_reg()) };
+                chunk[i * 4 + 0] = (data >> 0) as u8;
+                chunk[i * 4 + 1] = (data >> 8) as u8;
+                chunk[i * 4 + 2] = (data >> 16) as u8;
+                chunk[i * 4 + 3] = (data >> 24) as u8;
             }
-            unsafe {bsy(self.base())};
-            unsafe {check_drq_or_err(self.base());}
-            for j in 0..SSECTOR_SIZEWORD {
-                inner_buffer[j] = unsafe { inw(self.data_reg()) };
-            }
-            buffer.push(inner_buffer);
+            buffer.push(chunk);
         }
-        trace!("Finished read !");
-        buffer
+        Ok(buffer)
     }
-    pub fn read_sectors(&self, sector_address: u64, sector_count: u64) -> Result<Vec<[u16; SSECTOR_SIZEWORD]>, DiskError> {
+    fn polling(&self, read: bool, line: u32) -> Result<(), DiskError> {
+        /*
+        #define ATA_SR_BSY     0x80    // Busy
+        #define ATA_SR_DRDY    0x40    // Drive ready
+        #define ATA_SR_DF      0x20    // Drive write fault
+        #define ATA_SR_DSC     0x10    // Drive seek complete
+        #define ATA_SR_DRQ     0x08    // Data request ready
+        #define ATA_SR_CORR    0x04    // Corrected data
+        #define ATA_SR_IDX     0x02    // Index
+        #define ATA_SR_ERR     0x01    // Error
+        */
+        for _ in 0..4 {
+            // Doing this 4 times creates a 400ns delay
+            unsafe { inb(self.base()) };
+        }
+        for i in 0..10_000 {
+            let status = self.check_status()?;
+            if status & 0x80 == 0 {
+                if read && status & 0x08 == 0 {
+                    log::error!("IDE read data not ready");
+                    return Err(DiskError::ReadDataNotAvailable);
+                }
+                break
+            }
+            if i+1 == 10_000 {
+                log::error!("DRQ read timed out line {}, polling {} with status 0x{:02X}", line, if read { "read" } else { "write" }, status);
+                return Err(DiskError::ReadDataNotAvailable)
+            }
+        }
+        Ok(())
+    }
+    fn check_status(&self) -> Result<u8, DiskError> {
+        let status = unsafe { inb(self.command_reg()) };
+
+        if status & 0x01 != 0 {
+            log::error!("IDE error: {:#x}", unsafe{inb(self.error_reg())});
+            return Err(DiskError::DRQRead);
+        }
+
+        if status & 0x20 != 0 {
+            log::error!("IDE device write fault");
+            return Err(DiskError::DRQRead);
+        }
+
+        Ok(status)
+    }
+
+    pub fn read_sectors(&self, sector_address: u64, sector_count: u16) -> DResult<Sectors> {
         //TODO Move from vecs to slices
         if self.addressing_modes.lba48 != 0 {
-            Ok(self.read48(sector_address, sector_count))
+            self.read48(sector_address, sector_count)
         } else if self.addressing_modes.lba28 != 0 {
             let sector_address = sector_address.try_into()?;
             let sector_count    =   sector_count.try_into()?;
-            Ok(self.read28(sector_address, sector_count))
+            self.read28(sector_address, sector_count)
         } else if self.addressing_modes.chs == true {
             todo!("Implement CHS pio mode");
             // return self.readchs(sector_address.try_into()?, sector_count.try_into()?)

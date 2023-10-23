@@ -34,12 +34,15 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     Shell::new();
     info!("Done booting !");
+
+
+
     hlt_loop()
 }
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    error!("Error: {}", info);
+    error!("PANIC: {}", info);
     // print_trace();
     hlt_loop()
 }
