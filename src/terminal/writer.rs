@@ -267,12 +267,13 @@ pub fn calculate_end(start: &ScreenPos, len: usize) -> ScreenPos {
 }
 
 pub unsafe fn outb(port: u16, data: u8) {
-    // crate::serial_print!("Write 0b{:b} from port 0x{:x} - ", data, port);
     PortWrite::write_to_port(port, data)
-    // asm!("out dx, al", in("al") data, in("dx") port);
-    // serial_println!("Ok");
+
 }
 pub unsafe fn outw(port: u16, data: u16) {
+    PortWrite::write_to_port(port, data)
+}
+pub unsafe fn outdw(port: u16, data: u32) {
     PortWrite::write_to_port(port, data)
 }
 // Alias for read_from_port

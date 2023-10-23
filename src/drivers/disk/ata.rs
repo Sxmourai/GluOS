@@ -4,7 +4,7 @@ use alloc::{string::String, vec::Vec, boxed::Box};
 use log::{trace, error, info, debug};
 use spin::{Mutex, MutexGuard};
 
-use crate::{writer::{outb, inb, inw, indw}, println, serial_println, serial_print_all_bits, serial_print, bytes, numeric_to_char_vec, u16_to_u8, CharArray, CharSlice, CharSlicePtr, list_to_num, ptrlist_to_num, log::point, slice16_to_str};
+use crate::{writer::{outb, inb, inw, indw, outdw}, println, serial_println, serial_print_all_bits, serial_print, bytes, numeric_to_char_vec, u16_to_u8, CharArray, CharSlice, CharSlicePtr, list_to_num, ptrlist_to_num, log::point, slice16_to_str};
 use lazy_static::lazy_static;
 
 use super::DiskError;
@@ -129,8 +129,11 @@ fn get_selected_drive_type(channel: Channel) -> DriveType {
     }
 }
 //TODO Return a result, but for now it's for debugging so...
-pub fn read_from_disk(addr: impl DiskAddress, start_sector: u64, sector_count:u16) -> Result<Sectors, DiskError> {
+pub fn read_from_disk(addr: impl DiskAddress, start_sector: u64, sector_count:u16) -> DResult<Sectors> {
     disk_manager().as_mut().unwrap().read_disk(addr, start_sector, sector_count)
+}
+pub fn write_to_disk(addr: impl DiskAddress, start_sector: u64, content:Sectors) -> DResult<()> {
+    disk_manager().as_mut().unwrap().write_disk(addr, start_sector, content)
 }
 // Read disk sectors by iterating on it. Usefull when you want to read a lot and can't store everything in memory
 pub struct ReadDiskIterator {
@@ -250,6 +253,9 @@ impl DiskManager {
         let sectors = self.disks[disk_address.as_index()].as_mut().unwrap().read_sectors(start_sector, sector_count)?;
         Ok(sectors)
     }
+    pub fn write_disk(&mut self, disk_address: impl DiskAddress, start_sector: u64, content: Sectors) -> DResult<()> {
+        self.disks[disk_address.as_index()].as_mut().unwrap().write_sectors(start_sector, content)
+    }
 }
 
 
@@ -344,8 +350,6 @@ impl Disk {
     //48Bit Lba PIO mode
     // 0 for sector_count is equals to u16::MAX
     pub fn read48(&self, lba: u64, sector_count: u16) -> DResult<Sectors> {
-        debug!("CUR{} {}", lba, sector_count);
-        
         unsafe {
         outb(self.device_select_reg(),  self.loc.drive_lba48_addr());// Select drive
         outb(self.base(), inb(self.base()) | 0x80);
@@ -381,6 +385,45 @@ impl Disk {
             buffer.push(chunk);
         }
         Ok(buffer)
+    }
+    
+    pub fn write48(&self, start_sector: u64, content: Sectors) -> DResult<()> {
+        let sector_count = content.len();
+        unsafe {
+        outb(self.device_select_reg(),  self.loc.drive_lba48_addr());// Select drive
+        outb(self.base(), inb(self.base()) | 0x80);
+
+        outb(self.sector_count_reg(),(sector_count >> 8) as u8 ); // sector_count high
+        outb(self.lbalo_reg(), (start_sector >> 24) as u8);           // LBA4
+        outb(self.lbamid_reg(),(start_sector >> 32) as u8);          // LBA5
+        outb(self.lbahi_reg(), (start_sector >> 40) as u8);           // LBA6
+        
+        outb(self.base(), inb(self.base()) & !0x80);
+
+        outb(self.sector_count_reg(),sector_count as u8);         // sector_count low
+        outb(self.lbalo_reg(), start_sector as u8);                   // LBA1
+        outb(self.lbamid_reg(), (start_sector >> 8) as u8);           // LBA2
+        outb(self.lbahi_reg(), (start_sector >> 16) as u8);           // LBA3
+        outb(self.command_reg(), 0x34);                   // READ SECTORS EXT
+        }
+        self.send_write(content) 
+    }
+    fn send_write(&self, content: Sectors) -> DResult<()> {
+        for sector in 0..content.len() {
+            self.polling(false, line!())?;
+
+            for i in 0..128 {
+                let data = ((content[sector][i * 4 + 0] as u32) << 0) |
+                ((content[sector][i * 4 + 1] as u32) << 8) |
+                ((content[sector][i * 4 + 2] as u32) << 16) |
+                ((content[sector][i * 4 + 3] as u32) << 24);
+                unsafe{ outdw(self.data_reg(),data) };
+            }
+        }
+        // Cache flush
+        unsafe { outb(self.command_reg(), 0xEA) }
+        self.polling(false, line!())?;
+        Ok(())
     }
     fn polling(&self, read: bool, line: u32) -> Result<(), DiskError> {
         /*
@@ -440,6 +483,18 @@ impl Disk {
         } else if self.addressing_modes.chs == true {
             todo!("Implement CHS pio mode");
             // return self.readchs(sector_address.try_into()?, sector_count.try_into()?)
+        } else {
+            Err(DiskError::NoReadModeAvailable)
+        }
+    }
+    pub fn write_sectors(&self, start_sector: u64, content: Sectors) -> DResult<()> {
+        if self.addressing_modes.lba48 != 0 {
+            self.write48(start_sector, content)
+        } else if self.addressing_modes.lba28 != 0 {
+            todo!("Implement CHS pio mode");
+            // self.write28(start_sector, content)
+        } else if self.addressing_modes.chs == true {
+            todo!("Implement CHS pio mode");
         } else {
             Err(DiskError::NoReadModeAvailable)
         }

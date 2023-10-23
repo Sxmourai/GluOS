@@ -4,13 +4,13 @@ use alloc::{
     boxed::Box,
     string::{String, ToString},
     sync::Arc,
-    vec::Vec, format,
+    vec::{Vec, self}, format,
 };
 use hashbrown::HashMap;
 use lazy_static::lazy_static;
 use spin::Mutex;
 
-use crate::{print, println, prompt::input, drivers::disk::{ata::{Channel, Drive, read_from_disk, DiskLoc}, fs::parse_sectors}, serial_println};
+use crate::{print, println, prompt::input, drivers::disk::{ata::{Channel, Drive, read_from_disk, DiskLoc, write_to_disk}, fs::parse_sectors}, serial_println};
 type Commands = HashMap<String, (Arc<dyn Fn(String) -> Result<(), String> + Send + Sync>, String)>;
 
 // Helper function to generate closures and convert them to Arc
@@ -71,6 +71,38 @@ fn read(raw_args:I) -> O{
     println!("{:#?}", parse_sectors(&sectors));
     Ok(())
 }
+fn write(raw_args:I) -> O{
+    let mut args = raw_args.split(" ");
+    let channel = match args.next().ok_or("Invalid argument: missing channel (Primary/0, Secondary/1)")? {
+        "Primary" => Channel::Primary,
+        "0" => Channel::Primary,
+        "Secondary" => Channel::Secondary,
+        "1" => Channel::Secondary,
+        _ => return Err("Wrong channel: Primary//0 or Secondary//1".to_string()),
+    };
+    let drive = match args.next().ok_or("Invalid argument: missing drive (Master/0, Slave/1)")? {
+        "Master" => Drive::Master,
+        "0" => Drive::Master,
+        "Slave" => Drive::Slave,
+        "1" => Drive::Slave,
+        _ => return Err("Wrong drive: Master//0 or Slave//1".to_string()),
+    };
+    let start = args.next().ok_or("Invalid argument: missing start address (u64)")?;
+    let content: Vec<&str> = args.collect();
+    let start = start.parse().map_err(|e| format!("Failed to parse start: {}", e))?;
+    let mut bytes = Vec::new();
+    bytes.push([0; 512]);
+    let mut i = 0;
+    for word in content.iter() {
+        for c in word.chars() {
+            bytes[0][i] = c as u8;
+            i+=1;
+        }
+    }
+    let sectors = write_to_disk(DiskLoc(channel, drive), start, bytes)?;
+    println!("Done");
+    Ok(())
+}
 type I = String;
 type O = Result<(), String>;
 lazy_static! {
@@ -86,7 +118,8 @@ lazy_static! {
 
             f( "outb",  "Send data (u8) to a port (u16)", outb),
             f( "inb",   "Read data (u8) from a port (u16) and prints it",inb),
-            f( "read",  "Read raw data from a disk ()", read),
+            f( "read",  "Read raw data from a disk", read),
+            f( "write",  "Writes raw data to a disk", write),
             f( "clear", "Clears screen", |v:I| -> O {
                 crate::terminal::console::clear_console();
                 Ok(())

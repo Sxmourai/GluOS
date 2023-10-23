@@ -130,7 +130,7 @@ impl KbInput for BlockingPrompt {
                     if self.pos > 0 {
                         //TODO: Fix the fact that we clear entire input every time we backspace
                         // Remove all chars of line
-                        serial_println!("Or{:?}", self.origin);
+                        // serial_println!("Or{:?}", self.origin);
                         print_at(
                             self.origin.0,
                             self.origin.1,
