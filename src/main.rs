@@ -19,7 +19,7 @@ use core::{
 };
 use hashbrown::HashMap;
 use kernel::{
-    bytes_list, serial_print_all_bits, terminal::shell::Shell,
+    bytes_list, serial_print_all_bits, terminal::shell::Shell, drivers::disk::{fs::read_fat_disk, ata::{Channel, DiskLoc, Drive}},
 };
 use log::{debug, error, info};
 use pci_ids::SubSystem;
@@ -31,7 +31,7 @@ entry_point!(kernel_main);
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     kernel::boot(boot_info);
     // debug!("Read: {:?}", read_from_disk(DiskLoc(ata::Channel::Primary, ata::Drive::Master), 000, 600));
-
+    read_fat_disk(DiskLoc(Channel::Primary, Drive::Slave));
     Shell::new();
     info!("Done booting !");
 

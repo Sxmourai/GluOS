@@ -119,6 +119,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "fatfs"
+version = "0.4.0"
+source = "git+https://github.com/rafalh/rust-fatfs.git#1aa43f755572c6848fd981eafd11c02a4825dd62"
+dependencies = [
+ "bitflags 2.3.3",
+ "log",
+]
+
+[[package]]
 name = "futures-core"
 version = "0.3.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -162,6 +171,7 @@ dependencies = [
  "cmake",
  "conquer-once",
  "crossbeam-queue",
+ "fatfs",
  "futures-util",
  "hashbrown",
  "lazy_static",

@@ -27,6 +27,7 @@ raw-cpuid = "11.0.1"
 acpica-sys = "0.0.4"
 libacpica = "0.0.8"
 log = {version="0.4.20", default-features = false}
+fatfs = { git = "https://github.com/rafalh/rust-fatfs.git", default-features = false,features = ["alloc"] }
 
 [build-dependencies]
 cmake = "0.1.31" 
