@@ -30,7 +30,12 @@ use log::{debug, error, info};
 use pci_ids::SubSystem;
 use x86_64::{instructions::hlt, VirtAddr};
 
-// Sets the entry point of our kernel for the bootloader. This means we can have the 'boot_info' variable which stores some crucial info
+// const CONFIG: bootloader_api::BootloaderConfig = {
+//     let mut config = bootloader_api::BootloaderConfig::new_default();
+//     config.kernel_stack_size = 100 * 1024; // 100 KiB
+//     config
+// };
+
 entry_point!(kernel_main);
 // Main function of our kernel (1 func to start when boot if not in test mode). Never returns, because kernel runs until machine poweroff
 fn kernel_main(boot_info: &'static BootInfo) -> ! {

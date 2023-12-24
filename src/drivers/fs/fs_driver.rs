@@ -152,11 +152,11 @@ impl FsDriver {
     pub fn new(disk: DiskLoc) -> Self {
         let mut entries = HashMap::new();
         let fat_info = FsDriver::get_fat_info(disk).unwrap();
-        serial_println!("Fat info: {:?}", fat_info.0);
+        // serial_println!("Fat info: {:?}", fat_info.0);
         for (path, file) in Self::get_entries_in_root(&fat_info, DiskLoc(Channel::Primary, Drive::Slave)).unwrap() {
-            if file.is_file {serial_print!("FILE ")}
-            else            {serial_print!("DIR  ")}
-            serial_println!("{} {:?}", path.raw_path, file.sector);
+            // if file.is_file {serial_print!("FILE ")}
+            // else            {serial_print!("DIR  ")}
+            // serial_println!("{} {:?}", path.raw_path, file.sector);
             entries.insert(path, file);
         }
         // FsDriver::read_fat(disk, fat_info.0.reserved_sectors, fat_info.get_fat_size());
