@@ -2,11 +2,12 @@ use core::num::TryFromIntError;
 
 use alloc::{string::{String, ToString, ParseError}, vec::{Vec, self}, boxed::Box};
 use fatfs::IntoStorage;
+use hashbrown::HashMap;
 use log::error;
 
-use crate::{serial_print_all_bits, serial_print, serial_println, u16_to_u8, println, print, drivers::disk::{ata::{Sectors, DiskLoc, read_from_disk}, DiskError}};
+use crate::{serial_print_all_bits, serial_print, serial_println, u16_to_u8, println, print, drivers::disk::{ata::{Sectors, DiskLoc, read_from_disk}, DiskError}, state::{get_state, fs_driver}};
 
-use super::fat_driver;
+use super::fs_driver::{self, FsDriver};
 
 #[derive(Default, Debug, Clone)]
 #[repr(packed)]
@@ -42,9 +43,6 @@ pub struct BiosParameterBlock {
     pub fs_type_label: [u8; 8],
 }
 
-
-
-
 pub fn parse_sectors(sectors: &Sectors) -> String {
     let mut content = String::new();
     for b in sectors {
@@ -53,75 +51,6 @@ pub fn parse_sectors(sectors: &Sectors) -> String {
     content
 }
 
-
-pub fn get_files_in_root(disk: DiskLoc) -> Result<Vec<Fat32File>, DiskError>{
-    if let Ok(raw_fat_boot) = read_from_disk(disk, 0, 2) {
-        let mut files = Vec::new();
-        let fat_boot = unsafe { &*(raw_fat_boot.as_ptr() as *const BiosParameterBlock) };
-        let total_sectors = if (fat_boot.total_sectors_16 == 0) {fat_boot.total_sectors_32} else {fat_boot.total_sectors_16.into()};
-        let fat_size = if (fat_boot.sectors_per_fat_16==0) {fat_boot.sectors_per_fat_32} else {fat_boot.sectors_per_fat_16 as u32};
-        let res = fat_boot.bytes_per_sector;
-        // println!("{:?}",fat_boot);
-        let root_dir_sectors = ((fat_boot.root_entries as u64 * 32 as u64) + (fat_boot.bytes_per_sector as u64 - 1)) / fat_boot.bytes_per_sector as u64;
-        let first_data_sector = fat_boot.reserved_sectors as u64 + (fat_boot.fats as u64 * fat_size as u64) + root_dir_sectors;
-        let first_fat_sector = fat_boot.reserved_sectors;
-        let data_sectors = total_sectors as u64 - (fat_boot.reserved_sectors as u64 + (fat_boot.fats as u64 * fat_size as u64) + root_dir_sectors) as u64;
-        let total_clusters = data_sectors as u64 / fat_boot.sectors_per_cluster as u64;
-        let fat_type = 
-            // if (sectorsize == 0) {"ExFAT"}
-            if(total_clusters < 4085) {"FAT12"}
-            else if(total_clusters < 65525){"FAT16"}
-            else {"FAT32"};
-        // println!("total_sectors: {}\nfat_size: {}\nroot_dir_sectors: {}\nfirst_data_sector: {}\nfirst_fat_sector: {}\ndata_sectors: {}\ntotal_clusters: {}\n\nfat_type: {}",
-        // total_sectors,fat_size,root_dir_sectors,first_data_sector,first_fat_sector,data_sectors,total_clusters,fat_type);
-        let first_root_dir_sector = first_data_sector - root_dir_sectors;
-        let root_cluster_32 = fat_boot.root_dir_first_cluster;
-        let first_sector_of_cluster = ((root_cluster_32 - 2) * fat_boot.sectors_per_cluster as u32) as u64 + first_data_sector;
-        let sector = read_from_disk(disk, first_sector_of_cluster, 3).unwrap();
-        
-        for i in 0..sector.len()/32 {
-            let base = (i*32);
-            if (sector[base+0]==0) {
-                // println!("Dir is empty")
-            } else if (sector[base+0]==0xE5) {
-                // println!("Dir unused")
-            } else if (sector[base+11]==0x0F) {
-                let mut name = String::new();
-                let sector_section = &sector[base+1..base+11];
-                let mut name_finised=false;
-                for (i,b) in sector_section.iter().enumerate().step_by(2) {
-                    if (sector_section[i+1]==0 && sector_section[i]==0) {
-                        name_finised=true;
-                        break
-                    }
-                    name.push_str(&String::from_utf16_lossy( &[(sector_section[i+1] as u16) << 8 |  sector_section[i] as u16]));
-                }
-                let sector_section = &sector[base+14..base+26];
-                for (i,b) in sector_section.iter().enumerate().step_by(2) {
-                    if (sector_section[i+1]==0 && sector_section[i]==0) {
-                        name_finised=true;
-                        break
-                    }
-                    if (name_finised) {
-                        break
-                    }
-                    name.push_str(&String::from_utf16_lossy( &[(sector_section[i+1] as u16) << 8 |  sector_section[i] as u16]));
-                }
-                let size = [sector[28],sector[29],sector[30],sector[31]];
-                // for (i,n) in sector[base..base+32].iter().enumerate() {
-                //     println!("{i}: {:#x} ",n);
-                // }
-                // println!("- {:?} {} size={}",name, (sector[16+1] as u16) << 8 |  sector[16] as u16, u32::from_ne_bytes(size))
-                files.push(Fat32File::new(FilePath { raw_path: name }, u32::from_ne_bytes(size) as u64))
-            }
-        }
-        Ok(files)
-    } else {
-        error!("Error reading disk to read bios parameter block");
-        Err(DiskError::DiskNotFound)
-    }
-
-}
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub enum FileSystemError {
@@ -133,9 +62,9 @@ pub enum GenericFile {
     Fat32,
     // Fat32 => Fat32File(_)
 }
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Debug)]
 pub struct FilePath {
-    raw_path: String,
+    pub(crate) raw_path: String,
 }
 impl FilePath {
     pub fn new(full_path: String) -> Self {
@@ -143,73 +72,147 @@ impl FilePath {
             raw_path: full_path
         }
     }
-    pub fn root() -> Self {
-        Self::new("/".to_string())
+    pub fn splitted(&self) -> core::str::Split<'_, &str> {
+        self.raw_path.split("/")
+    }
+    pub fn root(&self) -> &str { 
+        let mut splitted = self.splitted();  
+        let root = splitted.next().unwrap();
+        if root.is_empty() {splitted.next().unwrap()}
+        else    {root}
     }
     pub fn open_file(&self) -> Result<GenericFile, FileSystemError> {
         Fat32File::open(self)
     }
     pub fn name(&self) -> &str {
-        self.raw_path.split("/").last().unwrap()
+        self.splitted().last().unwrap()
     }
 }
 
-// pub struct File {
 
+#[derive(Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
+pub struct FatPermissions(pub u8);
+#[derive(PartialEq,Eq, Hash, Debug)]
+pub struct FatGroup {
+    pub group_name: String,
+    pub id: u16,
+    pub derived_groups: Vec<u16>,
+}
+#[derive(PartialEq,Eq, Hash, Debug)]
+pub struct FatUser {
+    pub username: String,
+    pub id: u16,
+    pub groups: Vec<u16>,
+}
+pub fn get_group(id: u16) -> FatGroup {
+    FatGroup { group_name: "default".to_string(), id, derived_groups: Vec::new() }
+}
+pub fn get_user(id: u16) -> FatUser {
+    FatUser { username: "Sxmourai".to_string(), id, groups: alloc::vec![1] }
+}
+#[derive(PartialEq, Eq, Hash, Debug)]
+pub enum FatPerson {
+    Group(FatGroup),
+    User(FatUser),
+}
+impl FatPerson {
+    pub fn new(group: bool, id: u16) -> Self {
+        if group {
+            Self::Group(get_group(id))
+        } else {
+            Self::User(get_user(id))
+        }
+    }
+}
+#[derive(Default, Debug)] // Proper debug for attributes (flags in self.flags)
+pub struct FatAttributes {
+    flags: u16,
+    permissions: HashMap<FatPerson, FatPermissions>,
+}
+impl FatAttributes {
+    pub fn permissions(&self, group: &FatPerson) -> Option<&FatPermissions> {
+        self.permissions.get(group)
+    }
+}
+pub trait Fat32Element: core::fmt::Debug {
+    fn path(&self) -> &FilePath;
+    fn name(&self) -> &str;
+    fn size(&self) -> u64;
+    fn attributes(&self) -> &FatAttributes;
+}
+// #[derive(Debug)]
+// pub struct Fat32Dir {
+//     path: FilePath,
+//     size: u64,
+//     attributes: FatAttributes,
 // }
+// impl Fat32Element for Fat32Dir {
+//     fn name(&self) -> &String {&self.name}
+//     fn size(&self) -> u64 {self.size}
+//     fn attributes(&self) -> &FatAttributes {&self.attributes}
+// }
+#[derive(Debug)]
 pub struct Fat32File {
     path: FilePath,
     size: u64,
+    attributes: FatAttributes,
+}
+impl Fat32Element for Fat32File {
+    fn path(&self) -> &FilePath {&self.path}
+    fn name(&self) -> &str {&self.path.name()}
+    fn size(&self) -> u64 {self.size}
+    fn attributes(&self) -> &FatAttributes {&self.attributes}
 }
 impl Fat32File {
-    pub fn new(path: FilePath, size:u64) -> Self {
+    pub fn new(path: FilePath, size: u64, attributes: FatAttributes) -> Self {
         Self {
             path,
-            size
+            size,
+            attributes,
         }
     }
-    pub fn name(&self) -> &str {self.path.name()}
-    pub fn size(&self) -> u64 {self.size}
-    pub fn path(&self) -> &FilePath {&self.path}
-
     pub fn open(path: &FilePath) -> Result<GenericFile, FileSystemError> {
-        fat_driver().lock().open_file(path)
+        get_state().fs().lock().open_file(path)
     }
     pub fn close(&mut self) -> Result<(), FileSystemError> {
-        fat_driver().lock().close_file(self)
+        get_state().fs().lock().close_file(self)
+    }
+}
+// impl Fat32File {
+//     pub fn open(path: &FilePath) -> Result<GenericFile, FileSystemError> {
+//         get_state().fs().lock().open_file(path)
+//     }
+//     pub fn close(&mut self) -> Result<(), FileSystemError> {
+//         get_state().fs().lock().close_file(self)
+//     }
+// }
+
+
+pub enum Elements {
+    File(Fat32File),
+    Dir(Fat32File),
+    Other(Box<dyn Fat32Element>),
+}
+
+
+#[derive(Debug, Clone)]
+pub struct FatEntry {
+    pub sector: u64,
+    pub is_file: bool
+}
+impl FatEntry {
+    pub fn new(sector: u64, is_file: bool) -> Self {
+        Self {
+            sector,
+            is_file,
+        }
     }
 }
 
-// impl File {
-//     pub fn new(name:String) -> Self {
-//         Self {
-//             name,
-//             len: 10,
-//         }
-//     }
-//     pub fn read(&self) -> Result<String, DiskError> {
-//         let start = 0;
-//         let sectors = read_from_disk(1u8, start, start+self.len)?;
-//         let content = parse_sectors(&sectors);
-//         Ok(content)
-//     }
-//     pub fn write(&self, content: String) -> Result<(), DiskError> {
-//         Ok(())
-//     }
-//     pub fn delete(&self) -> Result<(), DiskError> {
-//         Ok(())
-//     }
-// }
-// // create [--object objectdef] [-q] [-f fmt] [-b backing_file] [-F backing_fmt] [-u] [-o options] filename [size]
-// pub fn open(filename: &str) -> Result<File, DiskError> {
-//     Ok(File::new(filename.to_string()))
-// }
-// pub fn read(filename: &str) -> Result<String, DiskError> {
-//     open(filename)?.read()
-// }
-// pub fn write(filename: &str, content: &str) -> Result<(), DiskError> {
-//     open(filename)?.write(content.to_string())
-// }
-// pub fn delete(filename: &str) -> Result<(), DiskError> {
-//     open(filename)?.delete()
-// }
+
+pub fn cluster_to_sector(cluster_number: u64, first_data_sector: u64) -> u64 {
+    (cluster_number-2)+first_data_sector
+}
+pub fn sector_to_cluster(sector_number: u64, first_data_sector: u64) -> u64 {
+    (sector_number-first_data_sector)+2
+}

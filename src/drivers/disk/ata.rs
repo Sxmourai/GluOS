@@ -328,14 +328,18 @@ impl DiskManager {
         start_sector: u64,
         sector_count: u16,
     ) -> Result<Sectors, DiskError> {
-        assert!(sector_count > 0, "Sector count is = 0 !");
-
-        // let disk = self.select_disk(disk_address)?;
-        let sectors = self.disks[disk_address.as_index()]
-            .as_ref()
-            .unwrap()
-            .read_sectors(start_sector, sector_count)?;
-        Ok(sectors)
+        let mut sectors = self.disks[disk_address.as_index()].as_ref().unwrap()
+        .read_sectors(start_sector, sector_count);
+        if sectors.is_err() {
+            let err = sectors.unwrap_err();
+            if err==DiskError::DRQRead { // Read twice if error cuz sometimes crashes
+                return self.disks[disk_address.as_index()].as_ref().unwrap().read_sectors(start_sector, sector_count)
+            }
+            else {
+                return Err(err)
+            }
+        }
+        sectors
     }
     pub fn write_disk(
         &self,
@@ -576,7 +580,7 @@ impl Disk {
             // Doing this 4 times creates a 400ns delay
             unsafe { inb(self.base()) };
         }
-        for i in 0..10_000 {
+        for i in 0..100_000 {
             let status = self.check_status()?;
             if status & 0x80 == 0 {
                 if read && status & 0x08 == 0 {
@@ -585,7 +589,7 @@ impl Disk {
                 }
                 break;
             }
-            if i + 1 == 10_000 {
+            if i == 100_000-1 {
                 log::error!(
                     "DRQ read timed out line {}, polling {} with status 0x{:02X}",
                     line,

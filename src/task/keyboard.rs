@@ -11,7 +11,7 @@ use futures_util::task::AtomicWaker;
 use lazy_static::lazy_static;
 use pc_keyboard::{layouts, HandleControl, Keyboard, ScancodeSet1, KeyCode, DecodedKey, KeyState};
 
-use crate::{serial_println, prompt::KbInput, writer::WRITER};
+use crate::{serial_println, prompt::KbInput, writer::WRITER, serial_print};
 
 static WAKER: AtomicWaker = AtomicWaker::new();
 static SCANCODE_QUEUE: OnceCell<ArrayQueue<u8>> = OnceCell::uninit();
@@ -38,29 +38,30 @@ impl KeyboardHandler {
     pub fn process_keyevent(&mut self, scancode:u8) {
         if let Ok(Some(key_event)) = self.inner.add_byte(scancode) {
             let state = key_event.state;
+            if state == KeyState::Down {
+                self.pressed.push(key_event.code);
+            }else if state == KeyState::Up {
+                self.pressed.swap_remove(self.pressed.iter().position(|x| *x == key_event.code).unwrap()); //TODO Change .retain to for loop or better (i.e. swap_remove is O(1) but u need the index)
+            }
             if let Some(key) = self.inner.process_keyevent(key_event) {
-                for input in KB_INPUTS.lock().iter_mut() {
-                    input.0.handle_key(key);
-                }
+                let mut key_handled = false;
                 match key {
                     DecodedKey::RawKey(k) => {
-                        if state == KeyState::Down {
-                            self.pressed.push(k);
-                        }else if state == KeyState::Up {
-                            self.pressed.retain(|x| *x != k); //TODO Change .retain to for loop or better (i.e. swap_remove is O(1) but u need the index)
-                        }
                         match k {
-                            KeyCode::ArrowUp => if self.is_pressed(&KeyCode::LControl) {WRITER.lock().move_down()},
-                            KeyCode::ArrowDown => if self.is_pressed(&KeyCode::LControl) {WRITER.lock().move_up()},
-                            // KeyCode::T => print_trace(),
+                            KeyCode::ArrowUp => if self.is_pressed(&KeyCode::LControl) {WRITER.lock().move_down(); key_handled = true;},
+                            KeyCode::ArrowDown => if self.is_pressed(&KeyCode::LControl) {WRITER.lock().move_up(); key_handled = true;},
                             _ => {} //serial_println!("Unsupported key: {:?}", k),
                         }
                     },
                     DecodedKey::Unicode(k) => {
                         match k {
-                            // 't' => print_trace(),
                             _ => {}//{serial_println!("This shouldn't happen because HandleControl is at ignore... {:?}", k);}}
                         }
+                    }
+                }
+                if !key_handled {
+                    for input in KB_INPUTS.lock().iter_mut() {
+                        input.0.handle_key(key);
                     }
                 }
             }

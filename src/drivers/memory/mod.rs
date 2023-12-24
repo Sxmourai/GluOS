@@ -6,26 +6,26 @@ use core::cell::Cell;
 use core::ops::Range;
 
 use x86_64::structures::paging::PageTableFlags as Flags;
+use x86_64::structures::paging::PageTableFlags;
 use x86_64::{
     structures::paging::{
         FrameAllocator, Mapper, OffsetPageTable, Page, PageTable, PhysFrame, Size4KiB,
     },
     PhysAddr, VirtAddr,
 };
-use x86_64::structures::paging::PageTableFlags;
 
+pub mod acpi;
+pub mod apic;
 pub mod frame_allocator;
 pub mod handler;
 pub mod rsdp;
-pub mod apic;
-pub mod acpi;
 
 pub use frame_allocator::BootInfoFrameAllocator;
 
-use crate::serial_println;
-use crate::state::{get_mem_handler, get_boot_info, STATE};
+use crate::{serial_println, serial_print};
+use crate::state::{get_boot_info, get_state, STATE};
 
-use super::Driver;
+use self::handler::MemoryHandler;
 
 /// Creates an example mapping for the given page to frame `0xb8000`.
 pub fn create_example_mapping(
@@ -67,72 +67,45 @@ unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut
 /// complete physical memory is mapped to virtual memory at the passed
 /// `physical_memory_offset`. Also, this function must be only called once
 /// to avoid aliasing `&mut` references (which is undefined behavior).
-pub unsafe fn init(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static> {
-    let level_4_table = active_level_4_table(physical_memory_offset);
-    OffsetPageTable::new(level_4_table, physical_memory_offset)
-}
+// pub unsafe fn init(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static> {
+//     let level_4_table = active_level_4_table(physical_memory_offset);
+//     OffsetPageTable::new(level_4_table, physical_memory_offset)
+// }
 
 // end_page is using .containing address
 //TODO Map a page when a page fault occurs (in interrupts/exceptions.rs)
-pub fn read_phys_memory_and_map(location: u64, size: usize, end_page:u64) -> &'static [u8] {
-    let flags:PageTableFlags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE; // TODO Change this to a constant
-    
+pub fn read_phys_memory_and_map(mem_handler: &mut MemoryHandler, location: u64, size: usize, end_page: u64) -> &'static [u8] {
+    let flags: PageTableFlags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE; // TODO Change this to a constant
+
     let size_64 = size as u64;
-    let start_frame_addr = PhysFrame::<Size4KiB>::containing_address(PhysAddr::new(location)).start_address().as_u64();
+    let start_frame_addr = PhysFrame::<Size4KiB>::containing_address(PhysAddr::new(location))
+        .start_address()
+        .as_u64();
     let mut offset = 0;
-    let mut mem_handler = get_mem_handler().get_mut();
-    let mut f_a = &mut mem_handler.frame_allocator;
-    let mut mapper = &mut mem_handler.mapper;
-    for i in (start_frame_addr..start_frame_addr+size as u64).step_by(4096) { // Map all frames that might be used
-        let page:Page<Size4KiB> = Page::containing_address(VirtAddr::new(end_page+offset));
+    for i in (start_frame_addr..start_frame_addr + size as u64).step_by(4096) {
+        // Map all frames that might be used
+        let page: Page<Size4KiB> = Page::containing_address(VirtAddr::new(end_page + offset));
         let phys_frame = PhysFrame::containing_address(PhysAddr::new(i));
-        
+
         // serial_println!("Physical frame_adress: {:X}\t-\tLocation: {:X}
         // Computed location {:X}\t-\tFrame to page: {:X} (Provided (unaligned): {:X})
         // Currently mapping: Physical({:X}-{:X})\t-\tVirtual({:X}-{:X})
         // ", phys_frame.start_address().as_u64(), location, end_page, page.start_address().as_u64(),end_page, i,i+4096, end_page+offset, end_page+offset+4096);
-        unsafe { mapper.map_to(page, phys_frame, flags, f_a).unwrap().flush() };
+        mem_handler.map_to(page, phys_frame, flags);
         offset += 4096;
     }
     // Reads the content from memory, should be safe
-    let end_page_start_addr = Page::<Size4KiB>::containing_address(VirtAddr::new(end_page)).start_address().as_u64();
-    let phys_offset = location - PhysFrame::<Size4KiB>::containing_address(PhysAddr::new(location)).start_address().as_u64();
-    let start_addr = phys_offset+end_page_start_addr;
+    let end_page_start_addr = Page::<Size4KiB>::containing_address(VirtAddr::new(end_page))
+        .start_address()
+        .as_u64();
+    let phys_offset = location
+        - PhysFrame::<Size4KiB>::containing_address(PhysAddr::new(location))
+            .start_address()
+            .as_u64();
+    let start_addr = phys_offset + end_page_start_addr;
     unsafe { read_memory(start_addr as *const u8, size) }
 }
 // Create a slice from the memory location with the given size
 pub unsafe fn read_memory(location: *const u8, size: usize) -> &'static [u8] {
     core::slice::from_raw_parts(location, size)
-}
-
-
-pub struct MemoryDriver {
-    initialized: bool,
-}
-impl Driver for MemoryDriver {
-    fn name(&self) -> &str {
-        "Memory"
-    }
-
-    fn init(&mut self) -> Result<(), super::DriverError> {
-        if self.initialized==true {
-            return Ok(())} // Returning error cuz I have to init twice memory driver
-        let memory_handler = handler::MemoryHandler::new(
-            VirtAddr::new(get_boot_info().physical_memory_offset),
-            &get_boot_info().memory_map,
-        );
-        unsafe { STATE.mem_handler = Some(Cell::new(memory_handler)) };
-        self.initialized = true;
-        Ok(())
-    }
-
-    fn required(&self) -> &str {
-        ""
-    }
-
-    fn new() -> Self where Self: Sized {
-        Self {
-            initialized: false,
-        }
-    }
 }

@@ -1,5 +1,5 @@
 use bootloader::bootinfo::MemoryMap;
-use x86_64::{structures::paging::OffsetPageTable, VirtAddr};
+use x86_64::{structures::paging::{OffsetPageTable, Mapper, Page, Size4KiB, PhysFrame, PageTableFlags}, VirtAddr};
 
 use log::trace;
 
@@ -11,7 +11,8 @@ pub struct MemoryHandler {
     pub frame_allocator: BootInfoFrameAllocator,
 }
 impl MemoryHandler {
-    pub fn new(physical_memory_offset: VirtAddr, memory_map: &'static MemoryMap) -> Self {
+    pub fn new(physical_memory_offset: u64, memory_map: &'static MemoryMap) -> Self {
+        let physical_memory_offset = VirtAddr::new(physical_memory_offset);
         // trace!("Getting active level 4 table");
         let level_4_table = unsafe { active_level_4_table(physical_memory_offset) };
 
@@ -28,6 +29,15 @@ impl MemoryHandler {
         Self {
             mapper,
             frame_allocator,
+        }
+    }
+    pub fn map_to(&mut self, page: Page<Size4KiB>, phys_frame: PhysFrame, flags: PageTableFlags){
+        unsafe {
+            self
+                .mapper
+                .map_to(page, phys_frame, flags, &mut self.frame_allocator)
+                .unwrap()
+                .flush()
         }
     }
 

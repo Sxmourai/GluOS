@@ -1,37 +1,14 @@
-use core::{cell::Cell, num::TryFromIntError, convert::Infallible};
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
+use core::{cell::Cell, convert::Infallible, num::TryFromIntError};
 use log::debug;
 use spin::Mutex;
 
-
-use super::{Driver, DriverError, get_driver};
-
-pub mod fs;
 pub mod ata;
 
-pub struct DiskDriver {}
-impl Driver for DiskDriver {
-    fn name(&self) -> &str {"Disk"}
-
-    fn init(&mut self) -> Result<(), DriverError> {
-        debug!("Init ATA driver");
-        ata::init();
-        Ok(())
-    }
-
-    fn required(&self) -> &str {
-        "Memory && Time"
-    }
-
-    fn new() -> Self where Self: Sized {
-        Self {
-            
-        }
-    }
-}
-
-
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub enum DiskError {
     NotFound,
     ReadDataNotAvailable,

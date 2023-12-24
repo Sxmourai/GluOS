@@ -12,7 +12,7 @@ static ACPI_HEAD_SIZE:usize = core::mem::size_of::<ACPISDTHeader>();
 
 use crate::{println, find_string, serial_println, serial_print, serial_print_all_bits, print, list_to_num, ptrlist_to_num, bytes};
 
-use super::{read_memory, read_phys_memory_and_map};
+use super::{read_memory, read_phys_memory_and_map, handler::MemoryHandler};
 /// This (usually!) contains the base address of the EBDA (Extended Bios Data Area), shifted right by 4
 const EBDA_START_SEGMENT_PTR: usize = 0x40e; // Base address in in 2 bytes
 /// The earliest (lowest) memory address an EBDA (Extended Bios Data Area) can start
@@ -175,7 +175,7 @@ impl MADT {
     }
 }
 
-trait APICRecord : Debug{}
+trait APICRecord : Debug + Sync {}
 
 #[repr(C, packed)]
 #[derive(Debug)]
@@ -312,10 +312,9 @@ pub struct AddressStructure {
 
 
 
-fn get_rsdt(rsdt_addr: u64) -> RSDT {
-    trace!("Getting RSDT at {}", rsdt_addr);
-    let (rsdt_header, raw) = read_sdt(rsdt_addr, rsdt_addr);
-    
+fn get_rsdt(mem_handler: &mut MemoryHandler, rsdt_addr: u64) -> RSDT {
+    // trace!("Getting RSDT at {}", rsdt_addr);
+    let (rsdt_header, raw) = read_sdt(mem_handler, rsdt_addr, rsdt_addr);
     
     let sdts_size = (rsdt_header.length as usize - ACPI_HEAD_SIZE); // / core::mem::size_of::<u32>();
     let sdts_offset = ACPI_HEAD_SIZE;
@@ -328,7 +327,7 @@ fn get_rsdt(rsdt_addr: u64) -> RSDT {
     }
     RSDT { h: rsdt_header, pointer_to_other_sdt }
 }
-
+// #[derive(Send, Sync)]
 pub struct DescriptorTablesHandler {
     facp: Option<&'static FADT>,
     madt: Option<MADT>,
@@ -336,14 +335,14 @@ pub struct DescriptorTablesHandler {
     waet: Option<&'static WAET>,
 }
 impl DescriptorTablesHandler {
-    pub fn new(physical_memory_offset:u64) -> Self {
+    pub fn new(mem_handler: &mut MemoryHandler, physical_memory_offset:u64) -> Self {
         let rsdp = search_rsdp(physical_memory_offset);
-        let rsdt = get_rsdt(rsdp.rsdt_addr as u64);
+        let rsdt = get_rsdt(mem_handler, rsdp.rsdt_addr as u64);
         let mut _self = Self {facp:None,madt:None,hpet:None,waet:None,};
 
         for (i,ptr) in rsdt.pointer_to_other_sdt.iter().enumerate() {
             let end_page = 0xFFFFFFFF+(i*4096) as u64;
-            let (header, table_bytes) = read_sdt(*ptr as u64, end_page);
+            let (header, table_bytes) = read_sdt(mem_handler, *ptr as u64, end_page);
 
             //TODO Make parsing in another function for cleaner code
             let binding = String::from_utf8_lossy(&header.signature).to_string();
@@ -422,8 +421,8 @@ unsafe fn handle_waet(bytes: &[u8]) -> Option<&'static WAET> {
 }
 
 
-fn read_sdt(ptr:u64, end_page:u64) -> (&'static ACPISDTHeader, &'static [u8]) {
-    let bytes = unsafe { read_phys_memory_and_map(ptr, ACPI_HEAD_SIZE, end_page) };
+fn read_sdt(mem_handler: &mut MemoryHandler, ptr:u64, end_page:u64) -> (&'static ACPISDTHeader, &'static [u8]) {
+    let bytes = unsafe { read_phys_memory_and_map(mem_handler, ptr, ACPI_HEAD_SIZE, end_page) };
     let entry: &ACPISDTHeader = unsafe { &*(bytes.as_ptr() as *const _) };
     let bytes = unsafe { read_memory(bytes.as_ptr(), entry.length as usize) };
     (entry, bytes)

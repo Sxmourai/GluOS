@@ -5,6 +5,8 @@ use x86_64::{
     PhysAddr, VirtAddr,
 };
 
+use crate::state::{get_state, mem_handler};
+
 /// A FrameAllocator that returns usable frames from the bootloader's memory map.
 #[derive(Debug, Clone)]
 pub struct BootInfoFrameAllocator {
@@ -38,7 +40,7 @@ impl BootInfoFrameAllocator {
     }
 
     unsafe fn map_physical_region(
-        &self,
+        &mut self,
         physical_address: usize,
     ) -> x86_64::structures::paging::Page {
         let frame =
@@ -46,16 +48,14 @@ impl BootInfoFrameAllocator {
                 .unwrap();
         let flags = Flags::PRESENT | Flags::WRITABLE;
 
-        let mut binding = crate::state::get_mem_handler();
-        let mem_handler = binding.get_mut();
-
         let page = Page::containing_address(VirtAddr::new(0xfffffff9));
-
+        
+        let mut binding = get_state();
+        let binding = binding.mem_handler();
+        let mut binding = binding.lock();
         let map_to_result = unsafe {
             // FIXME: this is not safe, we do it only for testing
-            mem_handler
-                .mapper
-                .map_to(page, frame, flags, &mut mem_handler.frame_allocator)
+            binding.mapper.map_to(page, frame, flags, self)
         };
         map_to_result.expect("map_to failed").flush();
         page
