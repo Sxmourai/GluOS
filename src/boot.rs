@@ -31,6 +31,7 @@ pub fn boot(boot_info: &'static bootloader::BootInfo) {
     );
     drivers::interrupts::init();
     drivers::disk::ata::init();
+    drivers::time::init();
     drivers::video::init_graphics();
     let fs_driver = FsDriver::new(DiskLoc(Channel::Primary, Drive::Slave));
     get_state().init(boot_info, mem_handler, fs_driver);
