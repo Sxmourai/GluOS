@@ -10,205 +10,24 @@
 #![allow(unused, dead_code)] //TODO: Only for debug (#[cfg(debug_assertions)])
 #![feature(int_roundings)] // To use div_ceil and other utilities... Not in stable because breaks num-bigint crate, but fixed now, no worries =)
 
-use alloc::format;
-use alloc::string::String;
-use alloc::vec::Vec;
-use x86_64::VirtAddr;
+use bootloader::{entry_point, BootInfo};
 
 pub mod state;
 pub mod drivers;
-pub use state::Kernel;
-pub mod terminal;
-pub use terminal::prompt;
-pub use terminal::writer;
-pub mod allocator;
-pub mod task;
 pub mod test;
-pub use test::{exit_qemu, QemuExitCode};
 pub mod boot;
-pub use boot::{boot, hlt_loop};
-pub mod pci;
-pub mod log;
-pub mod video;
+pub mod bit_manipulation;
+pub mod user;
 
+pub use drivers::*;
 
-use core::fmt::Display;
-use core::mem::size_of;
-use core::ops::BitOr;
-use core::ops::Shl;
-//-----------TESTS HANDLING-----------
-use core::panic::PanicInfo;
 #[cfg(test)]
 #[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
+fn panic(info: &core::panic::PanicInfo) -> ! {
     test::panic_handler(info)
 }
 
-#[cfg(test)]
-use bootloader::{entry_point, BootInfo};
-#[cfg(test)]
-entry_point!(test_kernel_main);
-#[cfg(test)]
-fn test_kernel_main(boot_info: &'static BootInfo) -> ! {
-    boot(boot_info);
-    test_main();
-    test::end()
-}
-
-// ! UTILITIES FUNCTIONS
-pub fn find_string(bytes: &[u8], search_string: &[u8]) -> Option<usize> {
-    let search_len = search_string.len();
-
-    for i in 0..(bytes.len() - search_len + 1) {
-        if &bytes[i..(i + search_len)] == search_string {
-            return Some(i);
-        }
-    }
-
-    None
-}
-
-pub fn serial_print_all_bits<T: Into<u128>>(num: T) {
-    let num = num.into();
-    let size = core::mem::size_of::<T>() * 8;
-
-    for i in (0..size).rev() {
-        let bit = (num >> i) & 1;
-        serial_print!("{}", bit);
-    }
-    serial_print!(" - ");
-}
-
-pub fn bytes<T: Into<u128>>(num: T) -> String {
-    let mut result = String::new();
-    let num = num.into();
-    let size = core::mem::size_of::<T>() * 8;
-
-    for i in (0..size).rev() {
-        let bit = (num >> i) & 1;
-        let str_bit = if bit == 0 {'0'} else {'1'};
-        result.push(str_bit);
-    }
-    result
-}
-pub fn bytes_list<T: Into<u128> + Copy, I: IntoIterator<Item = T>>(list: I) -> String {
-    let mut result = String::new();
-    for ele in list.into_iter() {
-        result.push_str(bytes(ele).as_str());
-    }
-    result
-}
-pub fn numeric_to_char_vec<T>(value: T) -> String
-where
-    T: Into<u64>,
-{
-    let value_u64 = value.into();
-    let mut char_vec = String::new();
-
-    for shift in (0..(core::mem::size_of::<T>() * 8)).step_by(8) {
-        let byte: u8 = ((value_u64 >> shift) & 0xFF) as u8;
-        char_vec.push(char::from(byte));
-    }
-
-    char_vec
-}
-pub fn bytes_to_numeric<T>(bytes: &[u8]) -> T
-where
-    T: From<u64>,
-{
-    let mut result: u64 = 0;
-
-    for (i, &byte) in bytes.iter().enumerate() {
-        if i < core::mem::size_of::<T>() {
-            result |= (byte as u64) << (i * 8);
-        }
-    }
-
-    T::from(result)
-}
-pub fn slice16_to_str(slice: &[u16]) -> String {    // return String::from_utf16_lossy(slice);
-    let mut content = String::new();
-    for (i,w) in slice.iter().enumerate() {
-        content.push(((w & 0xFF) as u8) as char);// Interpreted as chars
-        content.push(((w >> 8) as u8) as char); //Transforms the word into two bytes
-    }
-    content
-}
-
-// pub unsafe fn from_raw_parts_unchecked<T>(ptr:*mut T, len:usize) -> Vec<T>
-//     where T: Copy  {
-//     let mut v = Vec::new();
-//     let ele_size = core::mem::size_of::<T>();
-//     for i in 0..len {
-//         let addr = ptr as usize+i*ele_size;
-//         v.push(*ptr as T);
-//     }
-//     v
-// }
-
-///! DANGER ZONE DONT GO THERE 🤣
-pub fn list_to_num<T,R>(mut content: impl Iterator<Item = T> + DoubleEndedIterator) -> R 
-where T: Into<R>,
-      R: BitOr<Output = R> + Shl<usize> + From<<R as Shl<usize>>::Output> + Default{
-  let mut result = R::default();
-  for (i, byte) in content.into_iter().rev().enumerate() {
-      if i >= size_of::<R>()/size_of::<T>() {break}
-      result = Into::<R>::into((result << size_of::<T>()*8)) | byte.into();
-  }
-  result
-}
-pub fn ptrlist_to_num<'a, T,R>(mut content: &mut (impl Iterator<Item = &'a T> + ?Sized + DoubleEndedIterator)) -> R 
-where T: Into<R> + 'a + Clone,
-      R: BitOr<Output = R> + Shl<usize> + From<<R as Shl<usize>>::Output> + Default{
-  let mut result = R::default();
-  for (i, byte) in content.into_iter().rev().enumerate() {
-      if i >= size_of::<R>()/size_of::<T>() {break}
-      result = Into::<R>::into((result << size_of::<T>()*8)) | Into::<R>::into(byte.clone());
-  }
-  result
-}
-
-pub fn u16_to_u8(w: u16) -> (u8, u8) {
-    (((w >> 8) as u8), (w & 0xFF) as u8)
-}
-struct CharArray<const N: usize> ([char; N]);
-
-impl<const N: usize> Display for CharArray<N> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut s = String::new();
-        for element in &self.0 {
-            s.push(*element);
-        }
-        write!(f, "[{}]", s)
-    }
-}//TODO implement debugging
-struct CharSlice ([char]);
-
-impl Display for CharSlice {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut s = String::new();
-        for element in &self.0 {
-            s.push(*element);
-        }
-        write!(f, "[{}]", s)
-    }
-}//TODO implement debugging
-struct CharSlicePtr<'a> (&'a [char]);
-
-impl Display for CharSlicePtr<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut s = String::new();
-        for element in self.0 {
-            s.push(*element);
-        }
-        write!(f, "[{}]", s)
-    }
-}//TODO implement debugging
-
-
-
 //TODO: Remove the need for these
-
 extern crate alloc; // Lib which stores some useful structs on the heap / smart pointers from stdlib like Vec, String, Box...
 extern crate bootloader; // The bootloader crate, usefull for boot_info, paging and other stuff
 extern crate conquer_once;

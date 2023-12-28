@@ -30,24 +30,14 @@ impl Kernel {
             fs: None,
         }
     }
-    pub fn init(&mut self, boot_info: &'static bootloader::BootInfo) {
+    pub fn init(&mut self, boot_info: &'static bootloader::BootInfo, mem_handler: MemoryHandler, fs_driver: FsDriver) {
         self.boot_info.replace(boot_info);
-        serial_print!("Memory");
-        let mut mem_handler = MemoryHandler::new(
-            boot_info.physical_memory_offset,
-            &boot_info.memory_map,
-        );
-        serial_print!("Interrupts");
-        drivers::interrupts::init();
-        serial_print!("Ata");
-        drivers::disk::ata::init();
         // self.descriptor_tables.replace(Mutex::new(DescriptorTablesHandler::new(
         //     &mut mem_handler,
         //     boot_info.physical_memory_offset,
         // )));
         self.mem_handler.replace(Mutex::new(mem_handler));
-        serial_println!("Fs");
-        self.fs.replace(Mutex::new(FsDriver::new(DiskLoc(Channel::Primary, Drive::Slave))));
+        self.fs.replace(Mutex::new(fs_driver));
     }
     pub fn mem_handler(&mut self) -> &mut Mutex<MemoryHandler> {
         self.mem_handler.as_mut().unwrap()

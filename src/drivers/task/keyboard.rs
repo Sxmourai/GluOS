@@ -11,7 +11,7 @@ use futures_util::task::AtomicWaker;
 use lazy_static::lazy_static;
 use pc_keyboard::{layouts, HandleControl, Keyboard, ScancodeSet1, KeyCode, DecodedKey, KeyState};
 
-use crate::{serial_println, prompt::KbInput, writer::WRITER, serial_print};
+use crate::{serial_println, serial_print, user::prompt::KbInput, terminal::writer::WRITER};
 
 static WAKER: AtomicWaker = AtomicWaker::new();
 static SCANCODE_QUEUE: OnceCell<ArrayQueue<u8>> = OnceCell::uninit();

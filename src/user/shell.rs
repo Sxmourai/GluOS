@@ -14,18 +14,15 @@ use spin::Mutex;
 use crate::{
     drivers::{
         disk::ata::{self, read_from_disk, write_to_disk, Channel, DiskLoc, Drive},
-        fs::{
-            fs_driver,
-            fs::{parse_sectors, FilePath, Fat32Element},
-        },
+        fs::{fs::FilePath, fs_driver},
     },
-    print, println,
-    prompt::{input, COMMANDS_HISTORY, COMMANDS_INDEX},
-    serial_print, serial_println,
+    fs::fs::{Fat32Entry, ToFilePath},
+    print, println, serial_print, serial_println,
     state::{fs_driver, get_state},
+    terminal::console::{ScreenChar, DEFAULT_CHAR},
 };
 
-use super::console::{ScreenChar, DEFAULT_CHAR};
+use super::prompt::{input, COMMANDS_HISTORY, COMMANDS_INDEX};
 type Commands = HashMap<
     String,
     (
@@ -65,7 +62,7 @@ fn outb(args: I) -> O {
         .parse()
         .map_err(|e| format!("Failed to parse data: {}", e))?;
 
-    unsafe { crate::writer::outb(port, data) };
+    unsafe { crate::terminal::writer::outb(port, data) };
     Ok(())
 }
 // BOTH ARE UNSAFE BUT ITS FOR EASIER CODE
@@ -76,10 +73,10 @@ fn inb(args: I) -> O {
         .parse()
         .map_err(|e| format!("Failed to parse port: {}", e))?;
 
-    println!("{}", unsafe { crate::writer::inb(port) });
+    println!("{}", unsafe { crate::terminal::writer::inb(port) });
     Ok(())
 }
-fn read(raw_args: I) -> O {
+fn read_sector(raw_args: I) -> O {
     let mut args = raw_args.split(" ");
     let channel = match args
         .next()
@@ -113,18 +110,16 @@ fn read(raw_args: I) -> O {
     let end = end
         .parse()
         .map_err(|e| format!("Failed to parse end: {}", e))?;
-    
-    
-    let sectors = read_from_disk(DiskLoc(channel, drive), start, end)?;
-    let sectors = 
-    if raw_args.contains("num") {
+
+    let sectors = read_from_disk(&DiskLoc(channel, drive), start, end)?;
+    let sectors = if raw_args.contains("num") {
         let mut nums = String::new();
         for n in sectors {
             nums.push_str(&format!("{}, ", n));
         }
         nums
     } else {
-        parse_sectors(&sectors)
+        String::from_utf8_lossy(&sectors).to_string()
     };
     if raw_args.contains("--serial") {
         serial_println!("{:#?}", sectors);
@@ -136,7 +131,7 @@ fn read(raw_args: I) -> O {
     }
     Ok(())
 }
-fn write(raw_args: I) -> O {
+fn write_sector(raw_args: I) -> O {
     let mut args = raw_args.split(" ");
     let channel = match args
         .next()
@@ -177,59 +172,46 @@ fn write(raw_args: I) -> O {
     println!("Done");
     Ok(())
 }
-// fn install(args:I) -> O{
-//     let mut args = args.split(" ");
-//     let channel = match args.next().ok_or("Invalid argument: missing channel (Primary/0, Secondary/1)")? {
-//         "Primary" => Channel::Primary,
-//         "0" => Channel::Primary,
-//         "Secondary" => Channel::Secondary,
-//         "1" => Channel::Secondary,
-//         _ => return Err("Wrong channel: Primary//0 or Secondary//1".to_string()),
-//     };
-//     let drive = match args.next().ok_or("Invalid argument: missing drive (Master/0, Slave/1)")? {
-//         "Master" => Drive::Master,
-//         "0" => Drive::Master,
-//         "Slave" => Drive::Slave,
-//         "1" => Drive::Slave,
-//         _ => return Err("Wrong drive: Master//0 or Slave//1".to_string()),
-//     };
-//     let loc = DiskLoc(channel, drive);
-//     println!("Installing os on drive {:?} with channel {:?}", drive, channel);
-//     let sector = Vec::new();
-//     let bytes_per_sector: u16 = 5;
-//     // [0xEB, 0x3C, 0x90,
-//     // 'M' as u8, 'S' as u8, 'W' as u8, 'I' as u8, 'N' as u8, '4' as u8, '.' as u8, '1' as u8,
-//     // (bytes_per_sector & 0xFF) as u8, (bytes_per_sector >> 8) as u8,
-//     // sectors_per_cluster,
-//     // reserved_sector,
-//     // n_fats,
-//     // (root_dir_entries & 0xFF) as u8, (root_dir_entries >> 8) as u8,
-//     // (sectors & 0xFF) as u8, (sectors >> 8) as u8,];
-//     write_to_disk(loc, 0, &sector[..]);
-//     Ok(())
-// }
 
-fn read_file(raw_args: I) -> O {
+fn read(raw_args: I) -> O {
     let mut args = raw_args.split(" ");
-    let file_name = args.next().unwrap();
-    if let Some(content) = get_state().fs().lock().read_file(&FilePath{raw_path:file_name.to_string()}) {
-        println!("{}", content);
-    } else {
-        println!("Specified path couldn't be found")
-    }
-    Ok(())
-}
-fn read_dir(raw_args: I) -> O {
-    let mut args = raw_args.split(" ");
-    let file_name = args.next().unwrap();
-    if let Some(content) = get_state().fs().lock().read_dir(&FilePath{raw_path:file_name.to_string()}) {
-        for (path, ele) in content.iter() {
-            println!("- {:?} -> {:?}", path.raw_path, ele);
+    let path = args.next().unwrap();
+    let mut binding = get_state();
+    let fs_driver = binding.fs().lock();
+    if let Some(entry) = fs_driver.get_entry(&path.to_filepath()) {
+        match entry {
+            Fat32Entry::File(file) => {
+                let content = fs_driver.read_file(&path.to_filepath());
+                println!("{}", content.unwrap()); // Can safely unwrap because we know the file exists
+            }
+            Fat32Entry::Dir(dir) => {
+                if let Some(entries) = get_state()
+                    .fs()
+                    .lock()
+                    .read_dir_at_sector(&dir.path, dir.sector as u64)
+                {
+                    for (path, inner_entry) in entries.iter() {
+                        let name = match inner_entry {
+                            Fat32Entry::File(file) => ("File ", file.path(), file.size),
+                            Fat32Entry::Dir(dir) => ("Dir ", dir.path(), dir.sector as u64),
+                        };
+                        println!("- {:?} -> {:?}", path.path(), name);
+                    }
+                }
+            }
         }
     } else {
         println!("Specified path couldn't be found")
     }
     Ok(())
+    // let mut args = raw_args.split(" ");
+    // let file_name = args.next().unwrap();
+    // if let Some(content) = get_state().fs().lock().read_file(&FilePath::new(file_name.to_string())) {
+    //     println!("{}", content);
+    // } else {
+    //     println!("Specified path couldn't be found")
+    // }
+    // Ok(())
 }
 
 pub fn dump_disk(args: I) -> O {
@@ -256,7 +238,7 @@ pub fn dump_disk(args: I) -> O {
     };
     let mut i = 0;
     loop {
-        for b in read_from_disk(DiskLoc(channel, drive), i, 3).unwrap() {
+        for b in read_from_disk(&DiskLoc(channel, drive), i, 3).unwrap() {
             if b != 0 {
                 serial_print!("{b} ")
             }
@@ -275,19 +257,16 @@ lazy_static! {
         let CONSTANT_COMMANDS = [
             f( "echo",  "Prints args to console",
                 |v:I| ->O {print!("{}", v);Ok(())}),
-
             f( "ls","Prints disks", ls),
-
             f( "outb",  "Send data (u8) to a port (u16)", outb),
             f( "inb",   "Read data (u8) from a port (u16) and prints it",inb),
-            f( "read",  "Read raw data from a disk", read),
-            f( "write",  "Writes raw data to a disk", write),
+            f( "read_raw",  "Read raw data from a disk", read_sector),
+            f( "write_raw",  "Writes raw data to a disk", write_sector),
             f( "clear", "Clears screen", |v:I| -> O {
                 crate::terminal::console::clear_console();
                 Ok(())
             }),
-            f( "read_file", "Reads a file from fat disk", read_file),
-            f( "read_dir",  "Reads a dir from fat disk",  read_dir),
+            f( "read",  "Reads a entry from fat disk (If dir it's like 'ls' and if file is like 'cat'",  read),
             f( "dump_disk", "Reads all disk into serial", dump_disk),
         ];
         for (prog, fun, desc) in CONSTANT_COMMANDS {
@@ -327,9 +306,11 @@ impl CommandRunner {
             unsafe {
                 unsafe { COMMANDS_HISTORY.write().push(command) };
                 let history_len = COMMANDS_HISTORY.read().len();
-                if history_len>1{
-                    if COMMANDS_HISTORY.read().get(history_len-2).unwrap().len()==0 {
-                        COMMANDS_HISTORY.write().swap(history_len-2, history_len-1);
+                if history_len > 1 {
+                    if COMMANDS_HISTORY.read().get(history_len - 2).unwrap().len() == 0 {
+                        COMMANDS_HISTORY
+                            .write()
+                            .swap(history_len - 2, history_len - 1);
                     }
                 }
             }

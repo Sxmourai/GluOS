@@ -1,13 +1,13 @@
 use core::num::TryFromIntError;
 
-use alloc::{string::{String, ToString, ParseError}, vec::{Vec, self}, boxed::Box};
+use alloc::{string::{String, ToString, ParseError}, vec::{Vec, self}, boxed::Box, format};
 use fatfs::IntoStorage;
 use hashbrown::HashMap;
 use log::error;
 
-use crate::{serial_print_all_bits, serial_print, serial_println, u16_to_u8, println, print, drivers::disk::{ata::{Sectors, DiskLoc, read_from_disk}, DiskError}, state::{get_state, fs_driver}};
+use crate::{serial_print, serial_println, println, print, drivers::disk::{ata::{Sectors, DiskLoc, read_from_disk}, DiskError}, state::{get_state, fs_driver}};
 
-use super::fs_driver::{self, FsDriver};
+use super::{fs_driver::{self, FsDriver, Files}, userland::FatAttributes};
 
 #[derive(Default, Debug, Clone)]
 #[repr(packed)]
@@ -43,14 +43,6 @@ pub struct BiosParameterBlock {
     pub fs_type_label: [u8; 8],
 }
 
-pub fn parse_sectors(sectors: &Sectors) -> String {
-    let mut content = String::new();
-    for b in sectors {
-        content.push(*b as char);
-    }//String::from_utf16_lossy(&sector).as_str()
-    content
-}
-
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub enum FileSystemError {
@@ -58,16 +50,14 @@ pub enum FileSystemError {
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
-pub enum GenericFile {
-    Fat32,
-    // Fat32 => Fat32File(_)
-}
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Debug)]
 pub struct FilePath {
-    pub(crate) raw_path: String,
+    raw_path: String,
 }
 impl FilePath {
-    pub fn new(full_path: String) -> Self {
+    pub fn new(mut full_path: String) -> Self {
+        if !full_path.starts_with("/") {
+            full_path.insert(0, '/');
+        }
         Self {
             raw_path: full_path
         }
@@ -75,139 +65,89 @@ impl FilePath {
     pub fn splitted(&self) -> core::str::Split<'_, &str> {
         self.raw_path.split("/")
     }
-    pub fn root(&self) -> &str { 
+    pub fn len(&self) -> u64 {
+        let mut len = 0;
+        for word in self.splitted() {
+            len += 1;
+        }
+        len
+    }
+    pub fn root(&self) -> &str {
         let mut splitted = self.splitted();  
         let root = splitted.next().unwrap();
         if root.is_empty() {splitted.next().unwrap()}
         else    {root}
     }
-    pub fn open_file(&self) -> Result<GenericFile, FileSystemError> {
-        Fat32File::open(self)
+    pub fn path(&self) -> &String {
+        &self.raw_path
     }
+    pub fn join(self, other_path: FilePath) -> FilePath {
+        let mut path = self.raw_path;
+        path.extend(other_path.path().chars());
+        Self::new(path.replace("//", "/").replace("\\", "/"))
+    }
+    // pub fn open_file(&self) -> Result<Fat32Entry, FileSystemError> {
+    //     Fat32Entry::open(self)
+    // }
     pub fn name(&self) -> &str {
         self.splitted().last().unwrap()
     }
 }
-
-
-#[derive(Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
-pub struct FatPermissions(pub u8);
-#[derive(PartialEq,Eq, Hash, Debug)]
-pub struct FatGroup {
-    pub group_name: String,
-    pub id: u16,
-    pub derived_groups: Vec<u16>,
-}
-#[derive(PartialEq,Eq, Hash, Debug)]
-pub struct FatUser {
-    pub username: String,
-    pub id: u16,
-    pub groups: Vec<u16>,
-}
-pub fn get_group(id: u16) -> FatGroup {
-    FatGroup { group_name: "default".to_string(), id, derived_groups: Vec::new() }
-}
-pub fn get_user(id: u16) -> FatUser {
-    FatUser { username: "Sxmourai".to_string(), id, groups: alloc::vec![1] }
-}
-#[derive(PartialEq, Eq, Hash, Debug)]
-pub enum FatPerson {
-    Group(FatGroup),
-    User(FatUser),
-}
-impl FatPerson {
-    pub fn new(group: bool, id: u16) -> Self {
-        if group {
-            Self::Group(get_group(id))
-        } else {
-            Self::User(get_user(id))
-        }
+impl core::fmt::Debug for FilePath {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(format!("FilePath {:?}", self.path()).as_str())
     }
 }
-#[derive(Default, Debug)] // Proper debug for attributes (flags in self.flags)
-pub struct FatAttributes {
-    flags: u16,
-    permissions: HashMap<FatPerson, FatPermissions>,
-}
-impl FatAttributes {
-    pub fn permissions(&self, group: &FatPerson) -> Option<&FatPermissions> {
-        self.permissions.get(group)
+impl core::fmt::Display for FilePath {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(format!("{}", self.path()).as_str())
     }
 }
-pub trait Fat32Element: core::fmt::Debug {
-    fn path(&self) -> &FilePath;
-    fn name(&self) -> &str;
-    fn size(&self) -> u64;
-    fn attributes(&self) -> &FatAttributes;
+pub trait ToFilePath {
+    fn to_filepath(&self) -> FilePath;
 }
-// #[derive(Debug)]
-// pub struct Fat32Dir {
-//     path: FilePath,
-//     size: u64,
-//     attributes: FatAttributes,
-// }
-// impl Fat32Element for Fat32Dir {
-//     fn name(&self) -> &String {&self.name}
-//     fn size(&self) -> u64 {self.size}
-//     fn attributes(&self) -> &FatAttributes {&self.attributes}
-// }
-#[derive(Debug)]
+impl ToFilePath for String {
+    fn to_filepath(&self) -> FilePath {
+        FilePath::new(self.clone())
+    }
+}
+impl ToFilePath for &str {
+    fn to_filepath(&self) -> FilePath {
+        FilePath::new(self.to_string())
+    }
+}
+#[derive(Debug, Clone)]
+pub enum Fat32Entry {
+    File(Fat32File),
+    Dir(Fat32Dir),
+}
+#[derive(Debug, Clone)]
 pub struct Fat32File {
-    path: FilePath,
-    size: u64,
-    attributes: FatAttributes,
-}
-impl Fat32Element for Fat32File {
-    fn path(&self) -> &FilePath {&self.path}
-    fn name(&self) -> &str {&self.path.name()}
-    fn size(&self) -> u64 {self.size}
-    fn attributes(&self) -> &FatAttributes {&self.attributes}
+    pub path: FilePath,
+    pub size: u64,
+    pub attributes: FatAttributes,
+    pub sector: u32,
 }
 impl Fat32File {
-    pub fn new(path: FilePath, size: u64, attributes: FatAttributes) -> Self {
-        Self {
-            path,
-            size,
-            attributes,
-        }
-    }
-    pub fn open(path: &FilePath) -> Result<GenericFile, FileSystemError> {
-        get_state().fs().lock().open_file(path)
-    }
-    pub fn close(&mut self) -> Result<(), FileSystemError> {
-        get_state().fs().lock().close_file(self)
-    }
+    pub fn path(&self) -> &FilePath {&self.path}
+    pub fn name(&self) -> &str {&self.path.name()}
+    pub fn sector(&self) -> u32 {self.sector}
+    pub fn attributes(&self) -> &FatAttributes {&self.attributes}
 }
-// impl Fat32File {
-//     pub fn open(path: &FilePath) -> Result<GenericFile, FileSystemError> {
-//         get_state().fs().lock().open_file(path)
-//     }
-//     pub fn close(&mut self) -> Result<(), FileSystemError> {
-//         get_state().fs().lock().close_file(self)
-//     }
-// }
-
-
-pub enum Elements {
-    File(Fat32File),
-    Dir(Fat32File),
-    Other(Box<dyn Fat32Element>),
-}
-
-
 #[derive(Debug, Clone)]
-pub struct FatEntry {
-    pub sector: u64,
-    pub is_file: bool
+pub struct Fat32Dir {
+    pub path: FilePath,
+    pub attributes: FatAttributes,
+    pub sector: u32,
+    // pub dirs: HashMap<FilePath, Fat32Dir>,
 }
-impl FatEntry {
-    pub fn new(sector: u64, is_file: bool) -> Self {
-        Self {
-            sector,
-            is_file,
-        }
-    }
+impl Fat32Dir {
+    pub fn path(&self) -> &FilePath {&self.path}
+    pub fn name(&self) -> &str {&self.path.name()}
+    pub fn sector(&self) -> u32 {self.sector}
+    pub fn attributes(&self) -> &FatAttributes {&self.attributes}
 }
+
 
 
 pub fn cluster_to_sector(cluster_number: u64, first_data_sector: u64) -> u64 {
@@ -215,4 +155,52 @@ pub fn cluster_to_sector(cluster_number: u64, first_data_sector: u64) -> u64 {
 }
 pub fn sector_to_cluster(sector_number: u64, first_data_sector: u64) -> u64 {
     (sector_number-first_data_sector)+2
+}
+
+pub enum FatType {
+    ExFat,
+    Fat12,
+    Fat16,
+    Fat32,
+}
+#[derive(Default)]
+pub struct FatInfo(
+    pub BiosParameterBlock,
+);
+impl FatInfo {
+    pub fn first_sector_of_cluster(&self) -> u64 {
+        let first_data_sector = self.get_first_data_sector();
+        let first_root_dir_sector = first_data_sector - self.get_root_dir_sectors();
+        ((self.0.root_dir_first_cluster - 2) * self.0.sectors_per_cluster as u32) as u64 + first_data_sector
+    }
+    pub fn get_first_data_sector(&self) -> u64 {
+        let total_sectors = self.get_total_sectors();
+        let fat_size = self.get_fat_size();
+        let root_dir_sectors = self.get_root_dir_sectors();
+        self.first_fat_sector() as u64 + (self.0.fats as u64 * fat_size as u64) + root_dir_sectors
+    }
+    pub fn fat_type(&self) -> FatType {
+        let total_clusters = self.get_total_clusters();
+        if(total_clusters < 4085) {FatType::Fat12}
+            else if(total_clusters < 65525){FatType::Fat16}
+            else {FatType::Fat32}
+    }
+    pub fn get_total_clusters(&self) -> u64 {
+        self.get_data_sectors() as u64 / self.0.sectors_per_cluster as u64
+    }
+    pub fn get_data_sectors(&self) -> u64 {
+        self.get_total_sectors() as u64 - (self.0.reserved_sectors as u64 + (self.0.fats as u64 * self.get_fat_size() as u64) + self.get_root_dir_sectors()) as u64
+    }
+    pub fn get_total_sectors(&self) -> u32 {
+        if (self.0.total_sectors_16 == 0) {self.0.total_sectors_32} else {self.0.total_sectors_16.into()}
+    }
+    pub fn get_fat_size(&self) -> u32 {
+        if (self.0.sectors_per_fat_16==0) {self.0.sectors_per_fat_32} else {self.0.sectors_per_fat_16 as u32}
+    }
+    pub fn get_root_dir_sectors(&self) -> u64 {
+        ((self.0.root_entries as u64 * 32 as u64) + (self.0.bytes_per_sector as u64 - 1)) / self.0.bytes_per_sector as u64
+    }
+    pub fn first_fat_sector(&self) -> u16 {
+        self.0.reserved_sectors
+    }
 }

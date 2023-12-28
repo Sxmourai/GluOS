@@ -9,19 +9,11 @@ use hashbrown::HashMap;
 use pc_keyboard::{DecodedKey, KeyCode};
 use spin::RwLock;
 
-use crate::terminal::console::ScreenChar;
+use crate::terminal::{console::{ScreenChar, DEFAULT_CHAR}, writer::{ScreenPos, print_at, print_screenchars_atp, print_screenchar_at}, buffer::{BUFFER_WIDTH, SBUFFER_WIDTH}};
 use crate::{
     print, println, serial_println,
-    writer::{
-        print_at, print_atp, print_byte_at, print_screenchar_at, print_screenchar_atp,
-        print_screenchars_atp, Color, ColorCode, ScreenPos,
-    },
 };
 
-use super::{
-    buffer::{BUFFER_WIDTH, SBUFFER_WIDTH},
-    console::DEFAULT_CHAR,
-};
 
 pub static mut COMMANDS_HISTORY: RwLock<Vec<Vec<ScreenChar>>> = RwLock::new(Vec::new());
 pub static mut COMMANDS_INDEX  : RwLock<usize> = RwLock::new(0);
@@ -84,7 +76,7 @@ impl BlockingPrompt {
 impl KbInput for BlockingPrompt {
     fn move_cursor(&mut self, pos: usize) {
         self.pos = pos;
-        crate::writer::WRITER.lock().move_cursor(
+        crate::terminal::writer::WRITER.lock().move_cursor(
             ((self.pos + self.origin.0 as usize) % SBUFFER_WIDTH) as u8,
             (self.pos / SBUFFER_WIDTH) as u8 + self.origin.1,
         )
@@ -93,8 +85,8 @@ impl KbInput for BlockingPrompt {
         self.message.to_string()
     }
     fn run(mut self) -> String {
-        self.origin = crate::writer::calculate_end(
-            &crate::writer::WRITER.lock().pos.clone(),
+        self.origin = crate::terminal::writer::calculate_end(
+            &crate::terminal::writer::WRITER.lock().pos.clone(),
             self.message.len(),
         ); // Clone to be sure to not lock it during the function
         print!("{}", self.message);
@@ -249,5 +241,5 @@ impl KbInput for BlockingPrompt {
 }
 
 pub fn input(message: &str) -> String {
-    crate::prompt::BlockingPrompt::new(message).run()
+    crate::user::prompt::BlockingPrompt::new(message).run()
 }

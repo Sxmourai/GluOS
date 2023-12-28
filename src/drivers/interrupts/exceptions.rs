@@ -1,6 +1,6 @@
 use x86_64::structures::idt::{InterruptStackFrame, PageFaultErrorCode};
 
-use crate::{hlt_loop, println};
+use crate::println;
 use log::error;
 
 pub extern "x86-interrupt" fn alignment_check(stack_frame: InterruptStackFrame, error_code: u64) {
@@ -19,8 +19,7 @@ pub extern "x86-interrupt" fn device_not_available(stack_frame: InterruptStackFr
     error!("EXCEPTION: device_not_available\n{:#?}", stack_frame);
 }
 pub extern "x86-interrupt" fn machine_check(stack_frame: InterruptStackFrame) -> ! {
-    error!("EXCEPTION: Machine Check\n{:#?}", stack_frame);
-    hlt_loop()
+    panic!("EXCEPTION: Machine Check\n{:#?}", stack_frame);
 }
 pub extern "x86-interrupt" fn non_maskable_interrupt(stack_frame: InterruptStackFrame) {
     error!("EXCEPTION: non_maskable_interrupt\n{:#?}", stack_frame);
@@ -114,12 +113,11 @@ pub extern "x86-interrupt" fn page_fault_handler(
     error_code: PageFaultErrorCode,
 ) {
     use x86_64::registers::control::Cr2;
-//TODO Map a page to a frame when page fault
-    println!("EXCEPTION: PAGE FAULT");
-    println!("Accessed Address: {:?}", Cr2::read());
-    println!("Error Code: {:?}", error_code);
-    println!("{:#?}", stack_frame);
-    hlt_loop();
+    //TODO Map a page to a frame when page fault
+    panic!("EXCEPTION: PAGE FAULT
+    Accessed Address: {:?}
+    Error Code: {:?}
+    Stack frame: {:#?}",Cr2::read(),error_code,stack_frame);
 }
 
 // pub fn map_phys_memory(location: u64, size: usize, end_page:u64) -> &'static [u8] {
@@ -131,7 +129,7 @@ pub extern "x86-interrupt" fn page_fault_handler(
 //     unsafe { mem_h.mapper.map_to(page, phys_frame, flags, &mut mem_h.frame_allocator).unwrap().flush() };
 
 //     let addr = location-phys_frame.start_address().as_u64() + page.start_address().as_u64();
-    
+
 //     // err!("Physical frame_adress: {:x}\t-\tLocation: {:x}\nComputed location {:x}\t-\tFrame to page: {:x} (Provided (unaligned): {:x})", phys_frame.start_address().as_u64(), location, addr, page.start_address().as_u64(),end_page);
 //     unsafe { read_memory(addr as *const u8, size) }
 // }

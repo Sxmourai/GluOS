@@ -3,6 +3,7 @@ use x86_64::structures::idt::InterruptDescriptorTable;
 
 use crate::drivers::gdt::DOUBLE_FAULT_IST_INDEX;
 use crate::drivers::interrupts::hardware::InterruptIndex;
+use crate::interrupts::hardware::second_interrupt_controller;
 
 use super::exceptions::*;
 use super::hardware::{keyboard, timer};
@@ -10,7 +11,6 @@ use super::hardware::{keyboard, timer};
 lazy_static::lazy_static! {
     pub static ref IDT: InterruptDescriptorTable = {
         let mut idt = InterruptDescriptorTable::new();
-        // Mapping the CPU exceptions (in alphabetical order)
         idt.alignment_check.set_handler_fn(alignment_check);
         idt.bound_range_exceeded.set_handler_fn(bound_range_exceeded);
         idt.breakpoint.set_handler_fn(breakpoint_handler);
@@ -45,6 +45,9 @@ lazy_static::lazy_static! {
             .set_handler_fn(timer);
         idt[InterruptIndex::Keyboard.as_usize()]
             .set_handler_fn(keyboard);
+        // for i in 34..255 {
+        //     idt[i].set_handler_fn(second_interrupt_controller);
+        // }
         idt
     };
 }

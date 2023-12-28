@@ -13,14 +13,7 @@ use alloc::{
 use log::{debug, error, info, trace};
 use spin::{Mutex, MutexGuard};
 
-use crate::{
-    bytes, list_to_num,
-    log::point,
-    numeric_to_char_vec, println, ptrlist_to_num, serial_print, serial_print_all_bits,
-    serial_println, slice16_to_str, u16_to_u8,
-    writer::{inb, indw, inw, outb, outdw},
-    CharArray, CharSlice, CharSlicePtr,
-};
+use crate::{bit_manipulation::{u16_to_u8, bytes, ptrlist_to_num}, terminal::writer::{outb, inb, inw, indw, outdw}};
 use lazy_static::lazy_static;
 
 use super::DiskError;
@@ -175,7 +168,7 @@ fn get_selected_drive_type(channel: Channel) -> DriveType {
 }
 //TODO Return a result, but for now it's for debugging so...
 pub fn read_from_disk(
-    addr: impl DiskAddress,
+    addr: &impl DiskAddress,
     start_sector: u64,
     sector_count: u16,
 ) -> DResult<Sectors> {
@@ -324,19 +317,24 @@ impl DiskManager {
     }
     pub fn read_disk(
         &self,
-        disk_address: impl DiskAddress,
+        disk_address: &impl DiskAddress,
         start_sector: u64,
         sector_count: u16,
     ) -> Result<Sectors, DiskError> {
-        let mut sectors = self.disks[disk_address.as_index()].as_ref().unwrap()
-        .read_sectors(start_sector, sector_count);
+        let mut sectors = self.disks[disk_address.as_index()]
+            .as_ref()
+            .unwrap()
+            .read_sectors(start_sector, sector_count);
         if sectors.is_err() {
             let err = sectors.unwrap_err();
-            if err==DiskError::DRQRead { // Read twice if error cuz sometimes crashes
-                return self.disks[disk_address.as_index()].as_ref().unwrap().read_sectors(start_sector, sector_count)
-            }
-            else {
-                return Err(err)
+            if err == DiskError::DRQRead {
+                // Read twice if error cuz sometimes crashes
+                return self.disks[disk_address.as_index()]
+                    .as_ref()
+                    .unwrap()
+                    .read_sectors(start_sector, sector_count);
+            } else {
+                return Err(err);
             }
         }
         sectors
@@ -589,7 +587,7 @@ impl Disk {
                 }
                 break;
             }
-            if i == 100_000-1 {
+            if i == 100_000 - 1 {
                 log::error!(
                     "DRQ read timed out line {}, polling {} with status 0x{:02X}",
                     line,

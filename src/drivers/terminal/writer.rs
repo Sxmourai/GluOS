@@ -1,15 +1,21 @@
 use acpica_sys::Enum_AcpiRasfCapabiliities;
-use alloc::{string::{String, ToString}, vec::Vec};
-use log::debug;
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{arch::asm, fmt, iter::empty};
 use lazy_static::lazy_static;
+use log::debug;
 use spin::Mutex;
-use x86_64::{structures::port::{PortRead, PortWrite}, registers::debug};
+use x86_64::{
+    registers::debug,
+    structures::port::{PortRead, PortWrite},
+};
 
 use crate::{serial_println, terminal::buffer::VgaBuffer};
 
 use super::{
-    buffer::{Buffer, BUFFER_HEIGHT, BUFFER_WIDTH, SBUFFER_WIDTH},
+    buffer::{BUFFER_HEIGHT, BUFFER_WIDTH, SBUFFER_WIDTH},
     console::{Console, ConsoleError, ScreenChar, DEFAULT_CHAR},
 };
 
@@ -86,19 +92,32 @@ impl Writer {
         let (width, height) = self.console.size();
         x86_64::instructions::interrupts::without_interrupts(|| {
             let mut schrs = [ScreenChar::default(); SBUFFER_WIDTH];
-            for (i,c) in self.console.get_str_at(&ScreenPos(0, 0), width as u16).iter().enumerate() {
+            for (i, c) in self
+                .console
+                .get_str_at(&ScreenPos(0, 0), width as u16)
+                .iter()
+                .enumerate()
+            {
                 schrs[i] = *c
             }
             self.console.top_buffer.append(schrs);
             for y in 1..height {
                 let line = self.console.get_str_at(&ScreenPos(0, y), width as u16);
-                self.write_screenchars_at_no_wrap(0, y-1, line.iter());
+                self.write_screenchars_at_no_wrap(0, y - 1, line.iter());
             }
             if self.console.bottom_buffer.is_empty() {
-                self.write_screenchars_at_no_wrap(0, height-1, [DEFAULT_CHAR; 80].iter());
-                self.move_cursor(self.pos.0, self.pos.1-1)
+                self.write_screenchars_at_no_wrap(0, height - 1, [DEFAULT_CHAR; 80].iter());
+                self.move_cursor(self.pos.0, self.pos.1 - 1)
             } else {
-                self.write_screenchars_at_no_wrap(0, height-1, self.console.bottom_buffer.get_youngest_line().unwrap().iter());
+                self.write_screenchars_at_no_wrap(
+                    0,
+                    height - 1,
+                    self.console
+                        .bottom_buffer
+                        .get_youngest_line()
+                        .unwrap()
+                        .iter(),
+                );
                 self.console.bottom_buffer.remove_youngest_line();
             }
         })
@@ -112,28 +131,48 @@ impl Writer {
             // Move every line one down
             // Iterate in reverse order because it would copy the same line every time
             // It's like write left to write as a left-handed, the ink would be go on the text you are currently writing (I know that, I'm left-handed)
-            
+
             let mut schrs = [ScreenChar::default(); SBUFFER_WIDTH];
-            for (i,c) in self.console.get_str_at(&ScreenPos(0, height-1), width as u16).iter().enumerate() {
+            for (i, c) in self
+                .console
+                .get_str_at(&ScreenPos(0, height - 1), width as u16)
+                .iter()
+                .enumerate()
+            {
                 schrs[i] = *c
             }
             self.console.bottom_buffer.append(schrs);
             for y in 2..=height {
-                let line: Vec<ScreenChar> = self.console.get_str_at(&ScreenPos(0, height-y), width as u16);
-                self.write_screenchars_at_no_wrap(0, height-y+1, line.iter());
+                let line: Vec<ScreenChar> = self
+                    .console
+                    .get_str_at(&ScreenPos(0, height - y), width as u16);
+                self.write_screenchars_at_no_wrap(0, height - y + 1, line.iter());
             }
             if self.console.top_buffer.is_empty() {
-                self.write_screenchars_at_no_wrap(0, 0, [ScreenChar::default(); SBUFFER_WIDTH].iter());
-                self.move_cursor(self.pos.0, self.pos.1+1)
+                self.write_screenchars_at_no_wrap(
+                    0,
+                    0,
+                    [ScreenChar::default(); SBUFFER_WIDTH].iter(),
+                );
+                self.move_cursor(self.pos.0, self.pos.1 + 1)
             } else {
-                self.write_screenchars_at_no_wrap(0, 0, self.console.top_buffer.get_youngest_line().unwrap().iter());
+                self.write_screenchars_at_no_wrap(
+                    0,
+                    0,
+                    self.console.top_buffer.get_youngest_line().unwrap().iter(),
+                );
                 self.console.top_buffer.remove_youngest_line();
             }
         })
     }
-    pub fn write_screenchars_at_no_wrap<'a>(&mut self, mut x: u8, mut y: u8, s: impl Iterator<Item = &'a ScreenChar>) {
-        for (i, char) in s.enumerate(){
-            self.write_char_at(ScreenPos(x+i as u8, y), *char);
+    pub fn write_screenchars_at_no_wrap<'a>(
+        &mut self,
+        mut x: u8,
+        mut y: u8,
+        s: impl Iterator<Item = &'a ScreenChar>,
+    ) {
+        for (i, char) in s.enumerate() {
+            self.write_char_at(ScreenPos(x + i as u8, y), *char);
         }
     }
     pub fn write_screenchars_at(
@@ -143,7 +182,7 @@ impl Writer {
         s: impl IntoIterator<Item = ScreenChar>,
     ) -> (u8, u8) {
         for c in s.into_iter() {
-            if (x + 1 >= BUFFER_WIDTH) || (c.ascii_character == '\n' as u8) { 
+            if (x + 1 >= BUFFER_WIDTH) || (c.ascii_character == '\n' as u8) {
                 if y + 1 >= BUFFER_HEIGHT {
                     self.move_up()
                 } else {
@@ -151,7 +190,9 @@ impl Writer {
                 }
                 x = 0;
             }
-            if (c.ascii_character == '\n' as u8) {continue}
+            if (c.ascii_character == '\n' as u8) {
+                continue;
+            }
             self.write_char_at(ScreenPos(x, y), c);
             x += 1;
         }
@@ -161,7 +202,10 @@ impl Writer {
     pub fn write_string_at(&mut self, mut x: u8, mut y: u8, s: &str) -> (u8, u8) {
         let mut screenchars = Vec::new();
         for c in s.bytes() {
-            screenchars.push(ScreenChar {ascii_character: c, color_code: self.color_code})
+            screenchars.push(ScreenChar {
+                ascii_character: c,
+                color_code: self.color_code,
+            })
         }
 
         self.write_screenchars_at(x, y, screenchars)
@@ -202,7 +246,7 @@ lazy_static! {
 
 #[macro_export]
 macro_rules! print {
-    ($($arg:tt)*) => ($crate::writer::_print(format_args!($($arg)*)))
+    ($($arg:tt)*) => ($crate::terminal::writer::_print(format_args!($($arg)*)))
 }
 // #[macro_export]
 // macro_rules! print_at {
@@ -268,7 +312,6 @@ pub fn calculate_end(start: &ScreenPos, len: usize) -> ScreenPos {
 
 pub unsafe fn outb(port: u16, data: u8) {
     PortWrite::write_to_port(port, data)
-
 }
 pub unsafe fn outw(port: u16, data: u16) {
     PortWrite::write_to_port(port, data)

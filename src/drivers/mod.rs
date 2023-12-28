@@ -18,14 +18,10 @@ pub mod graphics;
 pub mod id;
 pub mod interrupts;
 pub mod memory;
+pub mod task;
+pub mod terminal;
 pub mod time;
-pub mod vga;
-
-use crate::{
-    serial_print, serial_println,
-    state::{self},
-};
-
+pub mod video;
 
 // pub struct DriverManager {
 //     pub drivers: HashMap<String, Box<dyn Driver>>,

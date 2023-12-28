@@ -1,12 +1,6 @@
-use crate::{
-    boot::hlt_loop,
-    drivers::time,
-    pci::port::Port,
-    prompt::KbInput,
-    serial_println,
-    writer::{inb, WRITER},
-};
+use crate::{boot::hlt_loop, drivers::time, terminal::writer::inb};
 use alloc::{boxed::Box, string::String, vec::Vec};
+use fatfs::debug;
 use pc_keyboard::{layouts::Us104Key, DecodedKey, HandleControl, KeyCode, Keyboard, ScancodeSet1};
 use pic8259::ChainedPics;
 use spin::Mutex;
@@ -26,6 +20,7 @@ pub static PICS: Mutex<ChainedPics> =
 pub enum InterruptIndex {
     Timer = PIC_1_OFFSET,
     Keyboard,
+    SecondInterruptController= PIC_2_OFFSET+4,
 }
 
 impl InterruptIndex {
@@ -57,4 +52,9 @@ pub extern "x86-interrupt" fn keyboard(_stack_frame: InterruptStackFrame) {
         .process_keyevent(scancode);
 
     notify_end_of_interrupt(InterruptIndex::Keyboard)
+}
+
+pub extern "x86-interrupt" fn second_interrupt_controller(_stack_frame: InterruptStackFrame) {
+    unsafe{log::debug!("{:?} | {:?}", _stack_frame, (inb(0x20),inb(0x21),inb(0xa0),inb(0xa1)))};
+    notify_end_of_interrupt(InterruptIndex::SecondInterruptController)
 }

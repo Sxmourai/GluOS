@@ -11,7 +11,7 @@ pub struct MemoryHandler {
     pub frame_allocator: BootInfoFrameAllocator,
 }
 impl MemoryHandler {
-    pub fn new(physical_memory_offset: u64, memory_map: &'static MemoryMap) -> Self {
+    pub fn init_heap_and_frame_allocator(physical_memory_offset: u64, memory_map: &'static MemoryMap) -> Self {
         let physical_memory_offset = VirtAddr::new(physical_memory_offset);
         // trace!("Getting active level 4 table");
         let level_4_table = unsafe { active_level_4_table(physical_memory_offset) };
@@ -23,7 +23,7 @@ impl MemoryHandler {
         let mut frame_allocator = unsafe {
             BootInfoFrameAllocator::init(memory_map) // Initialize the frame allocator
         };
-        crate::allocator::init_heap(&mut mapper, &mut frame_allocator)
+        crate::drivers::memory::allocator::init_heap(&mut mapper, &mut frame_allocator)
         .expect("heap initialization failed"); // Initialize the heap allocator
         trace!("Finished initializing heap, can now begin tracing !");
         Self {

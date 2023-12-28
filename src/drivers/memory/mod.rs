@@ -19,6 +19,7 @@ pub mod apic;
 pub mod frame_allocator;
 pub mod handler;
 pub mod rsdp;
+pub mod allocator;
 
 pub use frame_allocator::BootInfoFrameAllocator;
 
