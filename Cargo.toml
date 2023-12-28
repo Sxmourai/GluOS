@@ -2,14 +2,14 @@
 name = "kernel"
 version = "0.1.0"
 edition = "2021"
-authors = ["Sxmourai", "Grey"]
+authors = ["Sxmourai"]
 autotests = true
 
 [dependencies]
 x86_64 = "0.14.10"
 pc-keyboard = "0.7.0"
 pic8259 = "0.10.1"
-bootloader = { version = "0.9.23", features = ["map_physical_memory"]} #"map_physical_memory"
+bootloader = { version = "0.9.23", features = ["map_physical_memory", "vga_320x200"]} #"map_physical_memory"
 volatile = {version="0.3.0"}
 spin = "0.9.8"
 uart_16550 = "0.2.0"
