@@ -375,7 +375,7 @@ pub enum DriveType {
 }
 
 #[derive(Debug)]
-struct AddressingModes {
+pub struct AddressingModes {
     chs: bool,
     lba28: u32, // total number of 28 bit LBA addressable sectors on the drive. (If non-zero, the drive supports LBA28.)
     lba48: u64,

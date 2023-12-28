@@ -54,9 +54,6 @@ name = "bootloader"
 version = "0.9.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6e02311b16c9819e7c72866d379cdd3026c3b7b25c1edf161f548f8e887e7ff"
-dependencies = [
- "font8x8",
-]
 
 [[package]]
 name = "cc"
@@ -129,12 +126,6 @@ dependencies = [
  "bitflags 2.3.3",
  "log",
 ]
-
-[[package]]
-name = "font8x8"
-version = "0.2.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e63201c624b8c8883921b1a1accc8916c4fa9dbfb15d122b26e4dde945b86bbf"
 
 [[package]]
 name = "futures-core"

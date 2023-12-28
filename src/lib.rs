@@ -27,7 +27,6 @@ pub mod test;
 pub use test::{exit_qemu, QemuExitCode};
 pub mod boot;
 pub use boot::{boot, hlt_loop};
-pub mod cpu;
 pub mod pci;
 pub mod log;
 pub mod video;
