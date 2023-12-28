@@ -13,7 +13,7 @@ use alloc::{
 use log::{debug, error, info, trace};
 use spin::{Mutex, MutexGuard};
 
-use crate::{bit_manipulation::{u16_to_u8, bytes, ptrlist_to_num}, terminal::writer::{outb, inb, inw, indw, outdw}};
+use crate::{bit_manipulation::{u16_to_u8, bytes, ptrlist_to_num}, terminal::writer::{outb, inb, inw, indw, outdw}, serial_println};
 use lazy_static::lazy_static;
 
 use super::DiskError;
@@ -343,7 +343,7 @@ impl DiskManager {
         &self,
         disk_address: impl DiskAddress,
         start_sector: u64,
-        content: Sectors,
+        mut content: Sectors,
     ) -> DResult<()> {
         self.disks[disk_address.as_index()]
             .as_ref()
@@ -526,35 +526,39 @@ impl Disk {
     }
 
     pub fn write48(&self, start_sector: u64, content: Sectors) -> DResult<()> {
-        let sector_count = content.len();
+        let mut sector_count = content.len() / 512;
+        if sector_count==0{sector_count+=1}
         unsafe {
             outb(self.device_select_reg(), self.loc.drive_lba48_addr()); // Select drive
             outb(self.base(), inb(self.base()) | 0x80);
 
-            outb(self.sector_count_reg(), (sector_count >> 8) as u8); // sector_count high
-            outb(self.lbalo_reg(), (start_sector >> 24) as u8); // LBA4
-            outb(self.lbamid_reg(), (start_sector >> 32) as u8); // LBA5
-            outb(self.lbahi_reg(), (start_sector >> 40) as u8); // LBA6
+            outb(self.sector_count_reg(),   TryInto::<u8>::try_into((sector_count >> 8)).unwrap()); // sector_count high
+            outb(self.lbalo_reg(),          TryInto::<u8>::try_into((start_sector >> 24)).unwrap()); // LBA4
+            outb(self.lbamid_reg(),         TryInto::<u8>::try_into((start_sector >> 32)).unwrap()); // LBA5
+            outb(self.lbahi_reg(),          TryInto::<u8>::try_into((start_sector >> 40)).unwrap()); // LBA6
 
             outb(self.base(), inb(self.base()) & !0x80);
 
-            outb(self.sector_count_reg(), sector_count as u8); // sector_count low
-            outb(self.lbalo_reg(), start_sector as u8); // LBA1
-            outb(self.lbamid_reg(), (start_sector >> 8) as u8); // LBA2
-            outb(self.lbahi_reg(), (start_sector >> 16) as u8); // LBA3
+            outb(self.sector_count_reg(),   TryInto::<u8>::try_into(sector_count).unwrap()); // sector_count low
+            outb(self.lbalo_reg(),          TryInto::<u8>::try_into(start_sector).unwrap()); // LBA1
+            outb(self.lbamid_reg(),         TryInto::<u8>::try_into((start_sector >> 8)).unwrap()); // LBA2
+            outb(self.lbahi_reg(),          TryInto::<u8>::try_into((start_sector >> 16)).unwrap()); // LBA3
             outb(self.command_reg(), 0x34); // READ SECTORS EXT
         }
         self.send_write(content)
     }
     fn send_write(&self, content: Sectors) -> DResult<()> {
-        for sector in 0..content.len() / 512 {
+        let mut len = content.len() / 512;
+        if len==0{len+=1}
+        for sector in 0..len {
+            serial_println!("{:?}",(sector,&content));
             self.polling(false, line!())?;
 
             for i in 0..128 {
-                let data = ((content[(sector * 512) + i * 4 + 0] as u32) << 0)
-                    | ((content[(sector * 512) + i * 4 + 1] as u32) << 8)
-                    | ((content[(sector * 512) + i * 4 + 2] as u32) << 16)
-                    | ((content[(sector * 512) + i * 4 + 3] as u32) << 24);
+                let mut data = 0;
+                for j in 0..4 {
+                    data |= ((*content.get((sector * 512) + i * 4 + j).unwrap_or(&0) as u32) << 8*j)
+                }
                 unsafe { outdw(self.data_reg(), data) };
             }
         }
@@ -634,7 +638,7 @@ impl Disk {
         if self.addressing_modes.lba48 != 0 {
             self.write48(start_sector, content)
         } else if self.addressing_modes.lba28 != 0 {
-            todo!("Implement CHS pio mode");
+            todo!("Implement lba28 mode");
             // self.write28(start_sector, content)
         } else if self.addressing_modes.chs == true {
             todo!("Implement CHS pio mode");
