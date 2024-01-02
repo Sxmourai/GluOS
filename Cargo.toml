@@ -34,7 +34,8 @@ cmake = "0.1.31"
 
 [package.metadata.bootimage]
 run-args = [
-    "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04", "-serial", "stdio"
+    "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04", "-serial", "stdio",
+    "--drive", "file=fat-disk.img,format=raw"
 ]
 test-args = [
     "-display", "none"
