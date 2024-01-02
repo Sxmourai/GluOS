@@ -107,7 +107,11 @@ impl Writer {
             }
             if self.console.bottom_buffer.is_empty() {
                 self.write_screenchars_at_no_wrap(0, height - 1, [DEFAULT_CHAR; 80].iter());
-                self.move_cursor(self.pos.0, self.pos.1 - 1)
+                if self.pos.1!=0{
+                    self.move_cursor(self.pos.0, self.pos.1 - 1)
+                } else { //TODO Fix errors here
+                    serial_println!("Bug whilst moving cursor: {:?}", self.pos);
+                }
             } else {
                 self.write_screenchars_at_no_wrap(
                     0,

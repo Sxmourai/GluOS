@@ -161,11 +161,9 @@ fn write_sector(raw_args: I) -> O {
         .parse()
         .map_err(|e| format!("Failed to parse start: {}", e))?;
     let mut bytes = Vec::new();
-    let mut i = 0;
     for word in content.iter() {
         for c in word.chars() {
             bytes.push(c as u8);
-            i += 1;
         }
     }
     let sectors = write_to_disk(DiskLoc(channel, drive), start, bytes)?;
@@ -185,10 +183,7 @@ fn read(raw_args: I) -> O {
                 println!("{}", content.unwrap()); // Can safely unwrap because we know the file exists
             }
             Fat32Entry::Dir(dir) => {
-                if let Some(entries) = get_state()
-                    .fs()
-                    .lock()
-                    .read_dir_at_sector(&dir.path, dir.sector as u64)
+                if let Some(entries) = fs_driver.read_dir_at_sector(&dir.path, dir.sector as u64)
                 {
                     for (path, inner_entry) in entries.iter() {
                         let name = match inner_entry {
@@ -204,14 +199,38 @@ fn read(raw_args: I) -> O {
         println!("Specified path couldn't be found")
     }
     Ok(())
-    // let mut args = raw_args.split(" ");
-    // let file_name = args.next().unwrap();
-    // if let Some(content) = get_state().fs().lock().read_file(&FilePath::new(file_name.to_string())) {
-    //     println!("{}", content);
-    // } else {
-    //     println!("Specified path couldn't be found")
-    // }
-    // Ok(())
+}
+
+fn write(raw_args: I) -> O { // TODO Refactor input/output for PROPER error handling
+    let mut args = raw_args.split(" ");
+    let entry_type = args.next().unwrap();
+    let path = args.next().unwrap();
+    let mut binding = get_state();
+    let mut fs_driver = binding.fs().lock();
+    if let Some(entry) = fs_driver.get_entry(&path.to_filepath()) {
+        println!("File already exists !");
+        return Ok(())
+    }
+    let content = args.collect::<String>();
+    match entry_type {
+        "dir" => {
+            if !content.is_empty() {
+                println!("Useless to specify content, created a empty dir");
+            }
+            fs_driver.write_dir(path.to_filepath()).unwrap()
+        },
+        "file" => {
+            if content.is_empty() {
+                println!("Created a empty file");
+                return Ok(())
+            }
+            fs_driver.write_file(path.to_filepath(), content).unwrap()
+        },
+        _ => {
+            println!("Invalid entry type ! dir/file")
+        }
+    };
+    Ok(())
 }
 
 pub fn dump_disk(args: I) -> O {
@@ -267,6 +286,7 @@ lazy_static! {
                 Ok(())
             }),
             f( "read",  "Reads a entry from fat disk (If dir it's like 'ls' and if file is like 'cat'",  read),
+            f( "write", "Writes a entry to fat disk (If dir just path and if file path+content",  write),
             f( "dump_disk", "Reads all disk into serial", dump_disk),
         ];
         for (prog, fun, desc) in CONSTANT_COMMANDS {

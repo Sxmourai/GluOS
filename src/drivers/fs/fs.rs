@@ -44,7 +44,7 @@ pub struct BiosParameterBlock {
 }
 
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
 pub enum FileSystemError {
     FileNotFound
 }
@@ -77,6 +77,10 @@ impl FilePath {
         let root = splitted.next().unwrap();
         if root.is_empty() {splitted.next().unwrap()}
         else    {root}
+    }
+    pub fn parent(&self) -> String {
+        let mut splitted:Vec<&str> = self.splitted().collect();
+        splitted[0..splitted.len()-2].join("/")
     }
     pub fn path(&self) -> &String {
         &self.raw_path
@@ -194,6 +198,7 @@ impl FatInfo {
     pub fn get_total_sectors(&self) -> u32 {
         if (self.0.total_sectors_16 == 0) {self.0.total_sectors_32} else {self.0.total_sectors_16.into()}
     }
+    // Gets fat size in sectors
     pub fn get_fat_size(&self) -> u32 {
         if (self.0.sectors_per_fat_16==0) {self.0.sectors_per_fat_32} else {self.0.sectors_per_fat_16 as u32}
     }
@@ -203,4 +208,18 @@ impl FatInfo {
     pub fn first_fat_sector(&self) -> u16 {
         self.0.reserved_sectors
     }
+}
+
+
+pub struct FatTable {
+    pub size: u32,
+    pub first_sector: u16,
+    pub last_sector:u16,
+    pub last_offset:u16, // u16 even though in range 0..512 
+}
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Copy)]
+pub enum ClusterEnum {
+    EndOfChain,
+    BadCluster,
+    Cluster(u32)
 }

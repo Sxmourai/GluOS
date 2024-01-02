@@ -551,7 +551,6 @@ impl Disk {
         let mut len = content.len() / 512;
         if len==0{len+=1}
         for sector in 0..len {
-            serial_println!("{:?}",(sector,&content));
             self.polling(false, line!())?;
 
             for i in 0..128 {
