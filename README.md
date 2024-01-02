@@ -3,7 +3,7 @@
 This is a minimal, modular and lightweight kernel in rust
 
 ## Features
-- Full rust (with bootloader in assembly+rust, go check [[https://github.com/rust-osdev/bootloader|rust-bootloader]]), with at least unsafe blocks as possible
+- Full rust (with bootloader in assembly+rust, go check https://github.com/rust-osdev/bootloader), with at least unsafe blocks as possible
 - Keyboard input (no usb support, ps emulation)
 - CPU exceptions and interrupts
 - Paging, heap allocation and multitasking
