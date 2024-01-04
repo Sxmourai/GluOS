@@ -10,25 +10,21 @@ x86_64 = "0.14.10"
 pc-keyboard = "0.7.0"
 pic8259 = "0.10.1"
 bootloader = { version = "0.9.23", features = ["map_physical_memory", ]} #"map_physical_memory"
+linked_list_allocator = "0.10.5"
 spin = "0.9.8"
 uart_16550 = "0.3.0"
-linked_list_allocator = "0.9.0"
 hashbrown = "0.14.0"
-bit_field = "0.10.2"
 pci-ids = "0.2.5"
 lazy_static = { version = "1.4.0", features=["spin_no_std"]}
-crossbeam-queue = { version = "0.2.1", default-features = false, features = ["alloc"]}
-conquer-once = { version = "0.2.0", default-features = false }
+crossbeam-queue = { version = "0.3.10", default-features = false, features = ["alloc"]}
+conquer-once = { version = "0.4.0", default-features = false }
 log = {version="0.4.20", default-features = false}
 futures-util = { version = "0.3.4", default-features = false, features = ["alloc"]}
-
-[build-dependencies]
-cmake = "0.1.31" 
 
 [package.metadata.bootimage]
 run-args = [
     "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04", "-serial", "stdio",
-    "--drive", "file=fat-disk.img,format=raw"
+    "-drive", "file=fat-disk.img,format=raw"
 ]
 test-args = [
     "-display", "none"
@@ -39,7 +35,6 @@ test-timeout = 300
 [features]
 default = []
 print_trace = []
-
 
 
 # [profile.dev]

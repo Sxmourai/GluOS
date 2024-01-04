@@ -32,7 +32,6 @@ extern crate alloc; // Lib which stores some useful structs on the heap / smart 
 extern crate bootloader; // The bootloader crate, usefull for boot_info, paging and other stuff
 extern crate hashbrown;
 extern crate lazy_static; // Useful to declare some static without using only 'const fn ...'
-// extern crate linked_list_allocator;
 extern crate pc_keyboard; // Transforms keyboard scancode (i.e. 158) to letters, provides some keyboard like US, French...
 extern crate pic8259; //TODO: Switch from PIC (Programmable interupt controller) to APIC (Advanced PIC)
 extern crate spin; // Mutex and lock
