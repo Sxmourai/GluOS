@@ -10,6 +10,7 @@ use alloc::{
 use hashbrown::HashMap;
 use lazy_static::lazy_static;
 use spin::Mutex;
+use x86_64::structures::port::{PortRead, PortWrite};
 
 use crate::{
     drivers::{
@@ -62,7 +63,7 @@ fn outb(args: I) -> O {
         .parse()
         .map_err(|e| format!("Failed to parse data: {}", e))?;
 
-    unsafe { crate::terminal::writer::outb(port, data) };
+    unsafe { u8::write_to_port(port, data) };
     Ok(())
 }
 // BOTH ARE UNSAFE BUT ITS FOR EASIER CODE
@@ -73,7 +74,7 @@ fn inb(args: I) -> O {
         .parse()
         .map_err(|e| format!("Failed to parse port: {}", e))?;
 
-    println!("{}", unsafe { crate::terminal::writer::inb(port) });
+    println!("{}", unsafe { u8::read_from_port(port) });
     Ok(())
 }
 fn read_sector(raw_args: I) -> O {

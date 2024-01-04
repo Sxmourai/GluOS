@@ -59,7 +59,7 @@ unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut
     let virt = physical_memory_offset + phys.as_u64();
     let page_table_ptr: *mut PageTable = virt.as_mut_ptr();
 
-    &mut *page_table_ptr // unsafe
+    unsafe {&mut *page_table_ptr}
 }
 
 /// Initialize a new OffsetPageTable.
@@ -104,9 +104,5 @@ pub fn read_phys_memory_and_map(mem_handler: &mut MemoryHandler, location: u64, 
             .start_address()
             .as_u64();
     let start_addr = phys_offset + end_page_start_addr;
-    unsafe { read_memory(start_addr as *const u8, size) }
-}
-// Create a slice from the memory location with the given size
-pub unsafe fn read_memory(location: *const u8, size: usize) -> &'static [u8] {
-    core::slice::from_raw_parts(location, size)
+    unsafe { core::slice::from_raw_parts(start_addr as *const u8, size) }
 }

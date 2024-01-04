@@ -13,8 +13,10 @@ use alloc::{
 use log::{debug, error, info, trace};
 use spin::{Mutex, MutexGuard};
 
-use crate::{bit_manipulation::{u16_to_u8, bytes, ptrlist_to_num}, terminal::writer::{outb, inb, inw, indw, outdw}, serial_println};
+use crate::{bit_manipulation::{u16_to_u8, bytes, ptrlist_to_num}, serial_println};
 use lazy_static::lazy_static;
+
+use crate::x86_64::instructions::port::{PortWrite, PortRead};
 
 use super::DiskError;
 
@@ -59,8 +61,8 @@ fn detect(addr: impl DiskAddress) -> Option<Disk> {
         &channel,
         base
     );
-    // unsafe { outb(base+6, 0x80 | 0x40 | 0x20) }; // Send flags
-    unsafe { outb(base + 6, drive_addr) }; // Select drive of channel
+    // unsafe { u8::write_to_port(base+6, 0x80 | 0x40 | 0x20) }; // Send flags
+    unsafe { u8::write_to_port(base + 6, drive_addr) }; // Select drive of channel
 
     let drive_type = get_selected_drive_type(channel);
     let identify_command = if drive_type == DriveType::PATAPI {
@@ -69,25 +71,25 @@ fn detect(addr: impl DiskAddress) -> Option<Disk> {
         0xEC
     };
 
-    unsafe { outb(base + 2, 0) }; //Clear sector count
-    unsafe { outb(base + 3, 0) }; //Clear lba's
-    unsafe { outb(base + 4, 0) };
-    unsafe { outb(base + 5, 0) };
+    unsafe { u8::write_to_port(base + 2, 0) }; //Clear sector count
+    unsafe { u8::write_to_port(base + 3, 0) }; //Clear lba's
+    unsafe { u8::write_to_port(base + 4, 0) };
+    unsafe { u8::write_to_port(base + 5, 0) };
     unsafe {
-        outb(base + 7, 0xE7);
+        u8::write_to_port(base + 7, 0xE7);
         bsy(base);
     } //Clear cache
-    unsafe { outb(base + 7, identify_command) }; // Send IDENTIFY to selected drive
+    unsafe { u8::write_to_port(base + 7, identify_command) }; // Send IDENTIFY to selected drive
 
     trace!("Reading drive status");
-    if unsafe { inb(base + 7) } == 0 {
+    if unsafe { u8::read_from_port(base + 7) } == 0 {
         trace!("Drive does not exist !");
         return None;
     }
     unsafe {
         bsy(base);
     }
-    if unsafe { inb(base + 4) } != 0 || unsafe { inb(base + 5) } != 0 {
+    if unsafe { u8::read_from_port(base + 4) } != 0 || unsafe { u8::read_from_port(base + 5) } != 0 {
         trace!("ATAPI drive detected !");
     } else if unsafe { check_drq_or_err(base) }.is_err() {
         error!(
@@ -137,7 +139,7 @@ fn read_identify(command_port_addr: u16) -> [u16; SSECTOR_SIZEWORD] {
     trace!("Reading identify data");
     let mut data = [0u16; 256];
     for i in (0..data.len()) {
-        data[i] = unsafe { inw(command_port_addr) };
+        data[i] = unsafe { u16::read_from_port(command_port_addr) };
     }
     data
 }
@@ -146,11 +148,11 @@ fn read_identify(command_port_addr: u16) -> [u16; SSECTOR_SIZEWORD] {
 fn get_selected_drive_type(channel: Channel) -> DriveType {
     //TODO Do proper waiting etc, working in qemu tho
     let base = channel as u16;
-    unsafe { outb(base + 7, 0x90) }; // Reset drive
-    let sector_count = unsafe { inb(base + 2) };
-    let lba_low = unsafe { inb(base + 3) };
-    let lba_mid = unsafe { inb(base + 4) };
-    let lba_high = unsafe { inb(base + 5) };
+    unsafe { u8::write_to_port(base + 7, 0x90) }; // Reset drive
+    let sector_count = unsafe { u8::read_from_port(base + 2) };
+    let lba_low = unsafe { u8::read_from_port(base + 3) };
+    let lba_mid = unsafe { u8::read_from_port(base + 4) };
+    let lba_high = unsafe { u8::read_from_port(base + 5) };
 
     // let signature = (sector_count, lba_low, lba_mid, lba_high);
     let end_signature = (lba_mid, lba_high);
@@ -283,8 +285,8 @@ pub struct DiskManager {
 }
 impl DiskManager {
     pub fn new() -> Self {
-        unsafe { outb(0x3f6, (1 << 1) | (1 << 2)) }
-        unsafe { outb(0x376, (1 << 1) | (1 << 2)) }
+        unsafe { u8::write_to_port(0x3f6, (1 << 1) | (1 << 2)) }
+        unsafe { u8::write_to_port(0x376, (1 << 1) | (1 << 2)) }
         Self {
             disks: [detect(0u8), detect(1u8), detect(2u8), detect(3u8)],
             selected_disk: 0,
@@ -304,10 +306,10 @@ impl DiskManager {
 
         unsafe { bsy(self.get_selected_disk().base()) };
         // unsafe { check_drq_or_err(self.get_selected_disk().base()) };
-        unsafe { outb(base + 6, drive) }; // Select drive of channel
+        unsafe { u8::write_to_port(base + 6, drive) }; // Select drive of channel
         self.selected_disk = disk_address.as_index();
         for i in 0..14 {
-            unsafe { inb(self.get_selected_disk().command_reg()) };
+            unsafe { u8::read_from_port(self.get_selected_disk().command_reg()) };
         }
         unsafe { bsy(self.get_selected_disk().base()) };
         // if unsafe { check_drq_or_err(self.get_selected_disk().base()) }.is_err() {
@@ -455,57 +457,57 @@ impl Disk {
         let drive_addr = self.loc.drive_lba28_addr() as u32;
         let base = self.loc.channel_addr();
         unsafe {
-            outb(
+            u8::write_to_port(
                 base + 6,
                 (drive_addr | ((self.addressing_modes.lba28 >> 24) & 0x0F))
                     .try_into()
                     .unwrap(),
             );
-            outb(base + 1, 0x00);
-            outb(base + 2, sector_count);
-            outb(
+            u8::write_to_port(base + 1, 0x00);
+            u8::write_to_port(base + 2, sector_count);
+            u8::write_to_port(
                 base + 3,
                 (self.addressing_modes.lba28 & 0xFF).try_into().unwrap(),
             );
-            outb(
+            u8::write_to_port(
                 base + 4,
                 ((self.addressing_modes.lba28 >> 8) & 0xFF)
                     .try_into()
                     .unwrap(),
             );
-            outb(
+            u8::write_to_port(
                 base + 5,
                 ((self.addressing_modes.lba28 >> 16) & 0xFF)
                     .try_into()
                     .unwrap(),
             );
-            outb(base + 7, 0x20);
+            u8::write_to_port(base + 7, 0x20);
         }
         self.retrieve_read(sector_count.into())
     }
     fn flush_cache(&self) {
-        unsafe { outb(self.command_reg(), 0xE7) };
+        unsafe { u8::write_to_port(self.command_reg(), 0xE7) };
         unsafe { check_drq_or_err(self.base()) };
     }
     //48Bit Lba PIO mode
     // 0 for sector_count is equals to u16::MAX
     pub fn read48(&self, lba: u64, sector_count: u16) -> DResult<Sectors> {
         unsafe {
-            outb(self.device_select_reg(), self.loc.drive_lba48_addr()); // Select drive
-            outb(self.base(), inb(self.base()) | 0x80);
+            u8::write_to_port(self.device_select_reg(), self.loc.drive_lba48_addr()); // Select drive
+            u8::write_to_port(self.base(), u8::read_from_port(self.base()) | 0x80);
 
-            outb(self.sector_count_reg(), (sector_count >> 8) as u8); // sector_count high
-            outb(self.lbalo_reg(), (lba >> 24) as u8); // LBA4
-            outb(self.lbamid_reg(), (lba >> 32) as u8); // LBA5
-            outb(self.lbahi_reg(), (lba >> 40) as u8); // LBA6
+            u8::write_to_port(self.sector_count_reg(), (sector_count >> 8) as u8); // sector_count high
+            u8::write_to_port(self.lbalo_reg(), (lba >> 24) as u8); // LBA4
+            u8::write_to_port(self.lbamid_reg(), (lba >> 32) as u8); // LBA5
+            u8::write_to_port(self.lbahi_reg(), (lba >> 40) as u8); // LBA6
 
-            outb(self.base(), inb(self.base()) & !0x80);
+            u8::write_to_port(self.base(), u8::read_from_port(self.base()) & !0x80);
 
-            outb(self.sector_count_reg(), sector_count as u8); // sector_count low
-            outb(self.lbalo_reg(), lba as u8); // LBA1
-            outb(self.lbamid_reg(), (lba >> 8) as u8); // LBA2
-            outb(self.lbahi_reg(), (lba >> 16) as u8); // LBA3
-            outb(self.command_reg(), 0x24); // READ SECTORS EXT
+            u8::write_to_port(self.sector_count_reg(), sector_count as u8); // sector_count low
+            u8::write_to_port(self.lbalo_reg(), lba as u8); // LBA1
+            u8::write_to_port(self.lbamid_reg(), (lba >> 8) as u8); // LBA2
+            u8::write_to_port(self.lbahi_reg(), (lba >> 16) as u8); // LBA3
+            u8::write_to_port(self.command_reg(), 0x24); // READ SECTORS EXT
         }
         self.retrieve_read(sector_count)
     }
@@ -515,7 +517,7 @@ impl Disk {
         for sector in 0..sector_count {
             self.polling(true, line!())?;
             for i in 0..SSECTOR_SIZEWORD / 2 {
-                let data = unsafe { indw(self.data_reg()) };
+                let data = unsafe { u32::read_from_port(self.data_reg()) };
                 buffer.push((data >> 0) as u8);
                 buffer.push((data >> 8) as u8);
                 buffer.push((data >> 16) as u8);
@@ -529,21 +531,21 @@ impl Disk {
         let mut sector_count = content.len() / 512;
         if sector_count==0{sector_count+=1}
         unsafe {
-            outb(self.device_select_reg(), self.loc.drive_lba48_addr()); // Select drive
-            outb(self.base(), inb(self.base()) | 0x80);
+            u8::write_to_port(self.device_select_reg(), self.loc.drive_lba48_addr()); // Select drive
+            u8::write_to_port(self.base(), u8::read_from_port(self.base()) | 0x80);
 
-            outb(self.sector_count_reg(),   TryInto::<u8>::try_into((sector_count >> 8)).unwrap()); // sector_count high
-            outb(self.lbalo_reg(),          TryInto::<u8>::try_into((start_sector >> 24)).unwrap()); // LBA4
-            outb(self.lbamid_reg(),         TryInto::<u8>::try_into((start_sector >> 32)).unwrap()); // LBA5
-            outb(self.lbahi_reg(),          TryInto::<u8>::try_into((start_sector >> 40)).unwrap()); // LBA6
+            u8::write_to_port(self.sector_count_reg(),   TryInto::<u8>::try_into((sector_count >> 8)).unwrap()); // sector_count high
+            u8::write_to_port(self.lbalo_reg(),          TryInto::<u8>::try_into((start_sector >> 24)).unwrap()); // LBA4
+            u8::write_to_port(self.lbamid_reg(),         TryInto::<u8>::try_into((start_sector >> 32)).unwrap()); // LBA5
+            u8::write_to_port(self.lbahi_reg(),          TryInto::<u8>::try_into((start_sector >> 40)).unwrap()); // LBA6
 
-            outb(self.base(), inb(self.base()) & !0x80);
+            u8::write_to_port(self.base(), u8::read_from_port(self.base()) & !0x80);
 
-            outb(self.sector_count_reg(),   TryInto::<u8>::try_into(sector_count).unwrap()); // sector_count low
-            outb(self.lbalo_reg(),          TryInto::<u8>::try_into(start_sector).unwrap()); // LBA1
-            outb(self.lbamid_reg(),         TryInto::<u8>::try_into((start_sector >> 8)).unwrap()); // LBA2
-            outb(self.lbahi_reg(),          TryInto::<u8>::try_into((start_sector >> 16)).unwrap()); // LBA3
-            outb(self.command_reg(), 0x34); // READ SECTORS EXT
+            u8::write_to_port(self.sector_count_reg(),   TryInto::<u8>::try_into(sector_count).unwrap()); // sector_count low
+            u8::write_to_port(self.lbalo_reg(),          TryInto::<u8>::try_into(start_sector).unwrap()); // LBA1
+            u8::write_to_port(self.lbamid_reg(),         TryInto::<u8>::try_into((start_sector >> 8)).unwrap()); // LBA2
+            u8::write_to_port(self.lbahi_reg(),          TryInto::<u8>::try_into((start_sector >> 16)).unwrap()); // LBA3
+            u8::write_to_port(self.command_reg(), 0x34); // READ SECTORS EXT
         }
         self.send_write(content)
     }
@@ -558,11 +560,11 @@ impl Disk {
                 for j in 0..4 {
                     data |= ((*content.get((sector * 512) + i * 4 + j).unwrap_or(&0) as u32) << 8*j)
                 }
-                unsafe { outdw(self.data_reg(), data) };
+                unsafe { u32::write_to_port(self.data_reg(), data) };
             }
         }
         // Cache flush
-        unsafe { outb(self.command_reg(), 0xEA) }
+        unsafe { u8::write_to_port(self.command_reg(), 0xEA) }
         self.polling(false, line!())?;
         Ok(())
     }
@@ -579,7 +581,7 @@ impl Disk {
         */
         for _ in 0..4 {
             // Doing this 4 times creates a 400ns delay
-            unsafe { inb(self.base()) };
+            unsafe { u8::read_from_port(self.base()) };
         }
         for i in 0..100_000 {
             let status = self.check_status()?;
@@ -603,10 +605,10 @@ impl Disk {
         Ok(())
     }
     fn check_status(&self) -> Result<u8, DiskError> {
-        let status = unsafe { inb(self.command_reg()) };
+        let status = unsafe { u8::read_from_port(self.command_reg()) };
 
         if status & 0x01 != 0 {
-            log::error!("IDE error: {:#x}", unsafe { inb(self.error_reg()) });
+            log::error!("IDE error: {:#x}", unsafe { u8::read_from_port(self.error_reg()) });
             return Err(DiskError::DRQRead);
         }
 
@@ -684,7 +686,7 @@ impl Display for Disk {
 
 //         println!("Primary Port: 0x{:X}", primary_port);
 
-//         unsafe { outb(primary_port, 0xEC) };
+//         unsafe { u8::write_to_port(primary_port, 0xEC) };
 
 //         println!("Secondary Port: 0x{:X}", secondary_port);
 
@@ -705,9 +707,9 @@ impl Display for Disk {
 //                     serial_println!("Memory lib: {:?}", (p,q));
 //                 } else {
 //                     // I/O port address
-//                     // unsafe { outb((*bar).try_into().unwrap(), u8::MAX) };
+//                     // unsafe { u8::write_to_port((*bar).try_into().unwrap(), u8::MAX) };
 //                     // hlt();
-//                     let bar_size = unsafe { inb((*bar).try_into().unwrap()) }; // Send all ones
+//                     let bar_size = unsafe { u8::read_from_port((*bar).try_into().unwrap()) }; // Send all ones
 //                     let io_port_address = bar & !0x1; // Mask out the least significant bit
 //                     // Read the size of the I/O port region from the device-specific register
 //                     // For example, if it's a 16-bit BAR, the size will be 2 bytes (1 << 1).
@@ -725,10 +727,10 @@ impl Display for Disk {
 pub fn initialize_sata_controller() {
     unsafe {
         // Wait for the controller to be ready
-        while (inb(0x1F7) & 0xC0) != 0x40 {}
+        while (u8::read_from_port(0x1F7) & 0xC0) != 0x40 {}
 
         // Select the master drive
-        outb(0x1F6, 0xA0);
+        u8::write_to_port(0x1F6, 0xA0);
         // Delay to wait for the controller to switch to the master drive
         // You may need to adjust the delay based on your hardware
         for _ in 0..1000000 {
@@ -736,11 +738,11 @@ pub fn initialize_sata_controller() {
         }
 
         // Send ATA Identify command (0xEC) to the controller
-        outb(0x1F7, 0xEC);
+        u8::write_to_port(0x1F7, 0xEC);
 
         return;
         // Wait for the controller to respond
-        while (inb(0x1F7) & 0x80) == 0x80 {}
+        while (u8::read_from_port(0x1F7) & 0x80) == 0x80 {}
 
         // Read IDENTIFY data from the data ports (0x1F0 - 0x1F7)
         let mut identify_data = [0u16; 256];
@@ -757,18 +759,18 @@ pub fn initialize_sata_controller() {
 /// wait for BSY flag to be unset
 unsafe fn bsy(base: u16) {
     trace!("Waiting BSY flag to unset at base: {:X}", base);
-    while inb(base + 7) & 0x80 != 0x00 {}
+    while unsafe{u8::read_from_port(base + 7)} & 0x80 != 0x00 {}
     // 0x80 = 0b10000000
 }
 
 /// wait for DRQ to be ready or ERR to set
 unsafe fn check_drq_or_err(base: u16) -> Result<(), DiskError> {
     trace!("Waiting DRQ flag to set at base: {:X}", base);
-    let mut status = inb(base + 7);
+    let mut status = unsafe{u8::read_from_port(base + 7)};
     let mut i = 0;
     loop {
         if status & 0x01 != 0x00 {
-            error!("Error reading DRQ from drive: {}", bytes(inb(base + 1)));
+            error!("Error reading DRQ from drive: {}", bytes(unsafe{u8::read_from_port(base + 1)}));
             return Err(DiskError::DRQRead);
         } //TODO Make better error handling... Or make error handling in top level function
         if status & 0x08 != 0x00 {
@@ -778,7 +780,7 @@ unsafe fn check_drq_or_err(base: u16) -> Result<(), DiskError> {
             error!("Error reading DRQ from drive: TIMEOUT");
             return Err(DiskError::TimeOut);
         }
-        status = inb(base + 7);
+        status = unsafe{u8::read_from_port(base + 7)};
         i += 1;
     }
     Ok(())
@@ -786,46 +788,46 @@ unsafe fn check_drq_or_err(base: u16) -> Result<(), DiskError> {
 
 // pub unsafe fn detect_ata() {
 //     /* detecting hard disc */
-//     outb(0x1F3, 0x88);
-//     let mut drive=inb(0x1F3);
+//     u8::write_to_port(0x1F3, 0x88);
+//     let mut drive=u8::read_from_port(0x1F3);
 //     let mut harddisc_primary = 0;
 //     let mut harddisc_secundary = 0;
 //     let mut harddisc = 0;
 
 //     if(drive==0x88) {
 //         //detecting primary
-//         outb(0x1F6, 0xA0);
+//         u8::write_to_port(0x1F6, 0xA0);
 //         //flush
-//         outb(0x1F2, 0);
-//         outb(0x1F3, 0);
-//         outb(0x1F4, 0);
-//         outb(0x1F5, 0);
+//         u8::write_to_port(0x1F2, 0);
+//         u8::write_to_port(0x1F3, 0);
+//         u8::write_to_port(0x1F4, 0);
+//         u8::write_to_port(0x1F5, 0);
 //         //identify command
-//         outb(0x1F7, 0xEC);
+//         u8::write_to_port(0x1F7, 0xEC);
 //         //sleep();
-//         drive=inb(0x1F7);   // read the status port
+//         drive=u8::read_from_port(0x1F7);   // read the status port
 //         if (drive > 0) {
 //             harddisc_primary=DETECTED;
 //             tp("primary");
 //         }
 
 //         //detecting secundary
-//         outb(0x1F6, 0xB0);
+//         u8::write_to_port(0x1F6, 0xB0);
 //         //flush
-//         outb(0x1F2, 0);
-//         outb(0x1F3, 0);
-//         outb(0x1F4, 0);
-//         outb(0x1F5, 0);
+//         u8::write_to_port(0x1F2, 0);
+//         u8::write_to_port(0x1F3, 0);
+//         u8::write_to_port(0x1F4, 0);
+//         u8::write_to_port(0x1F5, 0);
 //         //identify command
-//         outb(0x1F7, 0xEC);
+//         u8::write_to_port(0x1F7, 0xEC);
 //         //sleep();
-//         drive=inb(0x1F7);   // read the status port
+//         drive=u8::read_from_port(0x1F7);   // read the status port
 //         if (drive > 0) {   // see if the busy bit is set
 //             harddisc_secundary=DETECTED;
 //             tp("secundary");
 //         }
 
-//         outb(0x3F6, 0x02);
+//         u8::write_to_port(0x3F6, 0x02);
 //         harddisc=DETECTED;
 //     }
 // }
@@ -1380,13 +1382,13 @@ unsafe fn check_drq_or_err(base: u16) -> Result<(), DiskError> {
 //     if (reg > 0x07 && reg < 0x0C) {
 //        ide_write(channel, ATA_REG_CONTROL, 0x80 | CHANNELS[channel].n_ien);}
 //     if (reg < 0x08) {
-//        result = unsafe { inb(CHANNELS[channel].base + reg) };}
+//        result = unsafe { u8::read_from_port(CHANNELS[channel].base + reg) };}
 //     else if (reg < 0x0C) {
-//        result = unsafe { inb(CHANNELS[channel].base  + reg - 0x06) };}
+//        result = unsafe { u8::read_from_port(CHANNELS[channel].base  + reg - 0x06) };}
 //     else if (reg < 0x0E) {
-//        result = unsafe { inb(CHANNELS[channel].ctrl  + reg - 0x0A) };}
+//        result = unsafe { u8::read_from_port(CHANNELS[channel].ctrl  + reg - 0x0A) };}
 //     else if (reg < 0x16) {
-//        result = unsafe { inb(CHANNELS[channel].bmide + reg - 0x0E) };}
+//        result = unsafe { u8::read_from_port(CHANNELS[channel].bmide + reg - 0x0E) };}
 //     else {panic!("Couldn't find reg ! {}", reg)}
 //     if (reg > 0x07 && reg < 0x0C) {
 //        ide_write(channel, ATA_REG_CONTROL, CHANNELS[channel].n_ien);}
@@ -1397,13 +1399,13 @@ unsafe fn check_drq_or_err(base: u16) -> Result<(), DiskError> {
 //     if (reg > 0x07 && reg < 0x0C) {
 //        ide_write(channel, ATA_REG_CONTROL, 0x80 | CHANNELS[channel].n_ien);}
 //     if (reg < 0x08) {
-//        unsafe { outb(CHANNELS[channel].base  + reg - 0x00, data) };}
+//        unsafe { u8::write_to_port(CHANNELS[channel].base  + reg - 0x00, data) };}
 //     else if (reg < 0x0C) {
-//        unsafe { outb(CHANNELS[channel].base  + reg - 0x06, data) };}
+//        unsafe { u8::write_to_port(CHANNELS[channel].base  + reg - 0x06, data) };}
 //     else if (reg < 0x0E) {
-//        unsafe { outb(CHANNELS[channel].ctrl  + reg - 0x0A, data) };}
+//        unsafe { u8::write_to_port(CHANNELS[channel].ctrl  + reg - 0x0A, data) };}
 //     else if (reg < 0x16) {
-//        unsafe { outb(CHANNELS[channel].bmide + reg - 0x0E, data) };}
+//        unsafe { u8::write_to_port(CHANNELS[channel].bmide + reg - 0x0E, data) };}
 //     if (reg > 0x07 && reg < 0x0C) {
 //        ide_write(channel, ATA_REG_CONTROL, CHANNELS[channel].n_ien);}
 // }
@@ -1611,16 +1613,16 @@ unsafe fn check_drq_or_err(base: u16) -> Result<(), DiskError> {
 
 // // unsafe fn insl(port:u16, mut buffer:c_uint, quads: c_uint) {
 // //    for i in 0..quads {
-// //       buffer = inb(port) as c_uint;
+// //       buffer = u8::read_from_port(port) as c_uint;
 // //    }
 // // }
 
-// unsafe fn outb(port:u16, data:c_uchar) {
+// unsafe fn u8::write_to_port(port:u16, data:c_uchar) {
 //    unsafe {
 //        asm!("out dx, al", in("dx") port, in("al") data, options(nomem, nostack, preserves_flags));
 //    }
 // }
-// unsafe fn inb(port:u16) -> c_uchar {
+// unsafe fn u8::read_from_port(port:u16) -> c_uchar {
 //    let value: u8;
 //    unsafe {
 //        asm!("in al, dx", out("al") value, in("dx") port, options(nomem, nostack, preserves_flags));

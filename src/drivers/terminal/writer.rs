@@ -75,10 +75,10 @@ impl Writer {
             );
         }
         unsafe {
-            outb(0x3D4, 0x0F);
-            outw(0x3D5, (pos).try_into().unwrap());
-            outb(0x3D4, 0x0E);
-            outw(0x3D5, (pos >> 8).try_into().unwrap());
+            PortWrite::write_to_port(0x3D4, 0x0Fu8);
+            PortWrite::write_to_port(0x3D5, pos as u16);
+            PortWrite::write_to_port(0x3D4, 0x0Eu8);
+            PortWrite::write_to_port(0x3D5, (pos >> 8) as u16);
         }
     }
     pub fn write_char_at(&mut self, pos: ScreenPos, chr: ScreenChar) {
@@ -311,24 +311,4 @@ pub fn calculate_end(start: &ScreenPos, len: usize) -> ScreenPos {
         start.0 + (len % SBUFFER_WIDTH) as u8,
         start.1 + ((len + start.0 as usize) / SBUFFER_WIDTH) as u8,
     )
-}
-
-pub unsafe fn outb(port: u16, data: u8) {
-    PortWrite::write_to_port(port, data)
-}
-pub unsafe fn outw(port: u16, data: u16) {
-    PortWrite::write_to_port(port, data)
-}
-pub unsafe fn outdw(port: u16, data: u32) {
-    PortWrite::write_to_port(port, data)
-}
-// Alias for read_from_port
-pub unsafe fn inb(port: u16) -> u8 {
-    PortRead::read_from_port(port)
-}
-pub unsafe fn inw(port: u16) -> u16 {
-    PortRead::read_from_port(port)
-}
-pub unsafe fn indw(port: u16) -> u32 {
-    PortRead::read_from_port(port)
 }

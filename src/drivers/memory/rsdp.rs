@@ -18,7 +18,7 @@ static ACPI_HEAD_SIZE: usize = core::mem::size_of::<ACPISDTHeader>();
 
 use crate::{println, serial_print, serial_println, bit_manipulation::ptrlist_to_num};
 
-use super::{handler::MemoryHandler, read_memory, read_phys_memory_and_map};
+use super::{handler::MemoryHandler, read_phys_memory_and_map};
 /// This (usually!) contains the base address of the EBDA (Extended Bios Data Area), shifted right by 4
 const EBDA_START_SEGMENT_PTR: usize = 0x40e; // Base address in in 2 bytes
 /// The earliest (lowest) memory address an EBDA (Extended Bios Data Area) can start
@@ -53,7 +53,7 @@ pub fn find_string(bytes: &[u8], search_string: &[u8]) -> Option<usize> {
 }
 
 fn search_rsdp_in_page(page: u64, physical_memory_offset: u64) -> Option<&'static RSDPDescriptor> {
-    let bytes_read = unsafe { read_memory((page + physical_memory_offset) as *const u8, 4096) };
+    let bytes_read = unsafe { core::slice::from_raw_parts((page + physical_memory_offset) as *const u8, 4096) };
     if let Some(offset) = find_string(&bytes_read, RSDP_SIGNATURE) {
         let sl: &[u8] = &bytes_read[offset..offset + core::mem::size_of::<RSDPDescriptor>()];
         // Check that the bytes_in_memory size matches the size of RSDPDescriptor
@@ -182,7 +182,7 @@ struct MADT {
 impl MADT {
     pub unsafe fn new(bytes: &[u8]) -> Self {
         Self {
-            inner: &*(bytes.as_ptr() as *const RMADT),
+            inner: unsafe {&*(bytes.as_ptr() as *const RMADT)},
             fields: Vec::new(),
             num_core: Vec::new(),
         }
@@ -482,6 +482,6 @@ fn read_sdt(
 ) -> (&'static ACPISDTHeader, &'static [u8]) {
     let bytes = unsafe { read_phys_memory_and_map(mem_handler, ptr, ACPI_HEAD_SIZE, end_page) };
     let entry: &ACPISDTHeader = unsafe { &*(bytes.as_ptr() as *const _) };
-    let bytes = unsafe { read_memory(bytes.as_ptr(), entry.length as usize) };
+    let bytes = unsafe { core::slice::from_raw_parts(bytes.as_ptr(), entry.length as usize) };
     (entry, bytes)
 }

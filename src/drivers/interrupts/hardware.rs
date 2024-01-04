@@ -1,12 +1,12 @@
-use crate::{boot::hlt_loop, drivers::time, terminal::writer::inb};
+use crate::{boot::hlt_loop, drivers::time};
 use alloc::{boxed::Box, string::String, vec::Vec};
 use pc_keyboard::{layouts::Us104Key, DecodedKey, HandleControl, KeyCode, Keyboard, ScancodeSet1};
 use pic8259::ChainedPics;
 use spin::Mutex;
-use x86_64::structures::{
+use x86_64::{structures::{
     idt::{InterruptStackFrame, PageFaultErrorCode},
     port::PortRead,
-};
+}, instructions::port::PortReadOnly};
 
 pub const PIC_1_OFFSET: u8 = 32;
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
@@ -43,9 +43,9 @@ pub extern "x86-interrupt" fn timer(_stack_frame: InterruptStackFrame) {
 
     notify_end_of_interrupt(InterruptIndex::Timer);
 }
-
+const KEYBOARD_DATA_PORT: PortReadOnly<u8> = PortReadOnly::new(0x60);
 pub extern "x86-interrupt" fn keyboard(_stack_frame: InterruptStackFrame) {
-    let scancode: u8 = unsafe { inb(0x60) };
+    let scancode: u8 = unsafe { KEYBOARD_DATA_PORT.read() };
     crate::task::keyboard::DEFAULT_KEYBOARD
         .lock()
         .process_keyevent(scancode);
@@ -54,6 +54,6 @@ pub extern "x86-interrupt" fn keyboard(_stack_frame: InterruptStackFrame) {
 }
 
 pub extern "x86-interrupt" fn second_interrupt_controller(_stack_frame: InterruptStackFrame) {
-    unsafe{log::debug!("{:?} | {:?}", _stack_frame, (inb(0x20),inb(0x21),inb(0xa0),inb(0xa1)))};
+    // unsafe{log::debug!("{:?} | {:?}", _stack_frame, (inb(0x20),inb(0x21),inb(0xa0),inb(0xa1)))};
     notify_end_of_interrupt(InterruptIndex::SecondInterruptController)
 }
