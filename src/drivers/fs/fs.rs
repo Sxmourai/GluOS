@@ -73,13 +73,11 @@ impl FilePath {
     }
     pub fn root(&self) -> &str {
         let mut splitted = self.splitted();  
-        let root = splitted.next().unwrap();
-        if root.is_empty() {splitted.next().unwrap()}
-        else    {root}
+        splitted.next().unwrap()
     }
-    pub fn parent(&self) -> String {
+    pub fn parent(&self) -> FilePath {
         let mut splitted:Vec<&str> = self.splitted().collect();
-        splitted[0..splitted.len()-2].join("/")
+        splitted[0..splitted.len()-2].join("/").into()
     }
     pub fn path(&self) -> &String {
         &self.raw_path
@@ -106,16 +104,13 @@ impl core::fmt::Display for FilePath {
         f.write_str(format!("{}", self.path()).as_str())
     }
 }
-pub trait ToFilePath {
-    fn to_filepath(&self) -> FilePath;
-}
-impl ToFilePath for String {
-    fn to_filepath(&self) -> FilePath {
-        FilePath::new(self.clone())
+impl Into<FilePath> for String {
+    fn into(self) -> FilePath {
+        FilePath::new(self)
     }
 }
-impl ToFilePath for &str {
-    fn to_filepath(&self) -> FilePath {
+impl Into<FilePath> for &str {    
+    fn into(self) -> FilePath {
         FilePath::new(self.to_string())
     }
 }

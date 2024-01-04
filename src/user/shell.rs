@@ -17,7 +17,7 @@ use crate::{
         disk::ata::{self, read_from_disk, write_to_disk, Channel, DiskLoc, Drive},
         fs::{fs::FilePath, fs_driver},
     },
-    fs::fs::{Fat32Entry, ToFilePath},
+    fs::fs::{Fat32Entry},
     print, println, serial_print, serial_println,
     state::{fs_driver, get_state},
     terminal::console::{ScreenChar, DEFAULT_CHAR},
@@ -177,10 +177,10 @@ fn read(raw_args: I) -> O {
     let path = args.next().unwrap();
     let mut binding = get_state();
     let fs_driver = binding.fs().lock();
-    if let Some(entry) = fs_driver.get_entry(&path.to_filepath()) {
+    if let Some(entry) = fs_driver.get_entry(&path.into()) {
         match entry {
             Fat32Entry::File(file) => {
-                let content = fs_driver.read_file(&path.to_filepath());
+                let content = fs_driver.read_file(&path.into());
                 println!("{}", content.unwrap()); // Can safely unwrap because we know the file exists
             }
             Fat32Entry::Dir(dir) => {
@@ -208,7 +208,7 @@ fn write(raw_args: I) -> O { // TODO Refactor input/output for PROPER error hand
     let path = args.next().unwrap();
     let mut binding = get_state();
     let mut fs_driver = binding.fs().lock();
-    if let Some(entry) = fs_driver.get_entry(&path.to_filepath()) {
+    if let Some(entry) = fs_driver.get_entry(&path.into()) {
         println!("File already exists !");
         return Ok(())
     }
@@ -218,14 +218,14 @@ fn write(raw_args: I) -> O { // TODO Refactor input/output for PROPER error hand
             if !content.is_empty() {
                 println!("Useless to specify content, created a empty dir");
             }
-            fs_driver.write_dir(path.to_filepath()).unwrap()
+            fs_driver.write_dir(path).unwrap()
         },
         "file" => {
             if content.is_empty() {
                 println!("Created a empty file");
                 return Ok(())
             }
-            fs_driver.write_file(path.to_filepath(), content).unwrap()
+            fs_driver.write_file(path, content).unwrap()
         },
         _ => {
             println!("Invalid entry type ! dir/file")

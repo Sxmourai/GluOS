@@ -72,17 +72,9 @@ pub fn slice16_to_str(slice: &[u16]) -> String {    // return String::from_utf16
     }
     content
 }
-
-// pub unsafe fn from_raw_parts_unchecked<T>(ptr:*mut T, len:usize) -> Vec<T>
-//     where T: Copy  {
-//     let mut v = Vec::new();
-//     let ele_size = core::mem::size_of::<T>();
-//     for i in 0..len {
-//         let addr = ptr as usize+i*ele_size;
-//         v.push(*ptr as T);
-//     }
-//     v
-// }
+pub unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
+    unsafe{core::slice::from_raw_parts((p as *const T) as *const u8, core::mem::size_of::<T>())}
+}
 
 ///! DANGER ZONE DONT GO THERE 🤣
 pub fn list_to_num<T,R>(mut content: impl Iterator<Item = T> + DoubleEndedIterator) -> R 

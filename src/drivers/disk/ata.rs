@@ -530,6 +530,7 @@ impl Disk {
     pub fn write48(&self, start_sector: u64, content: Sectors) -> DResult<()> {
         let mut sector_count = content.len() / 512;
         if sector_count==0{sector_count+=1}
+        debug!("{} {:?}", start_sector, content);
         unsafe {
             u8::write_to_port(self.device_select_reg(), self.loc.drive_lba48_addr()); // Select drive
             u8::write_to_port(self.base(), u8::read_from_port(self.base()) | 0x80);
@@ -542,7 +543,7 @@ impl Disk {
             u8::write_to_port(self.base(), u8::read_from_port(self.base()) & !0x80);
 
             u8::write_to_port(self.sector_count_reg(),   TryInto::<u8>::try_into(sector_count).unwrap()); // sector_count low
-            u8::write_to_port(self.lbalo_reg(),          TryInto::<u8>::try_into(start_sector).unwrap()); // LBA1
+            u8::write_to_port(self.lbalo_reg(),          TryInto::<u8>::try_into(start_sector&0xFF).unwrap()); // LBA1
             u8::write_to_port(self.lbamid_reg(),         TryInto::<u8>::try_into((start_sector >> 8)).unwrap()); // LBA2
             u8::write_to_port(self.lbahi_reg(),          TryInto::<u8>::try_into((start_sector >> 16)).unwrap()); // LBA3
             u8::write_to_port(self.command_reg(), 0x34); // READ SECTORS EXT

@@ -45,6 +45,7 @@ pub extern "x86-interrupt" fn timer(_stack_frame: InterruptStackFrame) {
 }
 const KEYBOARD_DATA_PORT: PortReadOnly<u8> = PortReadOnly::new(0x60);
 pub extern "x86-interrupt" fn keyboard(_stack_frame: InterruptStackFrame) {
+    #[allow(const_item_mutation)]
     let scancode: u8 = unsafe { KEYBOARD_DATA_PORT.read() };
     crate::task::keyboard::DEFAULT_KEYBOARD
         .lock()

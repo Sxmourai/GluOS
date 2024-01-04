@@ -37,6 +37,7 @@ pub fn boot(boot_info: &'static bootloader::BootInfo) {
     get_state().init(boot_info, mem_handler, fs_driver);
     user::log::initialize_logger();
     serial_println!("\t[Done booting]\n");
+    get_state().fs().lock().write_dir("");
     Shell::new();
 }
 
