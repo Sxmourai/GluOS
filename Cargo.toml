@@ -6,19 +6,19 @@ authors = ["Sxmourai"]
 autotests = true
 
 [dependencies]
-x86_64 = "0.14.10"
-pc-keyboard = "0.7.0"
+x86_64 = "0.14.10" # Usefull asm functions (inb outb, enable interrupts & all)
+pc-keyboard = "0.7.0" # Easy transform from key code to char
 pic8259 = "0.10.1"
 bootloader = { version = "0.9.23", features = ["map_physical_memory", ]} #"map_physical_memory"
-linked_list_allocator = "0.10.5"
-spin = "0.9.8"
-uart_16550 = "0.3.0"
-hashbrown = "0.14.0"
-pci-ids = "0.2.5"
-lazy_static = { version = "1.4.0", features=["spin_no_std"]}
+linked_list_allocator = "0.10.5" # A linked list allocator lib & also Heap
+spin = "0.9.8" # We have our allocator, so we can use std::spin
+uart_16550 = "0.3.0" # Talks to qemu
+hashbrown = "0.14.0" # A hashmap/hashset & all implementation
+pci-ids = "0.2.5" # Pci ids to discover what is connected but not updated anymore, maybe make our own ? With github actions
+lazy_static = { version = "1.4.0", features=["spin_no_std"]} # Helps us with static mut's & all
+log = {version="0.4.20", default-features = false} # Logging facility (not that useful)
 crossbeam-queue = { version = "0.3.10", default-features = false, features = ["alloc"]}
 conquer-once = { version = "0.4.0", default-features = false }
-log = {version="0.4.20", default-features = false}
 futures-util = { version = "0.3.4", default-features = false, features = ["alloc"]}
 
 [package.metadata.bootimage]
