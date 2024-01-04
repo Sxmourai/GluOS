@@ -27,9 +27,17 @@ impl Console {
 
     pub fn write_char_at(&mut self, x: u8, y: u8, chr: ScreenChar) {
         if x < self.size().0 && y < self.size().1 {
-            unsafe { write_volatile(&mut self.buffer.chars[x as usize][y as usize], chr) }
+            unsafe { write_volatile(&mut self.buffer.chars[y as usize][x as usize], chr) }
         } else {
             log::error!("Tried to write {:?} at {:?}", chr, (x,y))
+        }
+    }
+    pub fn get_char_at(&self, x: u8, y: u8) -> ScreenChar {
+        if x < self.size().0 && y < self.size().1 {
+            unsafe { read_volatile(&self.buffer.chars[y as usize][x as usize]) }
+        } else {
+            log::error!("Tried to read {:?}", (x,y));
+            return DEFAULT_CHAR;
         }
     }
 
@@ -52,25 +60,13 @@ impl Console {
     pub fn remove(&mut self, x: u8, y: u8) {
         self.write_char_at(x, y, DEFAULT_CHAR);
     }
-
-    pub fn get_at(&self, x: u8, y: u8) -> ScreenChar {
-        if x < self.size().0 && y < self.size().1 {
-            unsafe { read_volatile(&self.buffer.chars[y as usize][x as usize]) }
-        } else {
-            log::error!("Tried to read {:?}", (x,y));
-            return DEFAULT_CHAR;
-        }
-    }
-    pub fn get_atp(&self, pos: &ScreenPos) -> ScreenChar {
-        self.get_at(pos.0, pos.1)
-    }
     // Note that this makes a copy
     //TODO Support top and bottom buffer ?
     pub fn get_str_at(&self, pos: &ScreenPos, len: u16) -> Vec<ScreenChar> {
         let mut buffer = Vec::new();
         let (width, height) = self.size();
         for i in 0..len {
-            buffer.push(self.get_at(
+            buffer.push(self.get_char_at(
                 (pos.0 as u16 + i) as u8 % width,
                 ((i / width as u16) as u8 + pos.1),
             )); // Wrap around

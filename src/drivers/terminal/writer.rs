@@ -68,7 +68,7 @@ impl Writer {
 
         let pos: u16 = (y as u16 * 80 + x as u16);
 
-        if self.console.get_atp(&self.pos).ascii_character == DEFAULT_CHAR.ascii_character {
+        if self.console.get_char_at(self.pos.0,self.pos.1).ascii_character == DEFAULT_CHAR.ascii_character {
             self.write_char_at(
                 self.pos.clone(),
                 ScreenChar::new('\0' as u8, ColorCode::new(Color::White, Color::Black)),
