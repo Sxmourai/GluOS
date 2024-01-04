@@ -1,6 +1,5 @@
 use crate::{boot::hlt_loop, drivers::time, terminal::writer::inb};
 use alloc::{boxed::Box, string::String, vec::Vec};
-use fatfs::debug;
 use pc_keyboard::{layouts::Us104Key, DecodedKey, HandleControl, KeyCode, Keyboard, ScancodeSet1};
 use pic8259::ChainedPics;
 use spin::Mutex;

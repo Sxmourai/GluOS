@@ -1,8 +1,10 @@
+use core::ptr::{write_volatile, read_volatile};
+
 use alloc::vec::Vec;
 use spin::Mutex;
 
 use super::{
-    buffer::{ConsoleBuffer, VgaBuffer, Buffer},
+    buffer::{ConsoleBuffer, VgaBuffer, Buffer, BUFFER_WIDTH},
     writer::{Color, ColorCode, ScreenPos, print_screenchars_atp},
 };
 use lazy_static::lazy_static;
@@ -24,7 +26,11 @@ impl Console {
     }
 
     pub fn write_char_at(&mut self, x: u8, y: u8, chr: ScreenChar) {
-        self.buffer.write_screenchar_at(&ScreenPos(x, y), chr)
+        if x < self.size().0 && y < self.size().1 {
+            unsafe { write_volatile(&mut self.buffer.chars[x as usize][y as usize], chr) }
+        } else {
+            log::error!("Tried to write {:?} at {:?}", chr, (x,y))
+        }
     }
 
     pub fn write_byte_at(&mut self, x: u8, y: u8, byte: u8) {
@@ -48,7 +54,12 @@ impl Console {
     }
 
     pub fn get_at(&self, x: u8, y: u8) -> ScreenChar {
-        self.buffer.get_screenchar_at(&ScreenPos(x, y))
+        if x < self.size().0 && y < self.size().1 {
+            unsafe { read_volatile(&self.buffer.chars[y as usize][x as usize]) }
+        } else {
+            log::error!("Tried to read {:?}", (x,y));
+            return DEFAULT_CHAR;
+        }
     }
     pub fn get_atp(&self, pos: &ScreenPos) -> ScreenChar {
         self.get_at(pos.0, pos.1)
@@ -57,7 +68,7 @@ impl Console {
     //TODO Support top and bottom buffer ?
     pub fn get_str_at(&self, pos: &ScreenPos, len: u16) -> Vec<ScreenChar> {
         let mut buffer = Vec::new();
-        let (width, height) = self.buffer.size();
+        let (width, height) = self.size();
         for i in 0..len {
             buffer.push(self.get_at(
                 (pos.0 as u16 + i) as u8 % width,
@@ -67,9 +78,8 @@ impl Console {
         buffer
     }
     pub fn size(&self) -> (u8, u8) {
-        self.buffer.size()
+        (super::buffer::BUFFER_WIDTH, super::buffer::BUFFER_HEIGHT)
     }
-    // pub fn iter_chars(&self) -> impl Iterator<Item = ScreenChar> {self.buffer.}
 }
 unsafe impl Sync for Console {}
 unsafe impl Send for Console {}

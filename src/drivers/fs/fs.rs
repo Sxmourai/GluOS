@@ -1,7 +1,6 @@
 use core::num::TryFromIntError;
 
 use alloc::{string::{String, ToString, ParseError}, vec::{Vec, self}, boxed::Box, format};
-use fatfs::IntoStorage;
 use hashbrown::HashMap;
 use log::error;
 
@@ -167,7 +166,7 @@ pub enum FatType {
     Fat16,
     Fat32,
 }
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct FatInfo(
     pub BiosParameterBlock,
 );

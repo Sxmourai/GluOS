@@ -121,6 +121,7 @@ impl FsDriver {
     }
     pub fn new(disk: DiskLoc) -> Self {
         let fat_info = Self::get_fat_info(&disk).unwrap();
+        serial_println!("{:?}", &fat_info);
         let (mut last_sector, mut last_offset)=(0,0);
         let first_fat_sector = fat_info.first_fat_sector();
         let first_data_sector = fat_info.get_first_data_sector();

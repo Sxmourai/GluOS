@@ -1,7 +1,7 @@
 use alloc::{vec::Vec, boxed::Box};
 use spin::RwLockWriteGuard;
 
-use super::{frame_buffer::{fill_rect, ScreenLock}, Color};
+use super::{frame_buffer::{fill_rect, ScreenLock, put_pixel, put_pixel_lock}, Color};
 
 
 pub struct Pos{pub x:u16,pub y:u8}
@@ -30,7 +30,7 @@ impl Shape for Rect {
     fn draw(&mut self, color: Color, mut screen: &mut ScreenLock) {
         for x in self.pos.x..self.pos.x+self.size.x {
             for y in self.pos.y..self.pos.y+self.size.y {
-                screen.buffer[y as usize][x as usize].write(color);
+                put_pixel_lock(x.into(), y.into(), color, screen);
             }
         }
     }

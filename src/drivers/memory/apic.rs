@@ -1,7 +1,6 @@
 //! https://wiki.osdev.org/APIC
 
 use conquer_once::raw;
-use raw_cpuid::cpuid;
 use x86_64::registers::model_specific::Msr;
 static IA32_APIC_BASE_MSR:Msr        = Msr::new(0x1B);
 static IA32_APIC_BASE_MSR_BSP:Msr    = Msr::new(0x100); // Processor is a BSP

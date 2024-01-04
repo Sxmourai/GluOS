@@ -10,24 +10,17 @@ x86_64 = "0.14.10"
 pc-keyboard = "0.7.0"
 pic8259 = "0.10.1"
 bootloader = { version = "0.9.23", features = ["map_physical_memory", ]} #"map_physical_memory"
-volatile = {version="0.3.0"}
 spin = "0.9.8"
-uart_16550 = "0.2.0"
+uart_16550 = "0.3.0"
 linked_list_allocator = "0.9.0"
 hashbrown = "0.14.0"
 bit_field = "0.10.2"
-rsdp = "2.0.0"
 pci-ids = "0.2.5"
-libc = { version = "0.2.147", features = ["std"]}
-lazy_static = { version = "1.0", features=["spin_no_std"]}
+lazy_static = { version = "1.4.0", features=["spin_no_std"]}
 crossbeam-queue = { version = "0.2.1", default-features = false, features = ["alloc"]}
-futures-util = { version = "0.3.4", default-features = false, features = ["alloc"]}
 conquer-once = { version = "0.2.0", default-features = false }
-raw-cpuid = "11.0.1"
-acpica-sys = "0.0.4"
-libacpica = "0.0.8"
 log = {version="0.4.20", default-features = false}
-fatfs = { git = "https://github.com/rafalh/rust-fatfs.git", default-features = false,features = ["alloc"] }
+futures-util = { version = "0.3.4", default-features = false, features = ["alloc"]}
 
 [build-dependencies]
 cmake = "0.1.31" 

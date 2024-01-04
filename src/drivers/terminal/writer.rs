@@ -1,4 +1,3 @@
-use acpica_sys::Enum_AcpiRasfCapabiliities;
 use alloc::{
     string::{String, ToString},
     vec::Vec,

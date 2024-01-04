@@ -42,7 +42,7 @@ fn panic(info: &PanicInfo) -> ! {
 entry_point!(test_kernel_main);
 #[cfg(test)]
 fn test_kernel_main(boot_info: &'static BootInfo) -> ! {
-    kernel::boot(boot_info);
+    kernel::boot::boot(boot_info);
     test_main();
     kernel::test::end()
 }

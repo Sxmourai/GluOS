@@ -1,3 +1,5 @@
+use core::ptr::write_volatile;
+
 use alloc::vec::{self, Vec};
 
 use super::{console::{ScreenChar, DEFAULT_CHAR}, writer::ScreenPos};
@@ -21,41 +23,7 @@ pub trait Buffer {
 #[repr(transparent)]
 #[derive(Debug)]
 pub struct VgaBuffer {
-    chars: [[volatile::Volatile<ScreenChar>; SBUFFER_WIDTH]; SBUFFER_HEIGHT], // [row][column]
-}
-impl Buffer for VgaBuffer {
-    type SIZE = (u8, u8);
-    fn size(&self) -> Self::SIZE {
-        (BUFFER_WIDTH, BUFFER_HEIGHT)
-    } // WIDTH, HEIGHT
-    fn write_screenchar_at(&mut self, pos: &ScreenPos, chr: ScreenChar) {
-        if pos.0 < BUFFER_WIDTH && pos.1 < BUFFER_HEIGHT {
-            self.chars[pos.1 as usize][pos.0 as usize].write(chr)
-        } else {
-            log::error!("Tried to write {:?} at {:?}", chr, pos)
-        }
-    }
-    fn get_screenchar_at(&self, pos: &ScreenPos) -> ScreenChar {
-        if pos.0 < BUFFER_WIDTH && pos.1 < BUFFER_HEIGHT {
-            self.chars[pos.1 as usize][pos.0 as usize].read()
-        } else {
-            log::error!("Tried to read {:?}", pos);
-            return DEFAULT_CHAR;
-        }
-    }
-    // Loop over all chars to check if they are DEFAULT_CHARS
-    fn is_empty(&self) -> bool {
-        for y in 0..BUFFER_HEIGHT {
-            for x in 0..BUFFER_WIDTH {
-                if self.get_screenchar_at(&ScreenPos(x, y)).ascii_character
-                    == DEFAULT_CHAR.ascii_character
-                {
-                    return false;
-                }
-            }
-        }
-        true
-    }
+    pub chars: [[ScreenChar; SBUFFER_WIDTH]; SBUFFER_HEIGHT], // [row][column]
 }
 
 pub struct ConsoleBuffer {
