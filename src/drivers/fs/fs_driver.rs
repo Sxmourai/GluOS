@@ -21,7 +21,7 @@ impl FsDriver {
         let fat_info = Self::get_fat_info(&disk).unwrap();
         let first_fat_sector = fat_info.first_fat_sector();
         let first_data_sector = fat_info.get_first_data_sector();
-        serial_println!("{:?} {} {}", &fat_info, fat_info.first_fat_sector(), fat_info.get_first_data_sector());
+        // serial_println!("{:?} {} {}", &fat_info, fat_info.first_fat_sector(), fat_info.get_first_data_sector());
         let (mut last_sector, mut last_offset)=(0,0);
         let mut last_meaningful =0;
         serial_println!("Reading fat at {}", fat_info.first_fat_sector());
@@ -103,14 +103,14 @@ impl FsDriver {
     }
     pub fn write_dir(&mut self, path: impl Into<FilePath>) -> Result<(), FileSystemError> {
         let path = path.into();
-        serial_println!("{:?} {:?}", self.files, path.parent());
+        serial_println!("Files: {:?} {:?}", self.files, path.parent());
         if let Some(entry) = self.files.get(&Into::<FilePath>::into(path.parent())) {
             let start_sector = match entry {
                 Fat32Entry::File(_) => todo!(),
                 Fat32Entry::Dir(dir) => dir.sector,
             };
             let content = unsafe { any_as_u8_slice(entry) };
-            serial_println!("{:?} {:?}", content, String::from_utf8_lossy(content));
+            serial_println!("Writing {:?} - {:?}", content, String::from_utf8_lossy(content));
             let mut bytes = Vec::new();
             for c in content {
                 bytes.push(*c);
@@ -209,7 +209,6 @@ impl FsDriver {
             path: root,
             attributes: FatAttributes::default(),
             sector: sector as u32,
-            
         }));
         Ok(files)
     }
@@ -217,10 +216,12 @@ impl FsDriver {
         let raw_sector = read_from_disk(disk, sector, 1).unwrap();
         let mut files = Files::new();
         let raw_entries = Self::get_raw_entries(&raw_sector);
+        serial_println!("Raw Entries: at {}: {:?}", sector, raw_entries);
         for (path, entry) in Self::parse_entries(&raw_entries, first_data_sector, &prefix) {
+            serial_println!("Entry: {:?}", entry);
             let entry = match entry {
                 Fat32Entry::File(mut file) => {
-                    Fat32Entry::File(file)
+                Fat32Entry::File(file)
                 },
                 Fat32Entry::Dir(mut dir) => {
                     let dir2 = dir.clone();
@@ -231,7 +232,7 @@ impl FsDriver {
                 },
             };
             files.insert(path, entry);
-        }
+            }
         files
     }
     fn parse_entries(raw_entries: &Vec<&[u8]>, first_data_sector: u64, prefix: &FilePath) -> Files {
@@ -240,12 +241,17 @@ impl FsDriver {
             let entry = unsafe { &*(raw.as_ptr() as *const Dir83Format) };
             if entry.attributes&0xF==0xF{ // Long File Name LFN
                 let entry_name = Dir83Format::lfn_name(*raw);
+                if i+1>=raw_entries.len() {break} // Continue or break ? It's last element
                 let next_entry = unsafe { &*(raw_entries[i+1].as_ptr() as *const Dir83Format) };
                 // if next_entry.attributes&0x10==0x10 { // Directory
                 let next_entry_name = next_entry.name();
                 if next_entry_name.starts_with(".") || next_entry_name.starts_with("..") {continue} // Pass on "." and ".." folders
                 
                 let fst_cluster = ((next_entry.high_u16_1st_cluster as u32) << 16) | (next_entry.low_u16_1st_cluster as u32);
+                if fst_cluster>1_000_000 {
+                    serial_println!("Cluster to big ! {} {}", fst_cluster, next_entry.printable(first_data_sector));
+                    break
+                }
                 let sector = (fst_cluster - 2)+first_data_sector as u32;
                 let is_file = next_entry.attributes&0x20==0x20;
                 let path = prefix.clone().join(entry_name.into());
@@ -263,7 +269,7 @@ impl FsDriver {
                     })
                 };
                 files.insert(p2, parsed_entry);
-            }
+                }
             else if entry.attributes&0x08==0x08{
                 serial_println!("VOLUME {} ", entry.printable(first_data_sector));
             }
@@ -275,7 +281,7 @@ impl FsDriver {
             }
             else if entry.attributes&0x04==0x04{
                 serial_println!("SYSTEM {} ", entry.printable(first_data_sector));
-            } else if entry.attributes&0x10==0x10||entry.attributes&0x20==0x20{} // Dir 
+            } else if entry.attributes&0x10==0x10 || entry.attributes&0x20==0x20{} // Dir 
             else if entry.attributes==0{}
             else {
                 serial_println!("ELSE ({:#b}) {}", entry.attributes, entry.printable(first_data_sector));

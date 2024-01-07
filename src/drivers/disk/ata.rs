@@ -624,6 +624,10 @@ impl Disk {
     pub fn read_sectors(&self, sector_address: u64, sector_count: u16) -> DResult<Sectors> {
         //TODO Move from vecs to slices
         if self.addressing_modes.lba48 != 0 {
+            if sector_address+(sector_count as u64)>self.addressing_modes.lba48 { // > or >= ?
+                serial_println!("Sector not in disk");
+                return Err(DiskError::NotFound)
+            }
             self.read48(sector_address, sector_count)
         } else if self.addressing_modes.lba28 != 0 {
             let sector_address = sector_address.try_into()?;

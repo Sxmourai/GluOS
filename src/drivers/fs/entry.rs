@@ -42,6 +42,6 @@ impl Dir83Format {
         let size = self.size;
         let entry_type = self.name[0];
         let name = self.name();
-        format!("File8.3: {}\t | creation_date: {} | 1st cluster: {}({}) \t| size: {}", name, creation_date, fst_cluster,sector, size)
+        format!("File8.3: {}\t | creation_date: {} | 1st cluster: {}({}) \t| size: {}\t| attrs: {:#b}", name, creation_date, fst_cluster,sector, size, self.attributes)
     }
 }
