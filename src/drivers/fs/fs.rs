@@ -4,7 +4,7 @@ use alloc::{string::{String, ToString, ParseError}, vec::{Vec, self}, boxed::Box
 use hashbrown::HashMap;
 use log::error;
 
-use crate::{serial_print, serial_println, println, print, drivers::disk::{ata::{Sectors, DiskLoc, read_from_disk}, DiskError}, state::{get_state, fs_driver}};
+use crate::{serial_print, serial_println, println, print, drivers::disk::{ata::{Sectors, DiskLoc, read_from_disk}, DiskError}, state::{get_state, fs_driver}, dbg};
 
 use super::{fs_driver::{self, FsDriver, Files}, userland::FatAttributes};
 
@@ -147,9 +147,10 @@ impl Fat32Dir {
 }
 
 
-
+//TODO Mult by sectors_per_cluster
+// All safely to u32
 pub fn cluster_to_sector(cluster_number: u64, first_data_sector: u64) -> u64 {
-    (cluster_number-2)+first_data_sector
+    ((cluster_number-2))+first_data_sector
 }
 pub fn sector_to_cluster(sector_number: u64, first_data_sector: u64) -> u64 {
     (sector_number-first_data_sector)+2
@@ -168,14 +169,13 @@ pub struct FatInfo(
 impl FatInfo {
     pub fn first_sector_of_cluster(&self) -> u64 {
         let first_data_sector = self.get_first_data_sector();
-        let first_root_dir_sector = first_data_sector - self.get_root_dir_sectors();
-        ((self.0.root_dir_first_cluster - 2) * self.0.sectors_per_cluster as u32) as u64 + first_data_sector
+        cluster_to_sector(self.0.root_dir_first_cluster as u64, first_data_sector) // , self.0.sectors_per_cluster as u64
     }
     pub fn get_first_data_sector(&self) -> u64 {
-        let total_sectors = self.get_total_sectors();
         let fat_size = self.get_fat_size();
         let root_dir_sectors = self.get_root_dir_sectors();
-        self.first_fat_sector() as u64 + (self.0.fats as u64 * fat_size as u64) + root_dir_sectors
+        let reserved_sector_count = self.0.reserved_sectors;
+        reserved_sector_count as u64 + (self.0.fats as u64 * fat_size as u64) + root_dir_sectors
     }
     pub fn fat_type(&self) -> FatType {
         let total_clusters = self.get_total_clusters();
@@ -209,7 +209,8 @@ pub struct FatTable {
     pub size: u32,
     pub first_sector: u16,
     pub last_sector:u16,
-    pub last_offset:u16, // u16 even though in range 0..512 
+    pub last_offset:u16, // u16 even though in range 0..512
+    pub last_used_sector: u32,
 }
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Copy)]
 pub enum ClusterEnum {

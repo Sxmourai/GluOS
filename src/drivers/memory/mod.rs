@@ -28,6 +28,11 @@ use crate::state::{get_boot_info, get_state, STATE};
 
 use self::handler::MemoryHandler;
 
+// #[alloc_error_handler]
+// pub fn alloc_error(size: usize, align: usize) -> ! {
+    
+// }
+
 /// Creates an example mapping for the given page to frame `0xb8000`.
 pub fn create_example_mapping(
     page: Page,

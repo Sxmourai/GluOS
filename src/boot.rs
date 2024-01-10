@@ -9,14 +9,14 @@ use alloc::{
 use spin::Mutex;
 use x86_64::{
     structures::paging::{Mapper, Page, PageTableFlags, PhysFrame, Size4KiB},
-    PhysAddr, VirtAddr,
+    PhysAddr, VirtAddr, instructions::hlt,
 };
 
 use crate::{
     drivers::{self, memory::handler::MemoryHandler, fs::fs_driver::FsDriver, disk::ata::{DiskLoc, Channel, Drive}},
     serial_println,
     state::get_state,
-    state::Kernel, video, user::{shell::Shell, self}, task::executor::Executor,
+    state::Kernel, video, user::{shell::Shell, self}, task::executor::Executor, terminal::serial::read_serial_input,
 };
 // Supress compiler warning about unused imports, but if removed, error
 #[allow(unused_imports)]
@@ -37,7 +37,7 @@ pub fn boot(boot_info: &'static bootloader::BootInfo) {
     get_state().init(boot_info, mem_handler, fs_driver);
     user::log::initialize_logger();
     serial_println!("\t[Done booting]\n");
-    get_state().fs().lock().write_dir("");
+    // get_state().fs().lock().write_dir("hello");
     Shell::new();
 }
 

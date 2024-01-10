@@ -3,7 +3,7 @@ use hashbrown::HashMap;
 use log::{error, debug, info};
 
 
-use crate::{disk::{ata::{DiskLoc, read_from_disk, Channel, Drive, write_to_disk}, DiskError}, serial_println, serial_print, bit_manipulation::any_as_u8_slice};
+use crate::{disk::{ata::{DiskLoc, read_from_disk, Channel, Drive, write_to_disk}, DiskError}, serial_println, serial_print, bit_manipulation::any_as_u8_slice, dbg};
 use super::{fs::*, userland::FatAttributes};
 use super::entry::Dir83Format;
 
@@ -21,54 +21,15 @@ impl FsDriver {
         let fat_info = Self::get_fat_info(&disk).unwrap();
         let first_fat_sector = fat_info.first_fat_sector();
         let first_data_sector = fat_info.get_first_data_sector();
-        // serial_println!("{:?} {} {}", &fat_info, fat_info.first_fat_sector(), fat_info.get_first_data_sector());
-        let (mut last_sector, mut last_offset)=(0,0);
-        let mut last_meaningful =0;
-        serial_println!("Reading fat at {}", fat_info.first_fat_sector());
-        for i in 0..fat_info.get_fat_size() {
-            if last_sector!=0{break}
-            let content = read_from_disk(&disk, first_fat_sector as u64+i as u64, 1).unwrap();
-            for offset in 0..content.len()/4 {
-                let table_value = &content[offset*4..offset*4+4];
-                let mut table_value = 
-                ((table_value[3] as u32) << 24)
-                | ((table_value[2] as u32) << 16)
-                | ((table_value[1] as u32) << 8)
-                | ( table_value[0] as u32);
-                table_value &= 0x0FFFFFFF;
-                if table_value < 0x0FFFFFF8 && table_value != 0x0FFFFFF7 {
-                    if table_value==0 {
-                        last_sector = first_fat_sector+i as u16;
-                        last_offset = offset as u16;
-                        let table_value = &content[(offset-1)*4..(offset-1)*4+4];
-                        let mut table_value = 
-                        ((table_value[3] as u32) << 24)
-                        | ((table_value[2] as u32) << 16)
-                        | ((table_value[1] as u32) << 8)
-                        | ( table_value[0] as u32);
-                        table_value &= 0x0FFFFFFF;
-                        serial_println!("Last sector used: {}", last_meaningful);
-                        break;
-                    }
-                    let next_sector = cluster_to_sector(table_value as u64, first_data_sector)-1; // -1 because we add one at end
-                    last_meaningful=next_sector;
-                }
-            }
-        }
-        let fat_size = fat_info.get_fat_size();
+        serial_println!("{:?} {} {}", &fat_info, fat_info.first_fat_sector(), fat_info.get_first_data_sector());
+        let fat_table = FsDriver::read_fat(&disk, fat_info.get_fat_size(), first_fat_sector, first_data_sector);
         let _self = Self {
             files: Self::read_dirs_structure(&fat_info, &disk).unwrap(),
             fat_info,
             initialised: false,
             disk,
-            fat_table: FatTable {
-                size: fat_size,
-                first_sector: first_fat_sector,
-                last_sector,
-                last_offset,
-            },
+            fat_table,
         };
-        // serial_println!("{:?}", (last_sector, last_offset));
         _self
     }
     pub fn read_file(&self, path: &FilePath) -> Option<String> {
@@ -104,12 +65,33 @@ impl FsDriver {
     pub fn write_dir(&mut self, path: impl Into<FilePath>) -> Result<(), FileSystemError> {
         let path = path.into();
         serial_println!("Files: {:?} {:?}", self.files, path.parent());
-        if let Some(entry) = self.files.get(&Into::<FilePath>::into(path.parent())) {
-            let start_sector = match entry {
+        if let Some(parent_entry) = self.files.get(&Into::<FilePath>::into(path.parent())) {
+            let start_sector = match parent_entry {
                 Fat32Entry::File(_) => todo!(),
                 Fat32Entry::Dir(dir) => dir.sector,
             };
-            let content = unsafe { any_as_u8_slice(entry) };
+            dbg!(start_sector);
+            let path = Into::<FilePath>::into(path);
+            let mut path_name: Vec<u8> = path.name().bytes().collect();
+            if path_name.len() < 11 { // Add some 0 to convert to [u8; 11]
+                for i in 0..11-path_name.len() {
+                    path_name.push(0);
+                }
+            }
+            let name = <[u8; 11]>::try_from(path_name).unwrap();
+            let size = 1;
+            let to_write_sector = self.fat_table.last_sector+1;
+            dbg!(to_write_sector);
+            dbg!(self.fat_info.get_first_data_sector());
+            let cluster = sector_to_cluster(to_write_sector as u64, self.fat_info.get_first_data_sector());
+            let entry = Dir83Format {
+                name,
+                high_u16_1st_cluster: TryInto::<u16>::try_into(cluster & 0xFF00).unwrap(),
+                low_u16_1st_cluster:  TryInto::<u16>::try_into(cluster & 0x00FF).unwrap(),
+                size,
+                ..core::default::Default::default()
+            };
+            let content = unsafe { any_as_u8_slice(&entry) };
             serial_println!("Writing {:?} - {:?}", content, String::from_utf8_lossy(content));
             let mut bytes = Vec::new();
             for c in content {
@@ -155,8 +137,47 @@ impl FsDriver {
     pub fn get_entry(&self, path: &FilePath) -> Option<&Fat32Entry> {
         self.files.get(path)
     }
+    fn read_fat(disk: &DiskLoc,fat_size: u32, first_fat_sector: u16, first_data_sector: u64) -> FatTable {
+        let (mut last_sector, mut last_offset) = (0,0);
+        let mut last_used_sector = 0;
+        for i in 0..fat_size {
+            if last_sector!=0{break}
+            let content = read_from_disk(disk, first_fat_sector as u64+i as u64, 1).unwrap();
+            for offset in 0..content.len()/4 {
+                let table_value = &content[offset*4..offset*4+4];
+                let mut table_value = 
+                ((table_value[3] as u32) << 24)
+                | ((table_value[2] as u32) << 16)
+                | ((table_value[1] as u32) << 8)
+                | ( table_value[0] as u32);
+                table_value &= 0x0FFFFFFF;
+                if table_value < 0x0FFFFFF8 && table_value != 0x0FFFFFF7 {
+                    if table_value==0 {
+                        last_sector = first_fat_sector+i as u16;
+                        last_offset = offset as u16;
+                        let table_value = &content[(offset-1)*4..(offset-1)*4+4];
+                        let mut table_value = 
+                        ((table_value[3] as u32) << 24)
+                        | ((table_value[2] as u32) << 16)
+                        | ((table_value[1] as u32) << 8)
+                        | ( table_value[0] as u32);
+                        table_value &= 0x0FFFFFFF;
+                        break;
+                    }
+                    last_used_sector=cluster_to_sector(table_value as u64, first_data_sector) as u32;
+                }
+            }
+        }
+        FatTable {
+            size: fat_size,
+            first_sector: first_fat_sector,
+            last_sector,last_offset,
+            last_used_sector,
+        }
+    }
     // Current sector should be u32
     pub fn read_fat_cluster(&self, current_sector: u64, first_fat_sector: u64, first_data_sector: u64) -> ClusterEnum {
+        assert!(current_sector>first_data_sector+2, "Sector is to smoll pepe hands {}", current_sector);
         let fat_offset = ((current_sector-first_data_sector)+2)*4;
         let fat_sector = (fat_offset/512)+first_fat_sector;
         let ent_offset = (fat_offset%512) as usize;
@@ -201,14 +222,15 @@ impl FsDriver {
         entries
     }
     pub fn read_dirs_structure(fat_info: &FatInfo, disk: &DiskLoc) -> Result<Files, DiskError> {
-        let mut sector = fat_info.first_sector_of_cluster();
+        let mut root_sector = fat_info.first_sector_of_cluster();
+        dbg!(root_sector);
         let first_data_sector = fat_info.get_first_data_sector();
-        let mut files = Self::read_dir_recursively("/".into(), disk, sector, first_data_sector);
+        let mut files = Self::read_dir_recursively("/".into(), disk, root_sector, first_data_sector);
         let root = FilePath::new("/".to_string());
         files.insert(root.clone(), Fat32Entry::Dir(Fat32Dir {
             path: root,
             attributes: FatAttributes::default(),
-            sector: sector as u32,
+            sector: root_sector as u32,
         }));
         Ok(files)
     }

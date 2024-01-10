@@ -99,7 +99,13 @@ impl KbInput for BlockingPrompt {
                         panic!("ERROR: {}", msg)
                     }
                     return msg;
-                }
+            }
+            // let scancode = crate::terminal::serial::read_serial_input();
+            // if scancode!=0 {
+            //     crate::task::keyboard::DEFAULT_KEYBOARD
+            //     .lock()
+            //     .process_keyevent(scancode);
+            // }
             } else {
                 panic!(
                     "Trying to get an input that doesn't exist, index isn't right:{}",

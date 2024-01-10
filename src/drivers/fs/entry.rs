@@ -1,6 +1,6 @@
 use alloc::{string::{String, ToString}, format};
 
-
+#[derive(Debug, Default)]
 #[repr(packed)]
 pub struct Dir83Format {
     // r:u8,

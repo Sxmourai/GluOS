@@ -258,9 +258,10 @@ pub fn dump_disk(args: I) -> O {
     };
     let mut i = 0;
     loop {
+        serial_println!("\n\n-----------{}----------", i);
         for b in read_from_disk(&DiskLoc(channel, drive), i, 3).unwrap() {
             if b != 0 {
-                serial_print!("{b} ")
+                serial_print!("{}", b as char)
             }
         }
         i += 1;
