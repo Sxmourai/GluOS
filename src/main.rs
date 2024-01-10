@@ -11,6 +11,7 @@ extern crate kernel;
 extern crate log;
 extern crate x86_64;
 use bootloader::{entry_point, BootInfo};
+use kernel::serial_print;
 use core::
     panic::PanicInfo
 ;
@@ -34,8 +35,9 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
+    serial_print!("PANIC");
     error!("PANIC: {}", info);
-    kernel::boot::hlt_loop()
+    kernel::test::end()
 }
 
 #[cfg(test)]

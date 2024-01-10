@@ -3,9 +3,9 @@ use hashbrown::HashMap;
 use log::{error, debug, info};
 
 
-use crate::{disk::{ata::{DiskLoc, read_from_disk, Channel, Drive, write_to_disk}, DiskError}, serial_println, serial_print, bit_manipulation::any_as_u8_slice, dbg};
-use super::{fs::*, userland::FatAttributes};
-use super::entry::Dir83Format;
+use crate::{disk::{ata::{DiskLoc, read_from_disk, Channel, Drive, write_to_disk}, DiskError}, serial_println, serial_print, bit_manipulation::any_as_u8_slice, dbg, fs::entry::Standard32};
+use super::{fs::*, userland::FatAttributes, entry::{RawFat32Entry, LFN32}};
+
 
 pub type Files =   HashMap<FilePath, Fat32Entry>;
 
@@ -21,10 +21,10 @@ impl FsDriver {
         let fat_info = Self::get_fat_info(&disk).unwrap();
         let first_fat_sector = fat_info.first_fat_sector();
         let first_data_sector = fat_info.get_first_data_sector();
-        serial_println!("{:?} {} {}", &fat_info, fat_info.first_fat_sector(), fat_info.get_first_data_sector());
         let fat_table = FsDriver::read_fat(&disk, fat_info.get_fat_size(), first_fat_sector, first_data_sector);
+        let files = Self::read_dirs_structure(&fat_info, &disk).unwrap();
         let _self = Self {
-            files: Self::read_dirs_structure(&fat_info, &disk).unwrap(),
+            files,
             fat_info,
             initialised: false,
             disk,
@@ -78,14 +78,16 @@ impl FsDriver {
                     path_name.push(0);
                 }
             }
-            let name = <[u8; 11]>::try_from(path_name).unwrap();
+            let name = <[u8; 8]>::try_from(path_name.clone()).unwrap();
+            let extension = <[u8; 3]>::try_from(path_name[8..].to_vec()).unwrap();
             let size = 1;
             let to_write_sector = self.fat_table.last_sector+1;
             dbg!(to_write_sector);
             dbg!(self.fat_info.get_first_data_sector());
             let cluster = sector_to_cluster(to_write_sector as u64, self.fat_info.get_first_data_sector());
-            let entry = Dir83Format {
+            let entry = Standard32 {
                 name,
+                extension,
                 high_u16_1st_cluster: TryInto::<u16>::try_into(cluster & 0xFF00).unwrap(),
                 low_u16_1st_cluster:  TryInto::<u16>::try_into(cluster & 0x00FF).unwrap(),
                 size,
@@ -109,30 +111,40 @@ impl FsDriver {
         }
         Ok(())
     }
-    pub fn read_dir_at_sector(&self, prefix: &FilePath, dir_sector: u64) -> Option<Files> {
-        let mut entries = Files::new();
+    
+    pub fn read_and_follow_clusters(disk: &DiskLoc, start_sector: u64, first_data_sector: u64, first_fat_sector: u64) -> Option<Vec<u8>> {
+        let mut res = Vec::new();
         let mut reading = true;
-        let mut next_sector = dir_sector;
-        let first_data_sector = self.fat_info.get_first_data_sector();
-        let first_fat_sector = self.fat_info.first_fat_sector() as u64;
+        let mut next_sector = start_sector;
         while reading {
-            let sector = read_from_disk(&self.disk, next_sector, 1).unwrap_or(alloc::vec![0]);
-            if *sector.last().unwrap()==0 {
-                let next_cluster = match self.read_fat_cluster(next_sector, first_fat_sector, first_data_sector) {
-                    ClusterEnum::EndOfChain => {reading=false;break},
-                    ClusterEnum::BadCluster => {reading=false;break},
-                    ClusterEnum::Cluster(cluster) => cluster,
+            let mut sector = read_from_disk(disk, next_sector, 1).unwrap_or(alloc::vec![0]);
+            // if *sector.last().unwrap()==0 {
+            if let Some(cluster) = Self::read_fat_cluster(disk, next_sector, first_fat_sector, first_data_sector) {
+                match cluster {
+                    ClusterEnum::EndOfChain => {reading=false},
+                    ClusterEnum::BadCluster => {reading=false},
+                    ClusterEnum::Cluster(cluster) => {
+                        next_sector = cluster_to_sector(cluster as u64, first_data_sector);
+                    },
                 };
-                next_sector = cluster_to_sector(next_cluster as u64, first_data_sector)-1 // -1 Because we add one below
                 
+            } else {
+                error!("Sector too small ?!");
+                dbg!(Self::read_fat_cluster(disk, next_sector, first_fat_sector, first_data_sector))
             }
 
-            let raw_entries_part = Self::get_raw_entries(&sector);
-            let entries_part = Self::parse_entries(&raw_entries_part, self.fat_info.get_first_data_sector(), &prefix);
-            entries.extend(entries_part);
-            next_sector+=1;
+            res.append(&mut sector);
+            // next_sector+=1;
         }
-        Some(entries)
+        Some(res)
+    }
+
+    pub fn read_dir_at_sector(&self, prefix: &FilePath, dir_sector: u64) -> Option<Files> {
+        let mut entries = Files::new();
+        let sectors = Self::read_and_follow_clusters(&self.disk, dir_sector, self.fat_info.get_first_data_sector(), self.fat_info.first_fat_sector() as u64)?;
+        let raw_entries_part = Self::get_raw_entries(&sectors);
+        let entries_part = Self::parse_entries(&raw_entries_part, self.fat_info.get_first_data_sector(), &prefix);
+        Some(entries_part)
     }
     pub fn get_entry(&self, path: &FilePath) -> Option<&Fat32Entry> {
         self.files.get(path)
@@ -176,12 +188,16 @@ impl FsDriver {
         }
     }
     // Current sector should be u32
-    pub fn read_fat_cluster(&self, current_sector: u64, first_fat_sector: u64, first_data_sector: u64) -> ClusterEnum {
-        assert!(current_sector>first_data_sector+2, "Sector is to smoll pepe hands {}", current_sector);
+    // Reads the fat table to know where is the next cluster to follow
+    pub fn read_fat_cluster(disk: &DiskLoc, current_sector: u64, first_fat_sector: u64, first_data_sector: u64) -> Option<ClusterEnum> {
+        if current_sector<first_data_sector { // Should do current_sector-2 but we could have buffer underflows...
+            error!("Can't read cluster if sector is to small ! {}<{}", current_sector, first_data_sector);
+            return None;
+        }
         let fat_offset = ((current_sector-first_data_sector)+2)*4;
         let fat_sector = (fat_offset/512)+first_fat_sector;
         let ent_offset = (fat_offset%512) as usize;
-        let content = read_from_disk(&self.disk, fat_sector, 1).unwrap();
+        let content = read_from_disk(disk, fat_sector, 1).unwrap();
         let table_value = &content[ent_offset..ent_offset+4];
         let mut table_value = 
         ((table_value[3] as u32) << 24)
@@ -190,11 +206,11 @@ impl FsDriver {
             | (table_value[0] as u32);
         table_value &= 0x0FFFFFFF;
         if table_value >= 0x0FFFFFF8 {
-            ClusterEnum::EndOfChain
+            Some(ClusterEnum::EndOfChain)
         } else if table_value == 0x0FFFFFF7 {
-            ClusterEnum::BadCluster
+            Some(ClusterEnum::BadCluster)
         } else {
-            ClusterEnum::Cluster(table_value)
+            Some(ClusterEnum::Cluster(table_value))
         }
     }
     fn get_fat_boot(disk: &DiskLoc) -> Result<BiosParameterBlock, DiskError> {
@@ -208,24 +224,11 @@ impl FsDriver {
         let fat_info = FatInfo(fat_boot);
         Ok(fat_info)
     }
-    fn get_raw_entries(sector: &Vec<u8>) -> Vec<&[u8]> {
-        let mut entries = Vec::new();
-        for i in 0..sector.len()/32 {
-            let sector_section = &sector[(i*32)..(i*32)+31];
-
-            if (sector_section[0]!=0xE5) {
-                entries.push((sector_section));
-            } else if sector_section[0]==0 {
-                break
-            }
-        }
-        entries
-    }
+    
     pub fn read_dirs_structure(fat_info: &FatInfo, disk: &DiskLoc) -> Result<Files, DiskError> {
         let mut root_sector = fat_info.first_sector_of_cluster();
-        dbg!(root_sector);
         let first_data_sector = fat_info.get_first_data_sector();
-        let mut files = Self::read_dir_recursively("/".into(), disk, root_sector, first_data_sector);
+        let mut files = Self::read_dir_recursively("/".into(), disk, root_sector, first_data_sector, fat_info.first_fat_sector() as u64);
         let root = FilePath::new("/".to_string());
         files.insert(root.clone(), Fat32Entry::Dir(Fat32Dir {
             path: root,
@@ -234,21 +237,19 @@ impl FsDriver {
         }));
         Ok(files)
     }
-    fn read_dir_recursively(prefix: FilePath, disk: &DiskLoc, sector: u64, first_data_sector: u64) -> Files {
-        let raw_sector = read_from_disk(disk, sector, 1).unwrap();
+    fn read_dir_recursively(prefix: FilePath, disk: &DiskLoc, sector: u64, first_data_sector: u64, first_fat_sector: u64) -> Files {
         let mut files = Files::new();
+        let raw_sector = Self::read_and_follow_clusters(disk, sector, first_data_sector, first_fat_sector).unwrap();
         let raw_entries = Self::get_raw_entries(&raw_sector);
-        serial_println!("Raw Entries: at {}: {:?}", sector, raw_entries);
         for (path, entry) in Self::parse_entries(&raw_entries, first_data_sector, &prefix) {
-            serial_println!("Entry: {:?}", entry);
             let entry = match entry {
                 Fat32Entry::File(mut file) => {
-                Fat32Entry::File(file)
+                    Fat32Entry::File(file)
                 },
                 Fat32Entry::Dir(mut dir) => {
                     let dir2 = dir.clone();
                     let dir_name = Into::<FilePath>::into(dir.name());
-                    let inner_entries = Self::read_dir_recursively(prefix.clone().join(dir_name.clone()), disk, dir.sector() as u64, first_data_sector);
+                    let inner_entries = Self::read_dir_recursively(prefix.clone().join(dir_name.clone()), disk, dir.sector() as u64, first_data_sector, first_fat_sector);
                     files.extend(inner_entries);
                     Fat32Entry::Dir(dir2)
                 },
@@ -257,56 +258,111 @@ impl FsDriver {
             }
         files
     }
-    fn parse_entries(raw_entries: &Vec<&[u8]>, first_data_sector: u64, prefix: &FilePath) -> Files {
-        let mut files = Files::new();
-        for (i,raw) in raw_entries.iter().enumerate() {
-            let entry = unsafe { &*(raw.as_ptr() as *const Dir83Format) };
-            if entry.attributes&0xF==0xF{ // Long File Name LFN
-                let entry_name = Dir83Format::lfn_name(*raw);
-                if i+1>=raw_entries.len() {break} // Continue or break ? It's last element
-                let next_entry = unsafe { &*(raw_entries[i+1].as_ptr() as *const Dir83Format) };
-                // if next_entry.attributes&0x10==0x10 { // Directory
-                let next_entry_name = next_entry.name();
-                if next_entry_name.starts_with(".") || next_entry_name.starts_with("..") {continue} // Pass on "." and ".." folders
-                
-                let fst_cluster = ((next_entry.high_u16_1st_cluster as u32) << 16) | (next_entry.low_u16_1st_cluster as u32);
-                if fst_cluster>1_000_000 {
-                    serial_println!("Cluster to big ! {} {}", fst_cluster, next_entry.printable(first_data_sector));
-                    break
-                }
-                let sector = (fst_cluster - 2)+first_data_sector as u32;
-                let is_file = next_entry.attributes&0x20==0x20;
-                let path = prefix.clone().join(entry_name.into());
-                let p2=path.clone();
-                let parsed_entry = if is_file { Fat32Entry::File(Fat32File {
-                        size: entry.size as u64,
-                        path,
-                        attributes: FatAttributes::default(),
-                        sector,
-                    })
-                } else { Fat32Entry::Dir(Fat32Dir {
-                        path,
-                        attributes: FatAttributes::default(),
-                        sector,
-                    })
+    fn get_raw_entries(sector: &Vec<u8>) -> Vec<RawFat32Entry> {
+        let mut entries = Vec::new();
+        for i in 0..sector.len()/32 {
+            let sector_section = &sector[(i*32)..(i*32)+31];
+            if sector_section[0]==0 {
+                break
+            } else if sector_section[0]!=0xE5 {
+                let attribute = sector_section[11];
+                let entry = if attribute==0xF {
+                    RawFat32Entry::LFN(unsafe {&*(sector_section.as_ptr() as *const LFN32)}.clone())
+                } else {
+                    RawFat32Entry::Standard(unsafe {&*(sector_section.as_ptr() as *const Standard32)}.clone())
                 };
-                files.insert(p2, parsed_entry);
-                }
-            else if entry.attributes&0x08==0x08{
-                serial_println!("VOLUME {} ", entry.printable(first_data_sector));
+            // if entry.attributes&0x08==0x08{
+            //     serial_println!("VOLUME {} ", entry.printable(first_data_sector));
+            // }
+            // else if entry.attributes&0x01==0x01{
+            //     serial_println!("READ_ONLY {} ", entry.printable(first_data_sector));
+            // }
+            // else if entry.attributes&0x02==0x02{
+            //     serial_println!("HIDDEN {} ", entry.printable(first_data_sector));
+            // }
+            // else if entry.attributes&0x04==0x04{
+            //     serial_println!("SYSTEM {} ", entry.printable(first_data_sector));
+            // } else if entry.attributes&0x10==0x10 || entry.attributes&0x20==0x20{} // Dir 
+            // else if entry.attributes==0{}
+            // else {
+            //     serial_println!("ELSE ({:#b}) {}", entry.attributes, entry.printable(first_data_sector));
+            // };
+                entries.push(entry);
             }
-            else if entry.attributes&0x01==0x01{
-                serial_println!("READ_ONLY {} ", entry.printable(first_data_sector));
-            }
-            else if entry.attributes&0x02==0x02{
-                serial_println!("HIDDEN {} ", entry.printable(first_data_sector));
-            }
-            else if entry.attributes&0x04==0x04{
-                serial_println!("SYSTEM {} ", entry.printable(first_data_sector));
-            } else if entry.attributes&0x10==0x10 || entry.attributes&0x20==0x20{} // Dir 
-            else if entry.attributes==0{}
-            else {
-                serial_println!("ELSE ({:#b}) {}", entry.attributes, entry.printable(first_data_sector));
+        }
+        entries
+    }
+    fn parse_entries(entries: &Vec<RawFat32Entry>, first_data_sector: u64, prefix: &FilePath) -> Files {
+        let mut files = Files::new();
+        let mut i = 0;
+        while i < entries.len() {
+            let entry = &entries[i];
+            i+=1;
+            match entry {
+                RawFat32Entry::LFN(file) => {
+                    let mut name = file.name();
+                    let mut nentry = None;
+                    loop {
+                        if i >= entries.len() {
+                            dbg!(file);
+                            dbg!(entries[i-1]);
+                            break
+                        } else {
+                            match &entries[i] {
+                                RawFat32Entry::LFN(lfn) => {
+                                    let mut new_name = lfn.name();
+                                    new_name.push_str(&name);
+                                    name = new_name;
+                                    i+=1;
+                                },
+                                RawFat32Entry::Standard(file) => {nentry = Some(file); break},
+                            };
+                        }
+                    }
+                    if nentry.is_none() {continue}
+                    let nentry = nentry.unwrap();
+                    let next_name = nentry.name();
+                    if next_name.starts_with(".") || next_name.starts_with("..") {continue} // Pass on "." and ".." folders
+                    let is_file = nentry.attributes&0x20==0x20;
+                    let path = prefix.clone().join(name.into());
+
+                    let mut fst_cluster = ((nentry.high_u16_1st_cluster as u32) << 16) | (nentry.low_u16_1st_cluster as u32);
+                    if fst_cluster>1_000_000 {
+                        serial_print!("Cluster to big ! {} {}", fst_cluster, nentry.printable(first_data_sector));
+                    }
+                    let sector = if fst_cluster>2 { 
+                        cluster_to_sector(fst_cluster as u64, first_data_sector) 
+                    } else if fst_cluster==0 { // File is empty
+                        0
+                    } else {
+                        error!("Cluster is too low ! ({})", fst_cluster);
+                        dbg!(path);
+                        i+=1;
+                        continue
+                    } as u32;
+
+                    let parsed_entry = if is_file { Fat32Entry::File(Fat32File {
+                            size: nentry.size as u64,
+                            path: path.clone(),
+                            attributes: FatAttributes::default(),
+                            sector,
+                        })
+                    } else { Fat32Entry::Dir(Fat32Dir {
+                            path: path.clone(),
+                            attributes: FatAttributes::default(),
+                            sector,
+                        })
+                    };
+                    files.insert(path, parsed_entry);
+                    
+                    i+=1; // Skip next entry cuz it's related to the current LFN
+                },
+                RawFat32Entry::Standard(file) => { // From my tests only "." and ".." folders
+                    if !file.name().starts_with(".") && !file.name().contains("CACHEDIRTAG") { //EDIT Also CACHEDIRTAG file
+                        debug!("What is this file ?"); // If this prints one day we need to do investigations
+                        dbg!(file)
+                    }
+                },
             }
         }
         files

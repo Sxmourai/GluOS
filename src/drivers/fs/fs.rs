@@ -58,7 +58,7 @@ impl FilePath {
             full_path.insert(0, '/');
         }
         Self {
-            raw_path: full_path
+            raw_path: full_path.replace("\u{ffff}", "")
         }
     }
     pub fn splitted(&self) -> core::str::Split<'_, &str> {
@@ -204,7 +204,7 @@ impl FatInfo {
     }
 }
 
-
+#[derive(Debug)]
 pub struct FatTable {
     pub size: u32,
     pub first_sector: u16,
@@ -218,3 +218,4 @@ pub enum ClusterEnum {
     BadCluster,
     Cluster(u32)
 }
+

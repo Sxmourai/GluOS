@@ -625,7 +625,7 @@ impl Disk {
         //TODO Move from vecs to slices
         if self.addressing_modes.lba48 != 0 {
             if sector_address+(sector_count as u64)>self.addressing_modes.lba48 { // > or >= ?
-                serial_println!("Sector not in disk");
+                error!("Sector not in disk ({} - {})", sector_address, sector_count);
                 return Err(DiskError::NotFound)
             }
             self.read48(sector_address, sector_count)

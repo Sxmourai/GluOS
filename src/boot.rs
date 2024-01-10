@@ -30,12 +30,12 @@ pub fn boot(boot_info: &'static bootloader::BootInfo) {
         &boot_info.memory_map,
     );
     drivers::interrupts::init();
+    user::log::initialize_logger();
     drivers::disk::ata::init();
     drivers::time::init();
     drivers::video::init_graphics();
     let fs_driver = FsDriver::new(DiskLoc(Channel::Primary, Drive::Slave));
     get_state().init(boot_info, mem_handler, fs_driver);
-    user::log::initialize_logger();
     serial_println!("\t[Done booting]\n");
     // get_state().fs().lock().write_dir("hello");
     Shell::new();
