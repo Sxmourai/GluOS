@@ -14,7 +14,6 @@ linked_list_allocator = "0.10.5" # A linked list allocator lib & also Heap
 spin = "0.9.8" # We have our allocator, so we can use std::spin
 uart_16550 = "0.3.0" # Talks to qemu
 hashbrown = "0.14.0" # A hashmap/hashset & all implementation
-pci-ids = "0.2.5" # Pci ids to discover what is connected but not updated anymore, maybe make our own ? With github actions
 lazy_static = { version = "1.4.0", features=["spin_no_std"]} # Helps us with static mut's & all
 log = {version="0.4.20", default-features = false} # Logging facility (not that useful)
 crossbeam-queue = { version = "0.3.10", default-features = false, features = ["alloc"]}
@@ -22,6 +21,8 @@ conquer-once = { version = "0.4.0", default-features = false }
 futures-util = { version = "0.3.4", default-features = false, features = ["alloc"]}
 bit_field = "0.10.2"
 
+# Our libs
+pci-ids = { git = "https://github.com/Sxmourai/auto-pci-ids.rs.git" } # Pci ids to discover what is connected via pci
 shell_macro = { path = "src/user/shell_macro" }
 
 [package.metadata.bootimage]

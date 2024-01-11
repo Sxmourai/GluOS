@@ -262,22 +262,14 @@ fn dump_disk(args: String) -> Result<(), String> {
 
 #[command("lspci", "Lists pci devices connected to computer")]
 fn lspci(args: String) -> Result<(), String> {
+    let mut verbose = 0;
+    if args.contains("-v") {
+        verbose += 1;
+    }
     for device in crate::pci::pci_device_iter() {
-        let mut name;
-        let mut subs;
-        let mut vendor;
-        let mut class = "Not found";
-        let mut subclass = "Not found";
-        if device.vendor_id == 0x1234 && device.device_id == 0x1111 { //TODO This is a workaround because pci_ids is not updated
-            name = "QEMU Virtual Video Controller";
-            vendor = "QEMU"; // Any Some other hypervisors use this device
-            subs = Vec::new();
-        } else {
-            let d = pci_ids::Device::from_vid_pid(device.vendor_id, device.device_id).expect(&alloc::format!("Not found, {:?}", device));
-            name = d.name();
-            subs = d.subsystems().collect();
-            vendor = d.vendor().name(); 
-            
+        if let Some(d) = pci_ids::Device::from_vid_pid(device.vendor_id, device.device_id) {
+            let mut class = "Not found";
+            let mut subclass = "Not found";
             for iter_class in pci_ids::Classes::iter() {
                 if iter_class.id() == device.class {
                     for iter_subclass in iter_class.subclasses() {
@@ -288,18 +280,22 @@ fn lspci(args: String) -> Result<(), String> {
                     }
                 }
             }
+            
+            println!("{}.{}.{} - {} {:?}",
+                device.location.bus(),device.location.slot(),device.location.function(),
+                d.name(),
+                d.vendor().name(),
+            );
+            if verbose > 1 {
+                println!("Class: {} - Subclass: {}\nSubsystems {:?}",
+                class,
+                subclass,
+                d,);
+            }
+        } else {
+            crate::dbg!(device);
         }
         
-        subs[0].name();
-        serial_println!(
-            "BUS: {}\t- {}\t-\tVendor {:?}\nClass: {}\t-\tSubclass: {}\nSubsystems {:?}\n\n",
-            device.bus(),
-            name,
-            vendor,
-            class,
-            subclass,
-            subs,
-        );
     }
 
     Ok(())

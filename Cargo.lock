@@ -210,8 +210,7 @@ checksum = "ed089a1fbffe3337a1a345501c981f1eb1e47e69de5a40e852433e12953c3174"
 [[package]]
 name = "pci-ids"
 version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d88ae3281b415d856e9c2ddbcdd5961e71c1a3e90138512c04d720241853a6af"
+source = "git+https://github.com/Sxmourai/auto-pci-ids.rs.git#2532ea57ba96146f60cc6908310db873cb44ce0a"
 dependencies = [
  "nom",
  "phf",
