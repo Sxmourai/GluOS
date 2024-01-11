@@ -1,5 +1,4 @@
 // COPY PASTE FROM https://www.theseus-os.com/Theseus/doc/src/pci/lib.rs.html
-#![allow(dead_code)]
 
 // Usefull links: all of classes: https://pci-ids.ucw.cz/read/PD/
 // Intel devices : https://pci-ids.ucw.cz/read/PC/8086
@@ -9,13 +8,13 @@ pub mod port;
 
 use alloc::string::String;
 use alloc::vec::Vec;
-use bit_field::BitField;
 use core::fmt;
 use core::ops::{Deref, DerefMut};
 use pci_ids::{Class, FromId};
 use spin::{Mutex, Once};
 use x86_64::instructions::port::Port;
 use x86_64::PhysAddr;
+use bit_field::BitField;
 
 use crate::serial_println;
 

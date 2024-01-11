@@ -22,6 +22,7 @@ pub mod task;
 pub mod terminal;
 pub mod time;
 pub mod video;
+pub mod pci;
 
 // pub struct DriverManager {
 //     pub drivers: HashMap<String, Box<dyn Driver>>,

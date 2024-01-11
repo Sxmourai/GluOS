@@ -1,0 +1,12 @@
+[package]
+name = "shell_macro"
+version = "0.1.0"
+authors = ["Sxmourai <samourai_x@outlook.fr>"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = "*"
+quote = "*"
+proc-macro2 = "*"

@@ -9,6 +9,7 @@ use alloc::{
 };
 use hashbrown::HashMap;
 use lazy_static::lazy_static;
+use shell_macro::command;
 use spin::Mutex;
 use x86_64::structures::port::{PortRead, PortWrite};
 
@@ -17,33 +18,16 @@ use crate::{
         disk::ata::{self, read_from_disk, write_to_disk, Channel, DiskLoc, Drive},
         fs::{fs::FilePath, fs_driver},
     },
-    fs::fs::{Fat32Entry},
+    fs::fs::Fat32Entry,
     print, println, serial_print, serial_println,
     state::{fs_driver, get_state},
     terminal::console::{ScreenChar, DEFAULT_CHAR},
 };
 
 use super::prompt::{input, COMMANDS_HISTORY, COMMANDS_INDEX};
-type Commands = HashMap<
-    String,
-    (
-        Arc<dyn Fn(String) -> Result<(), String> + Send + Sync>,
-        String,
-    ),
->;
 
-// Helper function to generate closures and convert them to Arc
-fn f<F>(prog: &str, desc: &str, closure: F) -> (String, Arc<dyn Fn(I) -> O + Send + Sync>, String)
-where
-    F: Fn(I) -> O + Send + Sync + 'static,
-{
-    (
-        prog.to_string(),
-        Arc::new(closure) as Arc<dyn Fn(I) -> O + Send + Sync>,
-        desc.to_string(),
-    )
-}
-fn ls(args: I) -> O {
+#[command("lsdisk", "Lists plugged disks with size & slot")]
+fn lsdisk(args: String) -> Result<(), String> {
     for disk in &ata::disk_manager().as_ref().unwrap().disks {
         if let Some(disk) = disk.as_ref() {
             println!("-> {}", disk);
@@ -51,8 +35,7 @@ fn ls(args: I) -> O {
     }
     Ok(())
 }
-// BOTH ARE UNSAFE BUT ITS FOR EASIER CODE
-fn outb(args: I) -> O {
+fn outb(args: String) -> Result<(), String> {
     let mut args = args.split(" ");
     let port = args.next().ok_or("Invalid argument: missing port")?;
     let data = args.next().ok_or("Invalid argument: missing data")?;
@@ -66,8 +49,7 @@ fn outb(args: I) -> O {
     unsafe { u8::write_to_port(port, data) };
     Ok(())
 }
-// BOTH ARE UNSAFE BUT ITS FOR EASIER CODE
-fn inb(args: I) -> O {
+fn inb(args: String) -> Result<(), String> {
     let mut args = args.split(" ");
     let port = args.next().ok_or("Invalid argument: missing port")?;
     let port = port
@@ -77,7 +59,9 @@ fn inb(args: I) -> O {
     println!("{}", unsafe { u8::read_from_port(port) });
     Ok(())
 }
-fn read_sector(raw_args: I) -> O {
+
+#[command("read_raw", "Reads a raw sector from disk")]
+fn read_sector(raw_args: String) -> Result<(), String> {
     let mut args = raw_args.split(" ");
     let channel = match args
         .next()
@@ -132,11 +116,13 @@ fn read_sector(raw_args: I) -> O {
     }
     Ok(())
 }
-fn write_sector(raw_args: I) -> O {
+
+#[command("write_sector", "Writes a raw sector to disk")]
+fn write_sector(raw_args: String) -> Result<(), String> {
     let mut args = raw_args.split(" ");
     let channel = match args
         .next()
-        .ok_or("Invalid argument: missing channel (Primary/0, Secondary/1)")?
+        .ok_or_else(|| "Invalid argument: missing channel (Primary/0, Secondary/1)")?
     {
         "Primary" => Channel::Primary,
         "0" => Channel::Primary,
@@ -172,7 +158,8 @@ fn write_sector(raw_args: I) -> O {
     Ok(())
 }
 
-fn read(raw_args: I) -> O {
+#[command("read", "Reads a file/dir from disk")]
+fn read(raw_args: String) -> Result<(), String> {
     let mut args = raw_args.split(" ");
     let path = args.next().unwrap();
     let mut binding = get_state();
@@ -202,8 +189,10 @@ fn read(raw_args: I) -> O {
     Ok(())
 }
 
-fn write(raw_args: I) -> O { // TODO Refactor input/output for PROPER error handling
-    let mut args = raw_args.split(" ");
+
+#[command("write", "Writes a file to disk")]
+fn write(args: String) -> Result<(), String> { // TODO Refactor input/output for PROPER error handling
+    let mut args = args.split(" ");
     let entry_type = args.next().unwrap();
     let path = args.next().unwrap();
     let mut binding = get_state();
@@ -234,7 +223,8 @@ fn write(raw_args: I) -> O { // TODO Refactor input/output for PROPER error hand
     Ok(())
 }
 
-pub fn dump_disk(args: I) -> O {
+#[command("dump_disk", "Dumps disk to serial output (QEMU ONLY)")]
+fn dump_disk(args: String) -> Result<(), String> {
     let mut args = args.split(" ");
     let channel = match args
         .next()
@@ -269,42 +259,59 @@ pub fn dump_disk(args: I) -> O {
 
     Ok(())
 }
-type I = String;
-type O = Result<(), String>;
-lazy_static! {
-    pub static ref SHELL_COMMANDS: Commands = {
-        let mut c: Commands = HashMap::new();
-        #[allow(non_snake_case)] // If const need to provide type which mean
-        let CONSTANT_COMMANDS = [
-            f( "echo",  "Prints args to console",
-                |v:I| ->O {print!("{}", v);Ok(())}),
-            f( "ls","Prints disks", ls),
-            f( "outb",  "Send data (u8) to a port (u16)", outb),
-            f( "inb",   "Read data (u8) from a port (u16) and prints it",inb),
-            f( "read_raw",  "Read raw data from a disk", read_sector),
-            f( "write_raw",  "Writes raw data to a disk", write_sector),
-            f( "clear", "Clears screen", |v:I| -> O {
-                crate::terminal::console::clear_console();
-                Ok(())
-            }),
-            f( "read",  "Reads a entry from fat disk (If dir it's like 'ls' and if file is like 'cat'",  read),
-            f( "write", "Writes a entry to fat disk (If dir just path and if file path+content",  write),
-            f( "dump_disk", "Reads all disk into serial", dump_disk),
-        ];
-        for (prog, fun, desc) in CONSTANT_COMMANDS {
-            c.insert(prog, (fun, desc));
+
+#[command("lspci", "Lists pci devices connected to computer")]
+fn lspci(args: String) -> Result<(), String> {
+    for device in crate::pci::pci_device_iter() {
+        let mut name;
+        let mut subs;
+        let mut vendor;
+        let mut class = "Not found";
+        let mut subclass = "Not found";
+        if device.vendor_id == 0x1234 && device.device_id == 0x1111 { //TODO This is a workaround because pci_ids is not updated
+            name = "QEMU Virtual Video Controller";
+            vendor = "QEMU"; // Any Some other hypervisors use this device
+            subs = Vec::new();
+        } else {
+            let d = pci_ids::Device::from_vid_pid(device.vendor_id, device.device_id).expect(&alloc::format!("Not found, {:?}", device));
+            name = d.name();
+            subs = d.subsystems().collect();
+            vendor = d.vendor().name(); 
+            
+            for iter_class in pci_ids::Classes::iter() {
+                if iter_class.id() == device.class {
+                    for iter_subclass in iter_class.subclasses() {
+                        if iter_subclass.id() == device.subclass { //TODO Don't be afraid of nesting
+                            class = iter_class.name();
+                            subclass = iter_subclass.name();
+                        }
+                    }
+                }
+            }
         }
-        c
-    };
+        
+        subs[0].name();
+        serial_println!(
+            "BUS: {}\t- {}\t-\tVendor {:?}\nClass: {}\t-\tSubclass: {}\nSubsystems {:?}\n\n",
+            device.bus(),
+            name,
+            vendor,
+            class,
+            subclass,
+            subs,
+        );
+    }
+
+    Ok(())
 }
 
 pub struct CommandRunner {
     previous: Vec<String>,
     prefix: String,
-    commands: Commands,
+    commands: HashMap<String, Command>,
 }
 impl CommandRunner {
-    pub fn new(prefix: &str, commands: Commands) -> Self {
+    pub fn new(prefix: &str, commands: HashMap<String, Command>) -> Self {
         Self {
             previous: Vec::new(),
             prefix: String::from(prefix),
@@ -314,8 +321,8 @@ impl CommandRunner {
     pub fn print_help(&mut self) {
         //TODO Make it so we don't need &mut because we have to add to self.previous
         println!("Available commands:");
-        for (command, (fun, description)) in self.commands.iter() {
-            println!("- {} -> {}", command, description);
+        for (name, Command {name: _, description, run: _ }) in self.commands.iter() {
+            println!("- {} -> {}", name, description);
         }
     }
     pub fn run(mut self) {
@@ -340,7 +347,7 @@ impl CommandRunner {
 
             let mut c = b.split(" ");
             let program = c.next().unwrap(); //TODO Crash if user types nothing, handle error
-            if let Some((fun, desc)) = self.commands.get(program) {
+            if let Some(Command {name, description, run: fun}) = self.commands.get(program) {
                 let args = c
                     .into_iter()
                     .map(|s| alloc::string::ToString::to_string(&s))
@@ -360,10 +367,25 @@ impl CommandRunner {
 pub struct Shell {
     inner: CommandRunner,
 }
+#[derive(Debug, Clone)]
+pub struct Command {
+    name: &'static str,
+    description: &'static str,
+    run: fn(String) -> Result<(), String>,
+}
+
 impl Shell {
     pub fn new() -> () {
+        let commands = {
+            let commands = shell_macro::command_list!();
+            let mut res = HashMap::new();
+            for command in commands {
+                res.insert(command.name.to_string(), command.clone());
+            }
+            res
+        };
         Self {
-            inner: CommandRunner::new("> ", SHELL_COMMANDS.clone()),
+            inner: CommandRunner::new("> ", commands),
         }
         .inner
         .run()
