@@ -204,7 +204,7 @@ impl FatInfo {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct FatTable {
     pub size: u32,
     pub first_sector: u16,

@@ -11,7 +11,6 @@ pub type Files =   HashMap<FilePath, Fat32Entry>;
 
 pub struct FsDriver {
     files: Files,
-    initialised: bool,
     pub fat_info: FatInfo,
     disk: DiskLoc,
     fat_table: FatTable,
@@ -26,7 +25,6 @@ impl FsDriver {
         let _self = Self {
             files,
             fat_info,
-            initialised: false,
             disk,
             fat_table,
         };
