@@ -1,22 +1,19 @@
 //! Code inspired from rsdp crate
 
-use core::{fmt::Debug, num, slice::from_raw_parts};
+use core::{fmt::Debug, slice::from_raw_parts};
 
 use alloc::{
     format,
     string::{String, ToString},
     vec::Vec,
 };
-use hashbrown::HashMap;
+
 use log::trace;
-use x86_64::{
-    structures::paging::{Mapper, Page, PageTableFlags, PhysFrame, Size4KiB},
-    PhysAddr, VirtAddr,
-};
+
 
 static ACPI_HEAD_SIZE: usize = core::mem::size_of::<ACPISDTHeader>();
 
-use crate::{println, serial_print, serial_println, bit_manipulation::ptrlist_to_num};
+use crate::{bit_manipulation::ptrlist_to_num};
 
 use super::{handler::MemoryHandler, read_phys_memory_and_map};
 /// This (usually!) contains the base address of the EBDA (Extended Bios Data Area), shifted right by 4
@@ -53,7 +50,8 @@ pub fn find_string(bytes: &[u8], search_string: &[u8]) -> Option<usize> {
 }
 
 fn search_rsdp_in_page(page: u64, physical_memory_offset: u64) -> Option<&'static RSDPDescriptor> {
-    let bytes_read = unsafe { core::slice::from_raw_parts((page + physical_memory_offset) as *const u8, 4096) };
+    let bytes_read =
+        unsafe { core::slice::from_raw_parts((page + physical_memory_offset) as *const u8, 4096) };
     if let Some(offset) = find_string(&bytes_read, RSDP_SIGNATURE) {
         let sl: &[u8] = &bytes_read[offset..offset + core::mem::size_of::<RSDPDescriptor>()];
         // Check that the bytes_in_memory size matches the size of RSDPDescriptor
@@ -182,7 +180,7 @@ struct MADT {
 impl MADT {
     pub unsafe fn new(bytes: &[u8]) -> Self {
         Self {
-            inner: unsafe {&*(bytes.as_ptr() as *const RMADT)},
+            inner: unsafe { &*(bytes.as_ptr() as *const RMADT) },
             fields: Vec::new(),
             num_core: Vec::new(),
         }
@@ -336,7 +334,7 @@ fn get_rsdt(mem_handler: &mut MemoryHandler, rsdt_addr: u64) -> RSDT {
     // trace!("Getting RSDT at {}", rsdt_addr);
     let (rsdt_header, raw) = read_sdt(mem_handler, rsdt_addr, rsdt_addr);
 
-    let sdts_size = (rsdt_header.length as usize - ACPI_HEAD_SIZE); // / core::mem::size_of::<u32>();
+    let sdts_size = rsdt_header.length as usize - ACPI_HEAD_SIZE; // / core::mem::size_of::<u32>();
     let sdts_offset = ACPI_HEAD_SIZE;
     let ptr_addr = raw.as_ptr() as usize + sdts_offset;
     let sdts = unsafe { from_raw_parts(ptr_addr as *const u8, sdts_size) };

@@ -1,23 +1,17 @@
-use core::{
-    cell::{Cell, RefCell, UnsafeCell},
-    panic,
-};
-
-use alloc::{boxed::Box, sync::Arc};
 use bootloader::BootInfo;
-use lazy_static::lazy_static;
-use spin::{Mutex, RwLock, RwLockWriteGuard, MutexGuard};
-use x86_64::{structures::paging::OffsetPageTable, VirtAddr};
+use spin::{Mutex, RwLock, RwLockWriteGuard};
 
-use crate::{drivers::{
-    memory::{handler::MemoryHandler, rsdp::DescriptorTablesHandler}, self, fs::fs_driver::FsDriver, disk::ata::{DiskLoc, Channel, Drive},
-}, serial_print, serial_println};
+use crate::drivers::{
+    fs::fs_driver::FsDriver,
+    memory::{handler::MemoryHandler, rsdp::DescriptorTablesHandler},
+};
 
 pub static STATE: RwLock<Kernel> = RwLock::new(Kernel::new());
 
 pub struct Kernel {
     mem_handler: Option<Mutex<MemoryHandler>>,
     pub boot_info: Option<&'static BootInfo>,
+    #[allow(unused)]
     descriptor_tables: Option<Mutex<DescriptorTablesHandler>>,
     fs: Option<Mutex<FsDriver>>,
 }
@@ -30,7 +24,12 @@ impl Kernel {
             fs: None,
         }
     }
-    pub fn init(&mut self, boot_info: &'static bootloader::BootInfo, mem_handler: MemoryHandler, fs_driver: FsDriver) {
+    pub fn init(
+        &mut self,
+        boot_info: &'static bootloader::BootInfo,
+        mem_handler: MemoryHandler,
+        fs_driver: FsDriver,
+    ) {
         self.boot_info.replace(boot_info);
         // self.descriptor_tables.replace(Mutex::new(DescriptorTablesHandler::new(
         //     &mut mem_handler,

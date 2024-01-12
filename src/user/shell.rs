@@ -1,33 +1,30 @@
-use core::fmt::Error;
+
 
 use alloc::{
-    boxed::Box,
     format,
     string::{String, ToString},
-    sync::Arc,
-    vec::{self, Vec},
+    vec::{Vec},
 };
 use hashbrown::HashMap;
-use lazy_static::lazy_static;
+
 use shell_macro::command;
-use spin::Mutex;
+
 use x86_64::structures::port::{PortRead, PortWrite};
 
 use crate::{
     drivers::{
         disk::ata::{self, read_from_disk, write_to_disk, Channel, DiskLoc, Drive},
-        fs::{fs::FilePath, fs_driver},
     },
     fs::fs::Fat32Entry,
     print, println, serial_print, serial_println,
-    state::{fs_driver, get_state},
+    state::{get_state},
     terminal::console::{ScreenChar, DEFAULT_CHAR},
 };
 
 use super::prompt::{input, COMMANDS_HISTORY, COMMANDS_INDEX};
 
 #[command("lsdisk", "Lists plugged disks with size & slot")]
-fn lsdisk(args: String) -> Result<(), String> {
+fn lsdisk(_args: String) -> Result<(), String> {
     for disk in &ata::disk_manager().as_ref().unwrap().disks {
         if let Some(disk) = disk.as_ref() {
             println!("-> {}", disk);
@@ -153,7 +150,7 @@ fn write_sector(raw_args: String) -> Result<(), String> {
             bytes.push(c as u8);
         }
     }
-    let sectors = write_to_disk(DiskLoc(channel, drive), start, bytes)?;
+    let _sectors = write_to_disk(DiskLoc(channel, drive), start, bytes)?;
     println!("Done");
     Ok(())
 }
@@ -166,13 +163,12 @@ fn read(raw_args: String) -> Result<(), String> {
     let fs_driver = binding.fs().lock();
     if let Some(entry) = fs_driver.get_entry(&path.into()) {
         match entry {
-            Fat32Entry::File(file) => {
+            Fat32Entry::File(_file) => {
                 let content = fs_driver.read_file(&path.into());
                 println!("{}", content.unwrap()); // Can safely unwrap because we know the file exists
             }
             Fat32Entry::Dir(dir) => {
-                if let Some(entries) = fs_driver.read_dir_at_sector(&dir.path, dir.sector as u64)
-                {
+                if let Some(entries) = fs_driver.read_dir_at_sector(&dir.path, dir.sector as u64) {
                     for (path, inner_entry) in entries.iter() {
                         let name = match inner_entry {
                             Fat32Entry::File(file) => ("File ", file.path(), file.size),
@@ -189,17 +185,17 @@ fn read(raw_args: String) -> Result<(), String> {
     Ok(())
 }
 
-
 #[command("write", "Writes a file to disk")]
-fn write(args: String) -> Result<(), String> { // TODO Refactor input/output for PROPER error handling
+fn write(args: String) -> Result<(), String> {
+    // TODO Refactor input/output for PROPER error handling
     let mut args = args.split(" ");
     let entry_type = args.next().unwrap();
     let path = args.next().unwrap();
     let mut binding = get_state();
     let mut fs_driver = binding.fs().lock();
-    if let Some(entry) = fs_driver.get_entry(&path.into()) {
+    if let Some(_entry) = fs_driver.get_entry(&path.into()) {
         println!("File already exists !");
-        return Ok(())
+        return Ok(());
     }
     let content = args.collect::<String>();
     match entry_type {
@@ -208,14 +204,14 @@ fn write(args: String) -> Result<(), String> { // TODO Refactor input/output for
                 println!("Useless to specify content, created a empty dir");
             }
             fs_driver.write_dir(path).unwrap()
-        },
+        }
         "file" => {
             if content.is_empty() {
                 println!("Created a empty file");
-                return Ok(())
+                return Ok(());
             }
             fs_driver.write_file(path, content).unwrap()
-        },
+        }
         _ => {
             println!("Invalid entry type ! dir/file")
         }
@@ -273,29 +269,32 @@ fn lspci(args: String) -> Result<(), String> {
             for iter_class in pci_ids::Classes::iter() {
                 if iter_class.id() == device.class {
                     for iter_subclass in iter_class.subclasses() {
-                        if iter_subclass.id() == device.subclass { //TODO Don't be afraid of nesting
+                        if iter_subclass.id() == device.subclass {
+                            //TODO Don't be afraid of nesting
                             class = iter_class.name();
                             subclass = iter_subclass.name();
                         }
                     }
                 }
             }
-            
-            println!("{}.{}.{} - {} {:?}",
-                device.location.bus(),device.location.slot(),device.location.function(),
+
+            println!(
+                "{}.{}.{} - {} {:?}",
+                device.location.bus(),
+                device.location.slot(),
+                device.location.function(),
                 d.name(),
                 d.vendor().name(),
             );
             if verbose > 1 {
-                println!("Class: {} - Subclass: {}\nSubsystems {:?}",
-                class,
-                subclass,
-                d,);
+                println!(
+                    "Class: {} - Subclass: {}\nSubsystems {:?}",
+                    class, subclass, d,
+                );
             }
         } else {
             crate::dbg!(device);
         }
-        
     }
 
     Ok(())
@@ -317,7 +316,15 @@ impl CommandRunner {
     pub fn print_help(&mut self) {
         //TODO Make it so we don't need &mut because we have to add to self.previous
         println!("Available commands:");
-        for (name, Command {name: _, description, run: _ }) in self.commands.iter() {
+        for (
+            name,
+            Command {
+                name: _,
+                description,
+                run: _,
+            },
+        ) in self.commands.iter()
+        {
             println!("- {} -> {}", name, description);
         }
     }
@@ -343,7 +350,12 @@ impl CommandRunner {
 
             let mut c = b.split(" ");
             let program = c.next().unwrap(); //TODO Crash if user types nothing, handle error
-            if let Some(Command {name, description, run: fun}) = self.commands.get(program) {
+            if let Some(Command {
+                name: _,
+                description: _,
+                run: fun,
+            }) = self.commands.get(program)
+            {
                 let args = c
                     .into_iter()
                     .map(|s| alloc::string::ToString::to_string(&s))

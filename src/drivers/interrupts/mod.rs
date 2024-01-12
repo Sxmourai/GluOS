@@ -1,4 +1,3 @@
-
 pub mod exceptions;
 pub mod hardware;
 pub mod idt;

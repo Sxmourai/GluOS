@@ -1,15 +1,10 @@
-use core::{cell::Cell, fmt::Display};
 
-use alloc::{
-    boxed::Box,
-    string::{String, ToString},
-    vec,
-    vec::Vec,
-};
-use hashbrown::HashMap;
-use lazy_static::lazy_static;
-use log::{debug, error};
-use spin::{Mutex, MutexGuard};
+
+
+
+
+
+
 
 pub mod disk;
 pub mod fs;
@@ -18,11 +13,11 @@ pub mod graphics;
 pub mod id;
 pub mod interrupts;
 pub mod memory;
+pub mod pci;
 pub mod task;
 pub mod terminal;
 pub mod time;
-pub mod video;
-pub mod pci; // Adds 2MB to kernel size !
+pub mod video; // Adds 2MB to kernel size !
 
 // pub struct DriverManager {
 //     pub drivers: HashMap<String, Box<dyn Driver>>,

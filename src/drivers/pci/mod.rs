@@ -6,15 +6,15 @@
 pub mod pci_data;
 pub mod port;
 
-use alloc::string::String;
+
 use alloc::vec::Vec;
+use bit_field::BitField;
 use core::fmt;
 use core::ops::{Deref, DerefMut};
 use pci_ids::{Class, FromId};
 use spin::{Mutex, Once};
 use x86_64::instructions::port::Port;
 use x86_64::PhysAddr;
-use bit_field::BitField;
 
 use crate::serial_println;
 

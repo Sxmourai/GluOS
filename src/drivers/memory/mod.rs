@@ -2,8 +2,8 @@
 //TODO: Make a "simple" function to map ANY frame to a new page. Need this to access rsdp pointer
 // https://os.phil-opp.com/paging-implementation/#using-offsetpagetable
 
-use core::cell::Cell;
-use core::ops::Range;
+
+
 
 use x86_64::structures::paging::PageTableFlags as Flags;
 use x86_64::structures::paging::PageTableFlags;
@@ -15,22 +15,22 @@ use x86_64::{
 };
 
 pub mod acpi;
+pub mod allocator;
 pub mod apic;
 pub mod frame_allocator;
 pub mod handler;
 pub mod rsdp;
-pub mod allocator;
 
 pub use frame_allocator::BootInfoFrameAllocator;
 
-use crate::{serial_println, serial_print};
-use crate::state::{get_boot_info, get_state, STATE};
+
+
 
 use self::handler::MemoryHandler;
 
 // #[alloc_error_handler]
 // pub fn alloc_error(size: usize, align: usize) -> ! {
-    
+
 // }
 
 /// Creates an example mapping for the given page to frame `0xb8000`.
@@ -64,7 +64,7 @@ unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut
     let virt = physical_memory_offset + phys.as_u64();
     let page_table_ptr: *mut PageTable = virt.as_mut_ptr();
 
-    unsafe {&mut *page_table_ptr}
+    unsafe { &mut *page_table_ptr }
 }
 
 /// Initialize a new OffsetPageTable.
@@ -80,10 +80,15 @@ unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut
 
 // end_page is using .containing address
 //TODO Map a page when a page fault occurs (in interrupts/exceptions.rs)
-pub fn read_phys_memory_and_map(mem_handler: &mut MemoryHandler, location: u64, size: usize, end_page: u64) -> &'static [u8] {
+pub fn read_phys_memory_and_map(
+    mem_handler: &mut MemoryHandler,
+    location: u64,
+    size: usize,
+    end_page: u64,
+) -> &'static [u8] {
     let flags: PageTableFlags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE; // TODO Change this to a constant
 
-    let size_64 = size as u64;
+    let _size_64 = size as u64;
     let start_frame_addr = PhysFrame::<Size4KiB>::containing_address(PhysAddr::new(location))
         .start_address()
         .as_u64();

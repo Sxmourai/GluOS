@@ -1,9 +1,9 @@
 //! https://wiki.osdev.org/APIC
 
 use x86_64::registers::model_specific::Msr;
-static IA32_APIC_BASE_MSR:Msr        = Msr::new(0x1B);
-static IA32_APIC_BASE_MSR_BSP:Msr    = Msr::new(0x100); // Processor is a BSP
-static IA32_APIC_BASE_MSR_ENABLE:Msr = Msr::new(0x800);
+static IA32_APIC_BASE_MSR: Msr = Msr::new(0x1B);
+static IA32_APIC_BASE_MSR_BSP: Msr = Msr::new(0x100); // Processor is a BSP
+static IA32_APIC_BASE_MSR_ENABLE: Msr = Msr::new(0x800);
 
 // /** returns a 'true' value if the CPU supports APIC
 //  *  and if the local APIC hasn't been disabled in MSRs
@@ -25,15 +25,4 @@ static IA32_APIC_BASE_MSR_ENABLE:Msr = Msr::new(0x800);
 //     unsafe { IA32_APIC_BASE_MSR.write(eax) }
 //  }
 
-
-
-
-
-
-
-
-
-
-
-
-// 
+//

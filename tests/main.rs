@@ -12,7 +12,7 @@ use core::panic::PanicInfo;
 
 use alloc::{boxed::Box, vec::Vec};
 use bootloader::{entry_point, BootInfo};
-use kernel::{allocator::HEAP_SIZE, println};
+use kernel::memory::allocator::HEAP_SIZE;
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
@@ -21,7 +21,7 @@ fn panic(info: &PanicInfo) -> ! {
 
 entry_point!(main);
 fn main(boot_info: &'static BootInfo) -> ! {
-    kernel::boot(boot_info);
+    kernel::boot::boot(boot_info);
 
     test_runner();
 
@@ -31,7 +31,7 @@ fn main(boot_info: &'static BootInfo) -> ! {
 #[test_case]
 fn test_println_many() {
     for _ in 0..200 {
-        println!("test_println_many output");
+        kernel::println!("test_println_many output");
     }
 }
 

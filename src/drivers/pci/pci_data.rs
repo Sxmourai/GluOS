@@ -1,11 +1,11 @@
-use alloc::format;
-use alloc::string::String;
-use alloc::vec::Vec;
-use hashbrown::HashMap;
 
-use crate::serial_println;
 
-use super::pci_device_iter;
+
+
+
+
+
+
 
 // pub fn print_all_pci_classes_and_subclasses() {
 //     for class in pci_ids::Classes::iter() {
@@ -37,8 +37,8 @@ use super::pci_device_iter;
 //             let d = pci_ids::Device::from_vid_pid(device.vendor_id, device.device_id).expect(&alloc::format!("Not found, {:?}", device));
 //             name = d.name();
 //             subs = d.subsystems().collect();
-//             vendor = d.vendor().name(); 
-            
+//             vendor = d.vendor().name();
+
 //             for iter_class in pci_ids::Classes::iter() {
 //                 if iter_class.id() == device.class {
 //                     for iter_subclass in iter_class.subclasses() {
@@ -50,7 +50,7 @@ use super::pci_device_iter;
 //                 }
 //             }
 //         }
-        
+
 //         subs[0].name();
 //         serial_println!(
 //             "BUS: {}\t- {}\t-\tVendor {:?}\nClass: {}\t-\tSubclass: {}\nSubsystems {:?}\n\n",

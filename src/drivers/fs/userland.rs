@@ -1,28 +1,38 @@
-use alloc::{vec::Vec, string::{String, ToString}};
-use hashbrown::HashMap;
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
+
 
 use super::fs::FilePath;
 
-
 #[derive(Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
 pub struct FatPermissions(pub u8);
-#[derive(PartialEq,Eq, Hash, Debug, Clone)]
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct FatGroup {
     pub group_name: String,
     pub id: u16,
     pub derived_groups: Vec<u16>,
 }
-#[derive(PartialEq,Eq, Hash, Debug, Clone)]
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct FatUser {
     pub username: String,
     pub id: u16,
     pub groups: Vec<u16>,
 }
 pub fn get_group(id: u16) -> FatGroup {
-    FatGroup { group_name: "default".to_string(), id, derived_groups: Vec::new() }
+    FatGroup {
+        group_name: "default".to_string(),
+        id,
+        derived_groups: Vec::new(),
+    }
 }
 pub fn get_user(id: u16) -> FatUser {
-    FatUser { username: "Sxmourai".to_string(), id, groups: alloc::vec![1] }
+    FatUser {
+        username: "Sxmourai".to_string(),
+        id,
+        groups: alloc::vec![1],
+    }
 }
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub enum FatPerson {

@@ -1,21 +1,19 @@
 use alloc::{
-    string::{String, ToString},
     vec::Vec,
 };
-use core::{arch::asm, fmt, iter::empty};
+use core::{fmt};
 use lazy_static::lazy_static;
-use log::debug;
+
 use spin::Mutex;
 use x86_64::{
-    registers::debug,
-    structures::port::{PortRead, PortWrite},
+    structures::port::{PortWrite},
 };
 
 use crate::{serial_println, terminal::buffer::VgaBuffer};
 
 use super::{
     buffer::{BUFFER_HEIGHT, BUFFER_WIDTH, SBUFFER_WIDTH},
-    console::{Console, ConsoleError, ScreenChar, DEFAULT_CHAR},
+    console::{Console, ScreenChar, DEFAULT_CHAR},
 };
 
 #[allow(dead_code)]
@@ -66,9 +64,14 @@ impl Writer {
     pub fn move_cursor(&mut self, x: u8, y: u8) {
         self.pos = ScreenPos(x, y);
 
-        let pos: u16 = (y as u16 * 80 + x as u16);
+        let pos: u16 = y as u16 * 80 + x as u16;
 
-        if self.console.get_char_at(self.pos.0,self.pos.1).ascii_character == DEFAULT_CHAR.ascii_character {
+        if self
+            .console
+            .get_char_at(self.pos.0, self.pos.1)
+            .ascii_character
+            == DEFAULT_CHAR.ascii_character
+        {
             self.write_char_at(
                 self.pos.clone(),
                 ScreenChar::new('\0' as u8, ColorCode::new(Color::White, Color::Black)),
@@ -106,9 +109,10 @@ impl Writer {
             }
             if self.console.bottom_buffer.is_empty() {
                 self.write_screenchars_at_no_wrap(0, height - 1, [DEFAULT_CHAR; 80].iter());
-                if self.pos.1!=0{
+                if self.pos.1 != 0 {
                     self.move_cursor(self.pos.0, self.pos.1 - 1)
-                } else { //TODO Fix errors here
+                } else {
+                    //TODO Fix errors here
                     serial_println!("Bug whilst moving cursor: {:?}", self.pos);
                 }
             } else {
@@ -170,8 +174,8 @@ impl Writer {
     }
     pub fn write_screenchars_at_no_wrap<'a>(
         &mut self,
-        mut x: u8,
-        mut y: u8,
+        x: u8,
+        y: u8,
         s: impl Iterator<Item = &'a ScreenChar>,
     ) {
         for (i, char) in s.enumerate() {
@@ -193,7 +197,7 @@ impl Writer {
                 }
                 x = 0;
             }
-            if (c.ascii_character == '\n' as u8) {
+            if c.ascii_character == '\n' as u8 {
                 continue;
             }
             self.write_char_at(ScreenPos(x, y), c);
@@ -202,7 +206,7 @@ impl Writer {
         (x, y)
     }
     // Prints characters at desired position, with color of self.color_code and returns the end index
-    pub fn write_string_at(&mut self, mut x: u8, mut y: u8, s: &str) -> (u8, u8) {
+    pub fn write_string_at(&mut self, x: u8, y: u8, s: &str) -> (u8, u8) {
         let mut screenchars = Vec::new();
         for c in s.bytes() {
             screenchars.push(ScreenChar {

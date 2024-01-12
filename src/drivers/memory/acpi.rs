@@ -3,4 +3,4 @@
 // pub fn foo() {
 //     unsafe { libacpica::AcpiEnable() };
 //     // unsafe { acpica_sys::AcpiEnable() };
-// } 
+// }

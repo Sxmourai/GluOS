@@ -1,13 +1,13 @@
-use core::ptr::{write_volatile, read_volatile};
+use core::ptr::{read_volatile, write_volatile};
 
 use alloc::vec::Vec;
-use spin::Mutex;
+
 
 use super::{
-    buffer::{ConsoleBuffer, VgaBuffer, Buffer, BUFFER_WIDTH},
-    writer::{Color, ColorCode, ScreenPos, print_screenchars_atp},
+    buffer::{Buffer, ConsoleBuffer, VgaBuffer},
+    writer::{print_screenchars_atp, Color, ColorCode, ScreenPos},
 };
-use lazy_static::lazy_static;
+
 
 pub const DEFAULT_CHAR: ScreenChar = ScreenChar::new('\0' as u8, ColorCode(15)); // Black on black
 
@@ -29,14 +29,14 @@ impl Console {
         if x < self.size().0 && y < self.size().1 {
             unsafe { write_volatile(&mut self.buffer.chars[y as usize][x as usize], chr) }
         } else {
-            log::error!("Tried to write {:?} at {:?}", chr, (x,y))
+            log::error!("Tried to write {:?} at {:?}", chr, (x, y))
         }
     }
     pub fn get_char_at(&self, x: u8, y: u8) -> ScreenChar {
         if x < self.size().0 && y < self.size().1 {
             unsafe { read_volatile(&self.buffer.chars[y as usize][x as usize]) }
         } else {
-            log::error!("Tried to read {:?}", (x,y));
+            log::error!("Tried to read {:?}", (x, y));
             return DEFAULT_CHAR;
         }
     }
@@ -64,11 +64,11 @@ impl Console {
     //TODO Support top and bottom buffer ?
     pub fn get_str_at(&self, pos: &ScreenPos, len: u16) -> Vec<ScreenChar> {
         let mut buffer = Vec::new();
-        let (width, height) = self.size();
+        let (width, _height) = self.size();
         for i in 0..len {
             buffer.push(self.get_char_at(
                 (pos.0 as u16 + i) as u8 % width,
-                ((i / width as u16) as u8 + pos.1),
+                (i / width as u16) as u8 + pos.1,
             )); // Wrap around
         }
         buffer

@@ -7,16 +7,14 @@
 #![feature(const_mut_refs)]
 #![feature(linkage)]
 #![feature(naked_functions)]
-#![allow(unused, dead_code)] //TODO: Only for debug (#[cfg(debug_assertions)])
+// #![allow(unused, dead_code)] //TODO: Only for debug (#[cfg(debug_assertions)])
 #![deny(unsafe_op_in_unsafe_fn)]
 
-use bootloader::{entry_point, BootInfo};
-
-pub mod state;
-pub mod drivers;
-pub mod test;
-pub mod boot;
 pub mod bit_manipulation;
+pub mod boot;
+pub mod drivers;
+pub mod state;
+pub mod test;
 pub mod user;
 
 pub use drivers::*;

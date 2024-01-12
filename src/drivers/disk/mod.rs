@@ -1,10 +1,9 @@
 use alloc::{
-    string::{String, ToString},
-    vec::Vec,
+    string::{String},
 };
-use core::{cell::Cell, convert::Infallible, num::TryFromIntError};
-use log::debug;
-use spin::Mutex;
+use core::{num::TryFromIntError};
+
+
 
 pub mod ata;
 
@@ -21,7 +20,7 @@ pub enum DiskError {
 }
 
 impl From<TryFromIntError> for DiskError {
-    fn from(original: TryFromIntError) -> Self {
+    fn from(_original: TryFromIntError) -> Self {
         DiskError::SectorTooBig
     }
 }
@@ -39,7 +38,7 @@ impl From<TryFromIntError> for DiskError {
 //     }
 // }
 impl From<DiskError> for String {
-    fn from(original: DiskError) -> Self {
+    fn from(_original: DiskError) -> Self {
         Self::new()
     }
 }

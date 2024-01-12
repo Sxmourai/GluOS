@@ -1,4 +1,4 @@
-use alloc::string::String;
+
 use lazy_static::lazy_static;
 use spin::Mutex;
 use uart_16550::SerialPort;
@@ -11,23 +11,25 @@ lazy_static! {
     };
 }
 
-use core::{fmt::{Write, Arguments}, str::FromStr};
+use core::{
+    fmt::{Write},
+};
 use x86_64::instructions::interrupts;
 
-use crate::dbg;
+
 #[doc(hidden)]
 pub fn _print(args: ::core::fmt::Arguments) {
     interrupts::without_interrupts(|| {
-        SERIAL1.lock().write_fmt(args)
+        SERIAL1
+            .lock()
+            .write_fmt(args)
             .expect("Printing to serial failed");
     });
 }
 
 pub fn read_serial_input() -> u8 {
     use crate::x86_64::instructions::port::PortRead;
-    interrupts::without_interrupts(|| {
-        unsafe { u8::read_from_port(0x3F8) }
-    })
+    interrupts::without_interrupts(|| unsafe { u8::read_from_port(0x3F8) })
 }
 
 /// Prints to the host through the serial interface.

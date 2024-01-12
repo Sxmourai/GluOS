@@ -1,9 +1,12 @@
-use core::ptr::write_volatile;
 
-use alloc::vec::{self, Vec};
 
-use super::{console::{ScreenChar, DEFAULT_CHAR}, writer::ScreenPos};
-use crate::serial_println;
+use alloc::vec::{Vec};
+
+use super::{
+    console::{ScreenChar},
+    writer::ScreenPos,
+};
+
 
 pub const BUFFER_HEIGHT: u8 = 25;
 pub const BUFFER_WIDTH: u8 = 80;

@@ -5,18 +5,19 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use hashbrown::HashMap;
+
 use pc_keyboard::{DecodedKey, KeyCode};
 use spin::RwLock;
 
-use crate::terminal::{console::{ScreenChar, DEFAULT_CHAR}, writer::{ScreenPos, print_at, print_screenchars_atp, print_screenchar_at}, buffer::{BUFFER_WIDTH, SBUFFER_WIDTH}};
-use crate::{
-    print, println, serial_println,
+use crate::terminal::{
+    buffer::{BUFFER_WIDTH, SBUFFER_WIDTH},
+    console::{ScreenChar, DEFAULT_CHAR},
+    writer::{print_at, print_screenchar_at, print_screenchars_atp, ScreenPos},
 };
-
+use crate::{print, println};
 
 pub static mut COMMANDS_HISTORY: RwLock<Vec<Vec<ScreenChar>>> = RwLock::new(Vec::new());
-pub static mut COMMANDS_INDEX  : RwLock<usize> = RwLock::new(0);
+pub static mut COMMANDS_INDEX: RwLock<usize> = RwLock::new(0);
 
 pub trait KbInput: Send + Sync {
     fn run(self) -> String;
@@ -99,7 +100,7 @@ impl KbInput for BlockingPrompt {
                         panic!("ERROR: {}", msg)
                     }
                     return msg;
-            }
+                }
             // let scancode = crate::terminal::serial::read_serial_input();
             // if scancode!=0 {
             //     crate::task::keyboard::DEFAULT_KEYBOARD
@@ -176,8 +177,8 @@ impl KbInput for BlockingPrompt {
                         for (i, chr) in &mut self.pressed_keys[self.pos..].iter().enumerate() {
                             print_screenchar_at(
                                 ((self.pos + i + self.origin.0 as usize) % SBUFFER_WIDTH) as u8,
-                                (((self.pos + i + self.origin.0 as usize) / SBUFFER_WIDTH) as u8
-                                    + self.origin.1),
+                                ((self.pos + i + self.origin.0 as usize) / SBUFFER_WIDTH) as u8
+                                    + self.origin.1,
                                 *chr,
                             );
                         }
@@ -186,25 +187,21 @@ impl KbInput for BlockingPrompt {
                 }
             },
             DecodedKey::RawKey(key) => match key {
-                KeyCode::ArrowLeft => {
-                    x86_64::instructions::interrupts::without_interrupts(|| {
-                        if self.pos > 0 {
-                            self.move_cursor(self.pos - 1);
-                        }
-                    })
-                }
-                KeyCode::ArrowRight => {
-                    x86_64::instructions::interrupts::without_interrupts(|| {
-                        if self.pos < self.pressed_keys.len() {
-                            self.move_cursor(self.pos + 1);
-                        }
-                    })
-                }
+                KeyCode::ArrowLeft => x86_64::instructions::interrupts::without_interrupts(|| {
+                    if self.pos > 0 {
+                        self.move_cursor(self.pos - 1);
+                    }
+                }),
+                KeyCode::ArrowRight => x86_64::instructions::interrupts::without_interrupts(|| {
+                    if self.pos < self.pressed_keys.len() {
+                        self.move_cursor(self.pos + 1);
+                    }
+                }),
                 KeyCode::ArrowUp => unsafe {
                     // serial_println!("{} {:?}", COMMANDS_INDEX.read(), COMMANDS_HISTORY.read());
-                    if COMMANDS_INDEX.read().clone()>0 {
-                        *COMMANDS_INDEX.write()-=1;
-                        if COMMANDS_INDEX.read().clone()==COMMANDS_HISTORY.read().len()-1 {
+                    if COMMANDS_INDEX.read().clone() > 0 {
+                        *COMMANDS_INDEX.write() -= 1;
+                        if COMMANDS_INDEX.read().clone() == COMMANDS_HISTORY.read().len() - 1 {
                             COMMANDS_HISTORY.write().push(self.pressed_keys.clone());
                         }
                         {
@@ -216,26 +213,27 @@ impl KbInput for BlockingPrompt {
                         print_screenchars_atp(&self.origin, [DEFAULT_CHAR; 70]);
                         print_screenchars_atp(&self.origin, self.pressed_keys.clone());
                         self.move_cursor(self.get_pressed_keys_len());
-                    // serial_println!("{} {:?}", COMMANDS_INDEX.read(), COMMANDS_HISTORY.read());
-                }
-                }
+                        // serial_println!("{} {:?}", COMMANDS_INDEX.read(), COMMANDS_HISTORY.read());
+                    }
+                },
                 KeyCode::ArrowDown => unsafe {
                     unsafe {
-                        if COMMANDS_INDEX.read().clone()+1<COMMANDS_HISTORY.read().len() {
-                            *COMMANDS_INDEX.write()+=1;
+                        if COMMANDS_INDEX.read().clone() + 1 < COMMANDS_HISTORY.read().len() {
+                            *COMMANDS_INDEX.write() += 1;
                             // COMMANDS_HISTORY.write().push(self.pressed_keys.clone());
                             {
                                 let history = COMMANDS_HISTORY.read();
-                                let last_command = history.get(COMMANDS_INDEX.read().clone()).unwrap();
+                                let last_command =
+                                    history.get(COMMANDS_INDEX.read().clone()).unwrap();
                                 self.pressed_keys = last_command.clone();
                             }
                             print_screenchars_atp(&self.origin, [DEFAULT_CHAR; 70]);
                             print_screenchars_atp(&self.origin, self.pressed_keys.clone());
                             self.move_cursor(self.get_pressed_keys_len());
                         }
-                    // serial_println!("{} {:?}", COMMANDS_INDEX.read(), COMMANDS_HISTORY.read());
-                }
-                }
+                        // serial_println!("{} {:?}", COMMANDS_INDEX.read(), COMMANDS_HISTORY.read());
+                    }
+                },
                 _ => {}
             },
         }

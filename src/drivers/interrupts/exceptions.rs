@@ -114,10 +114,15 @@ pub extern "x86-interrupt" fn page_fault_handler(
 ) {
     use x86_64::registers::control::Cr2;
     //TODO Map a page to a frame when page fault
-    panic!("EXCEPTION: PAGE FAULT
+    panic!(
+        "EXCEPTION: PAGE FAULT
     Accessed Address: {:?}
     Error Code: {:?}
-    Stack frame: {:#?}",Cr2::read(),error_code,stack_frame);
+    Stack frame: {:#?}",
+        Cr2::read(),
+        error_code,
+        stack_frame
+    );
 }
 
 // pub fn map_phys_memory(location: u64, size: usize, end_page:u64) -> &'static [u8] {

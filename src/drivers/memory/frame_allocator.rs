@@ -1,11 +1,11 @@
 use bootloader::bootinfo::{MemoryMap, MemoryRegionType};
 use x86_64::structures::paging::PageTableFlags as Flags;
 use x86_64::{
-    structures::paging::{self, FrameAllocator, Mapper, Page, PhysFrame, Size4KiB},
+    structures::paging::{FrameAllocator, Mapper, Page, PhysFrame, Size4KiB},
     PhysAddr, VirtAddr,
 };
 
-use crate::state::{get_state, mem_handler};
+use crate::state::{get_state};
 
 /// A FrameAllocator that returns usable frames from the bootloader's memory map.
 #[derive(Debug, Clone)]
@@ -49,7 +49,7 @@ impl BootInfoFrameAllocator {
         let flags = Flags::PRESENT | Flags::WRITABLE;
 
         let page = Page::containing_address(VirtAddr::new(0xfffffff9));
-        
+
         let mut binding = get_state();
         let binding = binding.mem_handler();
         let mut binding = binding.lock();

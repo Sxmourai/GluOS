@@ -1,12 +1,14 @@
-use crate::{boot::hlt_loop, drivers::time};
-use alloc::{boxed::Box, string::String, vec::Vec};
-use pc_keyboard::{layouts::Us104Key, DecodedKey, HandleControl, KeyCode, Keyboard, ScancodeSet1};
+use crate::{drivers::time};
+
+
 use pic8259::ChainedPics;
 use spin::Mutex;
-use x86_64::{structures::{
-    idt::{InterruptStackFrame, PageFaultErrorCode},
-    port::PortRead,
-}, instructions::port::PortReadOnly};
+use x86_64::{
+    instructions::port::PortReadOnly,
+    structures::{
+        idt::{InterruptStackFrame},
+    },
+};
 
 pub const PIC_1_OFFSET: u8 = 32;
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
@@ -19,7 +21,7 @@ pub static PICS: Mutex<ChainedPics> =
 pub enum InterruptIndex {
     Timer = PIC_1_OFFSET,
     Keyboard,
-    SecondInterruptController= PIC_2_OFFSET+4,
+    SecondInterruptController = PIC_2_OFFSET + 4,
 }
 
 impl InterruptIndex {

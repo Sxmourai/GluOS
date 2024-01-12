@@ -1,9 +1,8 @@
 use x86_64::structures::idt::InterruptDescriptorTable;
 
-
 use crate::drivers::gdt::DOUBLE_FAULT_IST_INDEX;
 use crate::drivers::interrupts::hardware::InterruptIndex;
-use crate::interrupts::hardware::second_interrupt_controller;
+
 
 use super::exceptions::*;
 use super::hardware::{keyboard, timer};

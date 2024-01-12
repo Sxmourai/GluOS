@@ -1,31 +1,20 @@
-use core::{cell::Cell, ffi::c_uchar};
-
-use ::log::{debug, trace};
-use alloc::{
-    format,
-    string::String,
-    vec::{self, Vec},
-};
-use spin::Mutex;
-use x86_64::{
-    structures::paging::{Mapper, Page, PageTableFlags, PhysFrame, Size4KiB},
-    PhysAddr, VirtAddr, instructions::hlt,
-};
-
 use crate::{
-    drivers::{self, memory::handler::MemoryHandler, fs::fs_driver::FsDriver, disk::ata::{DiskLoc, Channel, Drive}},
+    drivers::{
+        self,
+        disk::ata::{Channel, DiskLoc, Drive},
+        fs::fs_driver::FsDriver,
+        memory::handler::MemoryHandler,
+    },
     serial_println,
     state::get_state,
-    state::Kernel, video, user::{shell::Shell, self}, task::executor::Executor, terminal::serial::read_serial_input,
+    task::executor::Executor,
+    user::{self, shell::Shell},
 };
-// Supress compiler warning about unused imports, but if removed, error
-#[allow(unused_imports)]
-use crate::println;
 
 pub fn boot(boot_info: &'static bootloader::BootInfo) {
     //TODO Can't use vecs, Strings before heap init (in memoryHandler init), which means we can't do trace... Use a constant-size list ?
     drivers::gdt::init();
-    let mut mem_handler = MemoryHandler::init_heap_and_frame_allocator(
+    let mem_handler = MemoryHandler::init_heap_and_frame_allocator(
         boot_info.physical_memory_offset,
         &boot_info.memory_map,
     );
@@ -41,7 +30,8 @@ pub fn boot(boot_info: &'static bootloader::BootInfo) {
     Shell::new();
 }
 
-pub fn end() -> ! { //TODO Implement async stuff & all in Executor
+pub fn end() -> ! {
+    //TODO Implement async stuff & all in Executor
     // hlt_loop()
     let mut executor = Executor::new();
     // // executor.spawn(Task::new(keyboard::print_keypresses()));

@@ -1,22 +1,21 @@
 use core::{
-    cell::{RefCell, RefMut},
     fmt::Display,
     panic,
 };
 
 use alloc::{
-    boxed::Box,
     format,
-    string::String,
-    vec::{self, Vec},
+    vec::{Vec},
 };
 use log::{debug, error, info, trace};
 use spin::{Mutex, MutexGuard};
 
-use crate::{bit_manipulation::{u16_to_u8, bytes, ptrlist_to_num}, serial_println};
-use lazy_static::lazy_static;
+use crate::{
+    bit_manipulation::{bytes, ptrlist_to_num, u16_to_u8},
+};
 
-use crate::x86_64::instructions::port::{PortWrite, PortRead};
+
+use crate::x86_64::instructions::port::{PortRead, PortWrite};
 
 use super::DiskError;
 
@@ -89,7 +88,8 @@ fn detect(addr: impl DiskAddress) -> Option<Disk> {
     unsafe {
         bsy(base);
     }
-    if unsafe { u8::read_from_port(base + 4) } != 0 || unsafe { u8::read_from_port(base + 5) } != 0 {
+    if unsafe { u8::read_from_port(base + 4) } != 0 || unsafe { u8::read_from_port(base + 5) } != 0
+    {
         trace!("ATAPI drive detected !");
     } else if unsafe { check_drq_or_err(base) }.is_err() {
         error!(
@@ -100,7 +100,7 @@ fn detect(addr: impl DiskAddress) -> Option<Disk> {
         //TODO Try to handle the error
         return None;
     }
-    let mut identify = read_identify(base + 0);
+    let identify = read_identify(base + 0);
     let mut u8_identify = [0u8; 512];
     let mut char_identify = ['\0'; 512];
     for i in 0..identify.len() {
@@ -138,7 +138,7 @@ fn detect(addr: impl DiskAddress) -> Option<Disk> {
 fn read_identify(command_port_addr: u16) -> [u16; SSECTOR_SIZEWORD] {
     trace!("Reading identify data");
     let mut data = [0u16; 256];
-    for i in (0..data.len()) {
+    for i in 0..data.len() {
         data[i] = unsafe { u16::read_from_port(command_port_addr) };
     }
     data
@@ -149,8 +149,8 @@ fn get_selected_drive_type(channel: Channel) -> DriveType {
     //TODO Do proper waiting etc, working in qemu tho
     let base = channel as u16;
     unsafe { u8::write_to_port(base + 7, 0x90) }; // Reset drive
-    let sector_count = unsafe { u8::read_from_port(base + 2) };
-    let lba_low = unsafe { u8::read_from_port(base + 3) };
+    let _sector_count = unsafe { u8::read_from_port(base + 2) };
+    let _lba_low = unsafe { u8::read_from_port(base + 3) };
     let lba_mid = unsafe { u8::read_from_port(base + 4) };
     let lba_high = unsafe { u8::read_from_port(base + 5) };
 
@@ -308,7 +308,7 @@ impl DiskManager {
         // unsafe { check_drq_or_err(self.get_selected_disk().base()) };
         unsafe { u8::write_to_port(base + 6, drive) }; // Select drive of channel
         self.selected_disk = disk_address.as_index();
-        for i in 0..14 {
+        for _i in 0..14 {
             unsafe { u8::read_from_port(self.get_selected_disk().command_reg()) };
         }
         unsafe { bsy(self.get_selected_disk().base()) };
@@ -323,7 +323,7 @@ impl DiskManager {
         start_sector: u64,
         sector_count: u16,
     ) -> Result<Sectors, DiskError> {
-        let mut sectors = self.disks[disk_address.as_index()]
+        let sectors = self.disks[disk_address.as_index()]
             .as_ref()
             .unwrap()
             .read_sectors(start_sector, sector_count);
@@ -345,7 +345,7 @@ impl DiskManager {
         &self,
         disk_address: impl DiskAddress,
         start_sector: u64,
-        mut content: Sectors,
+        content: Sectors,
     ) -> DResult<()> {
         self.disks[disk_address.as_index()]
             .as_ref()
@@ -453,7 +453,7 @@ impl Disk {
     }
 
     //28Bit Lba PIO mode
-    pub fn read28(&self, lba: u32, sector_count: u8) -> DResult<Sectors> {
+    pub fn read28(&self, _lba: u32, sector_count: u8) -> DResult<Sectors> {
         let drive_addr = self.loc.drive_lba28_addr() as u32;
         let base = self.loc.channel_addr();
         unsafe {
@@ -514,9 +514,9 @@ impl Disk {
     fn retrieve_read(&self, sector_count: u16) -> DResult<Sectors> {
         trace!("Retrieving read !");
         let mut buffer = alloc::vec![];
-        for sector in 0..sector_count {
+        for _sector in 0..sector_count {
             self.polling(true, line!())?;
-            for i in 0..SSECTOR_SIZEWORD / 2 {
+            for _i in 0..SSECTOR_SIZEWORD / 2 {
                 let data = unsafe { u32::read_from_port(self.data_reg()) };
                 buffer.push((data >> 0) as u8);
                 buffer.push((data >> 8) as u8);
@@ -529,37 +529,66 @@ impl Disk {
 
     pub fn write48(&self, start_sector: u64, content: Sectors) -> DResult<()> {
         let mut sector_count = content.len() / 512;
-        if sector_count==0{sector_count+=1}
+        if sector_count == 0 {
+            sector_count += 1
+        }
         debug!("{} {:?}", start_sector, content);
         unsafe {
             u8::write_to_port(self.device_select_reg(), self.loc.drive_lba48_addr()); // Select drive
             u8::write_to_port(self.base(), u8::read_from_port(self.base()) | 0x80);
 
-            u8::write_to_port(self.sector_count_reg(),   TryInto::<u8>::try_into((sector_count >> 8)).unwrap()); // sector_count high
-            u8::write_to_port(self.lbalo_reg(),          TryInto::<u8>::try_into((start_sector >> 24)).unwrap()); // LBA4
-            u8::write_to_port(self.lbamid_reg(),         TryInto::<u8>::try_into((start_sector >> 32)).unwrap()); // LBA5
-            u8::write_to_port(self.lbahi_reg(),          TryInto::<u8>::try_into((start_sector >> 40)).unwrap()); // LBA6
+            u8::write_to_port(
+                self.sector_count_reg(),
+                TryInto::<u8>::try_into(sector_count >> 8).unwrap(),
+            ); // sector_count high
+            u8::write_to_port(
+                self.lbalo_reg(),
+                TryInto::<u8>::try_into(start_sector >> 24).unwrap(),
+            ); // LBA4
+            u8::write_to_port(
+                self.lbamid_reg(),
+                TryInto::<u8>::try_into(start_sector >> 32).unwrap(),
+            ); // LBA5
+            u8::write_to_port(
+                self.lbahi_reg(),
+                TryInto::<u8>::try_into(start_sector >> 40).unwrap(),
+            ); // LBA6
 
             u8::write_to_port(self.base(), u8::read_from_port(self.base()) & !0x80);
 
-            u8::write_to_port(self.sector_count_reg(),   TryInto::<u8>::try_into(sector_count).unwrap()); // sector_count low
-            u8::write_to_port(self.lbalo_reg(),          TryInto::<u8>::try_into(start_sector&0xFF).unwrap()); // LBA1
-            u8::write_to_port(self.lbamid_reg(),         TryInto::<u8>::try_into((start_sector >> 8)).unwrap()); // LBA2
-            u8::write_to_port(self.lbahi_reg(),          TryInto::<u8>::try_into((start_sector >> 16)).unwrap()); // LBA3
+            u8::write_to_port(
+                self.sector_count_reg(),
+                TryInto::<u8>::try_into(sector_count).unwrap(),
+            ); // sector_count low
+            u8::write_to_port(
+                self.lbalo_reg(),
+                TryInto::<u8>::try_into(start_sector & 0xFF).unwrap(),
+            ); // LBA1
+            u8::write_to_port(
+                self.lbamid_reg(),
+                TryInto::<u8>::try_into(start_sector >> 8).unwrap(),
+            ); // LBA2
+            u8::write_to_port(
+                self.lbahi_reg(),
+                TryInto::<u8>::try_into(start_sector >> 16).unwrap(),
+            ); // LBA3
             u8::write_to_port(self.command_reg(), 0x34); // READ SECTORS EXT
         }
         self.send_write(content)
     }
     fn send_write(&self, content: Sectors) -> DResult<()> {
         let mut len = content.len() / 512;
-        if len==0{len+=1}
+        if len == 0 {
+            len += 1
+        }
         for sector in 0..len {
             self.polling(false, line!())?;
 
             for i in 0..128 {
                 let mut data = 0;
                 for j in 0..4 {
-                    data |= ((*content.get((sector * 512) + i * 4 + j).unwrap_or(&0) as u32) << 8*j)
+                    data |=
+                        (*content.get((sector * 512) + i * 4 + j).unwrap_or(&0) as u32) << 8 * j
                 }
                 unsafe { u32::write_to_port(self.data_reg(), data) };
             }
@@ -609,7 +638,9 @@ impl Disk {
         let status = unsafe { u8::read_from_port(self.command_reg()) };
 
         if status & 0x01 != 0 {
-            log::error!("IDE error: {:#x}", unsafe { u8::read_from_port(self.error_reg()) });
+            log::error!("IDE error: {:#x}", unsafe {
+                u8::read_from_port(self.error_reg())
+            });
             return Err(DiskError::DRQRead);
         }
 
@@ -624,9 +655,10 @@ impl Disk {
     pub fn read_sectors(&self, sector_address: u64, sector_count: u16) -> DResult<Sectors> {
         //TODO Move from vecs to slices
         if self.addressing_modes.lba48 != 0 {
-            if sector_address+(sector_count as u64)>self.addressing_modes.lba48 { // > or >= ?
+            if sector_address + (sector_count as u64) > self.addressing_modes.lba48 {
+                // > or >= ?
                 error!("Sector not in disk ({} - {})", sector_address, sector_count);
-                return Err(DiskError::NotFound)
+                return Err(DiskError::NotFound);
             }
             self.read48(sector_address, sector_count)
         } else if self.addressing_modes.lba28 != 0 {
@@ -764,18 +796,21 @@ pub fn initialize_sata_controller() {
 /// wait for BSY flag to be unset
 unsafe fn bsy(base: u16) {
     trace!("Waiting BSY flag to unset at base: {:X}", base);
-    while unsafe{u8::read_from_port(base + 7)} & 0x80 != 0x00 {}
+    while unsafe { u8::read_from_port(base + 7) } & 0x80 != 0x00 {}
     // 0x80 = 0b10000000
 }
 
 /// wait for DRQ to be ready or ERR to set
 unsafe fn check_drq_or_err(base: u16) -> Result<(), DiskError> {
     trace!("Waiting DRQ flag to set at base: {:X}", base);
-    let mut status = unsafe{u8::read_from_port(base + 7)};
+    let mut status = unsafe { u8::read_from_port(base + 7) };
     let mut i = 0;
     loop {
         if status & 0x01 != 0x00 {
-            error!("Error reading DRQ from drive: {}", bytes(unsafe{u8::read_from_port(base + 1)}));
+            error!(
+                "Error reading DRQ from drive: {}",
+                bytes(unsafe { u8::read_from_port(base + 1) })
+            );
             return Err(DiskError::DRQRead);
         } //TODO Make better error handling... Or make error handling in top level function
         if status & 0x08 != 0x00 {
@@ -785,7 +820,7 @@ unsafe fn check_drq_or_err(base: u16) -> Result<(), DiskError> {
             error!("Error reading DRQ from drive: TIMEOUT");
             return Err(DiskError::TimeOut);
         }
-        status = unsafe{u8::read_from_port(base + 7)};
+        status = unsafe { u8::read_from_port(base + 7) };
         i += 1;
     }
     Ok(())

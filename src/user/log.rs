@@ -1,9 +1,11 @@
-use alloc::{format, string::{String, ToString}, vec::Vec};
-use spin::Mutex;
+use alloc::{
+    format,
+};
 
-use crate::{serial_println, println, serial_print};
-use lazy_static::lazy_static;
-use log::{Level, LevelFilter, Log, Metadata, Record, error};
+
+use crate::{serial_println};
+
+use log::{error, Level, LevelFilter, Log, Metadata, Record};
 
 //TODO Have all codes https://chrisyeh96.github.io/2020/03/28/terminal-colors.html
 enum Color {
@@ -27,7 +29,10 @@ impl From<u8> for Color {
             5 => Color::Magenta,
             6 => Color::Cyan,
             7 => Color::White,
-            _ => {error!("From u8 but u8 is too big !");Color::White}
+            _ => {
+                error!("From u8 but u8 is too big !");
+                Color::White
+            }
         }
     }
 }
@@ -39,7 +44,9 @@ enum Codes {
     SlowBlink = 5,
 }
 impl Codes {
-    fn reset() -> &'static str {"\x1b[0;0m"}
+    fn reset() -> &'static str {
+        "\x1b[0;0m"
+    }
 }
 
 struct Logger;
@@ -50,9 +57,15 @@ impl Log for Logger {
     }
     fn log(&self, record: &Record) {
         // Implement your own logic to handle the log record
-        let mut buffer = [0u8; 128];
+        let _buffer = [0u8; 128];
         let color = format!("\x1b[1;3{}m", Color::from(record.level() as u8) as u8);
-        serial_println!("[{}{}{}] {}", color, record.level(),Codes::reset(), record.args());
+        serial_println!(
+            "[{}{}{}] {}",
+            color,
+            record.level(),
+            Codes::reset(),
+            record.args()
+        );
         // Your logic to write to an output (e.g., a memory buffer)
     }
     //TODO
@@ -75,7 +88,8 @@ pub fn point() {
 #[macro_export]
 macro_rules! dbg {
     ($variable:expr) => {
-        serial_println!("{} = {:?} at {}:{}",
+        serial_println!(
+            "{} = {:?} at {}:{}",
             stringify!($variable),
             $variable,
             file!(),
