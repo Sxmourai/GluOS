@@ -3,21 +3,18 @@
 use alloc::{
     format,
     string::{String, ToString},
-    vec::{Vec},
+    vec::Vec,
 };
 use hashbrown::HashMap;
 
 use shell_macro::command;
 
-use x86_64::structures::port::{PortRead, PortWrite};
 
 use crate::{
-    drivers::{
-        disk::ata::{self, read_from_disk, write_to_disk, Channel, DiskLoc, Drive},
-    },
+    drivers::disk::ata::{self, read_from_disk, write_to_disk, Channel, DiskLoc, Drive},
     fs::fs::Fat32Entry,
     print, println, serial_print, serial_println,
-    state::{get_state},
+    state::get_state,
     terminal::console::{ScreenChar, DEFAULT_CHAR},
 };
 
@@ -30,30 +27,6 @@ fn lsdisk(_args: String) -> Result<(), String> {
             println!("-> {}", disk);
         }
     }
-    Ok(())
-}
-fn outb(args: String) -> Result<(), String> {
-    let mut args = args.split(" ");
-    let port = args.next().ok_or("Invalid argument: missing port")?;
-    let data = args.next().ok_or("Invalid argument: missing data")?;
-    let port = port
-        .parse()
-        .map_err(|e| format!("Failed to parse port: {}", e))?;
-    let data = data
-        .parse()
-        .map_err(|e| format!("Failed to parse data: {}", e))?;
-
-    unsafe { u8::write_to_port(port, data) };
-    Ok(())
-}
-fn inb(args: String) -> Result<(), String> {
-    let mut args = args.split(" ");
-    let port = args.next().ok_or("Invalid argument: missing port")?;
-    let port = port
-        .parse()
-        .map_err(|e| format!("Failed to parse port: {}", e))?;
-
-    println!("{}", unsafe { u8::read_from_port(port) });
     Ok(())
 }
 
@@ -245,7 +218,9 @@ fn dump_disk(args: String) -> Result<(), String> {
     let mut i = 0;
     loop {
         serial_println!("\n\n-----------{}----------", i);
-        for b in read_from_disk(&DiskLoc(channel, drive), i, 3).unwrap() {
+        let sectors = read_from_disk(&DiskLoc(channel, drive), i, 3);
+        if sectors.is_err() {break}
+        for b in sectors.unwrap() {
             if b != 0 {
                 serial_print!("{}", b as char)
             }
@@ -329,14 +304,14 @@ impl CommandRunner {
         }
     }
     pub fn run(mut self) {
-        'commands: loop {
+        loop {
             let b = input(&self.prefix); // Binding for longer lived value
             let mut command = Vec::new();
             for char in b.bytes() {
                 command.push(ScreenChar::new(char, DEFAULT_CHAR.color_code));
             }
             unsafe {
-                unsafe { COMMANDS_HISTORY.write().push(command) };
+                COMMANDS_HISTORY.write().push(command);
                 let history_len = COMMANDS_HISTORY.read().len();
                 if history_len > 1 {
                     if COMMANDS_HISTORY.read().get(history_len - 2).unwrap().len() == 0 {

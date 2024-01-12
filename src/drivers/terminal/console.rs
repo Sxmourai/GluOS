@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 
 
 use super::{
-    buffer::{Buffer, ConsoleBuffer, VgaBuffer},
+    buffer::{ConsoleBuffer, VgaBuffer},
     writer::{print_screenchars_atp, Color, ColorCode, ScreenPos},
 };
 

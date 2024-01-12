@@ -197,42 +197,35 @@ impl KbInput for BlockingPrompt {
                         self.move_cursor(self.pos + 1);
                     }
                 }),
-                KeyCode::ArrowUp => unsafe {
-                    // serial_println!("{} {:?}", COMMANDS_INDEX.read(), COMMANDS_HISTORY.read());
-                    if COMMANDS_INDEX.read().clone() > 0 {
-                        *COMMANDS_INDEX.write() -= 1;
-                        if COMMANDS_INDEX.read().clone() == COMMANDS_HISTORY.read().len() - 1 {
-                            COMMANDS_HISTORY.write().push(self.pressed_keys.clone());
+                KeyCode::ArrowUp => {
+                    if unsafe { COMMANDS_INDEX.read().clone() } > 0 {
+                        *unsafe { COMMANDS_INDEX.write() } -= 1;
+                        if unsafe { COMMANDS_INDEX.read().clone() } == unsafe { COMMANDS_HISTORY.read().len() } - 1 {
+                            unsafe { COMMANDS_HISTORY.write().push(self.pressed_keys.clone()) };
                         }
                         {
-                            // let his = COMMANDS_HISTORY;
-                            let history = COMMANDS_HISTORY.read();
-                            let last_command = history.get(COMMANDS_INDEX.read().clone()).unwrap();
+                            let history = unsafe { COMMANDS_HISTORY.read() };
+                            let last_command = history.get(unsafe { COMMANDS_INDEX.read().clone() }).unwrap();
                             self.pressed_keys = last_command.clone();
                         }
                         print_screenchars_atp(&self.origin, [DEFAULT_CHAR; 70]);
                         print_screenchars_atp(&self.origin, self.pressed_keys.clone());
                         self.move_cursor(self.get_pressed_keys_len());
-                        // serial_println!("{} {:?}", COMMANDS_INDEX.read(), COMMANDS_HISTORY.read());
                     }
                 },
-                KeyCode::ArrowDown => unsafe {
-                    unsafe {
-                        if COMMANDS_INDEX.read().clone() + 1 < COMMANDS_HISTORY.read().len() {
-                            *COMMANDS_INDEX.write() += 1;
-                            // COMMANDS_HISTORY.write().push(self.pressed_keys.clone());
+                KeyCode::ArrowDown => {
+                        if unsafe { COMMANDS_INDEX.read().clone() } + 1 < unsafe { COMMANDS_HISTORY.read().len() } {
+                            *unsafe { COMMANDS_INDEX.write() } += 1;
                             {
-                                let history = COMMANDS_HISTORY.read();
+                                let history = unsafe { COMMANDS_HISTORY.read() };
                                 let last_command =
-                                    history.get(COMMANDS_INDEX.read().clone()).unwrap();
+                                    history.get(unsafe { COMMANDS_INDEX.read().clone() }).unwrap();
                                 self.pressed_keys = last_command.clone();
                             }
                             print_screenchars_atp(&self.origin, [DEFAULT_CHAR; 70]);
                             print_screenchars_atp(&self.origin, self.pressed_keys.clone());
                             self.move_cursor(self.get_pressed_keys_len());
                         }
-                        // serial_println!("{} {:?}", COMMANDS_INDEX.read(), COMMANDS_HISTORY.read());
-                    }
                 },
                 _ => {}
             },

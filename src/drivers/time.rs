@@ -6,7 +6,7 @@ use x86_64::instructions::{hlt, port::Port};
 use crate::serial_println;
 
 static ELAPSED_TICKS_SINCE_BOOT: Mutex<usize> = Mutex::new(0);
-static DATE: Mutex<usize> = Mutex::new(0);
+// static DATE: Mutex<usize> = Mutex::new(0);
 
 pub struct Date {
     pub seconds: u8,

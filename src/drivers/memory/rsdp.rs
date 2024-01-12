@@ -13,19 +13,19 @@ use log::trace;
 
 static ACPI_HEAD_SIZE: usize = core::mem::size_of::<ACPISDTHeader>();
 
-use crate::{bit_manipulation::ptrlist_to_num};
+use crate::bit_manipulation::ptrlist_to_num;
 
 use super::{handler::MemoryHandler, read_phys_memory_and_map};
 /// This (usually!) contains the base address of the EBDA (Extended Bios Data Area), shifted right by 4
-const EBDA_START_SEGMENT_PTR: usize = 0x40e; // Base address in in 2 bytes
-/// The earliest (lowest) memory address an EBDA (Extended Bios Data Area) can start
-const EBDA_EARLIEST_START: usize = 0x80000;
-/// The end of the EBDA (Extended Bios Data Area)
-const EBDA_END: usize = 0x9ffff;
-/// The start of the main BIOS area below 1mb in which to search for the RSDP (Root System Description Pointer)
-const RSDP_BIOS_AREA_START: usize = 0xe0000;
-/// The end of the main BIOS area below 1mb in which to search for the RSDP (Root System Description Pointer)
-const RSDP_BIOS_AREA_END: usize = 0xfffff;
+// const EBDA_START_SEGMENT_PTR: usize = 0x40e; // Base address in in 2 bytes
+// /// The earliest (lowest) memory address an EBDA (Extended Bios Data Area) can start
+// const EBDA_EARLIEST_START: usize = 0x80000;
+// /// The end of the EBDA (Extended Bios Data Area)
+// const EBDA_END: usize = 0x9ffff;
+// /// The start of the main BIOS area below 1mb in which to search for the RSDP (Root System Description Pointer)
+// const RSDP_BIOS_AREA_START: usize = 0xe0000;
+// /// The end of the main BIOS area below 1mb in which to search for the RSDP (Root System Description Pointer)
+// const RSDP_BIOS_AREA_END: usize = 0xfffff;
 // Root System Description Pointer signature
 pub const RSDP_SIGNATURE: &'static [u8; 8] = b"RSD PTR ";
 #[repr(C, packed)]
@@ -162,9 +162,9 @@ struct FADT {
     x_gpe1_block: GenericAddressStructure,
 }
 
-#[repr(C)]
-#[derive(Debug)]
-struct RMADT {
+#[repr(C, packed)]
+// #[derive(Debug)] Can't derive debug because packed struct
+struct RawMADT {
     h: ACPISDTHeader,
     local_apic_addr: u32,
     flags: u32,
@@ -173,14 +173,17 @@ struct RMADT {
     // ETC
 }
 struct MADT {
-    pub inner: &'static RMADT,
+    #[allow(unused)]
+    // Do the parsing of MADT in new
+    pub inner: &'static RawMADT,
     pub fields: Vec<&'static dyn APICRecord>,
     pub num_core: Vec<(usize, u8)>, // (core id, apic id)
 }
 impl MADT {
     pub unsafe fn new(bytes: &[u8]) -> Self {
+        let inner = unsafe { &*(bytes.as_ptr() as *const RawMADT) };
         Self {
-            inner: unsafe { &*(bytes.as_ptr() as *const RMADT) },
+            inner,
             fields: Vec::new(),
             num_core: Vec::new(),
         }
@@ -396,7 +399,7 @@ unsafe fn handle_fadt(bytes: &[u8]) -> Option<&'static FADT> {
 unsafe fn handle_apic(bytes: &[u8]) -> Option<MADT> {
     let mut madt = unsafe { MADT::new(bytes) };
 
-    let mut start_idx = core::mem::size_of::<RMADT>(); // Start at size of MADT - fields
+    let mut start_idx = core::mem::size_of::<RawMADT>(); // Start at size of MADT - fields
                                                        //TODO Make proper stop handling (rn it stops when there are no more bytes, but if the provided bytes is too long, kernel panic)
     let mut num_core: usize = 0;
     loop {

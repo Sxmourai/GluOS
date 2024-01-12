@@ -1,9 +1,6 @@
-use alloc::{
-    format,
-};
+use alloc::format;
 
-
-use crate::{serial_println};
+use crate::serial_println;
 
 use log::{error, Level, LevelFilter, Log, Metadata, Record};
 
@@ -36,7 +33,7 @@ impl From<u8> for Color {
         }
     }
 }
-enum Codes {
+pub enum Codes {
     Reset = 0,
     Bold = 1,
     Dim = 2,

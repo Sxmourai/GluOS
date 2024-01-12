@@ -5,34 +5,20 @@ use core::{
 
 use alloc::{
     format,
-    vec::{Vec},
+    vec::Vec,
 };
 use log::{debug, error, info, trace};
 use spin::{Mutex, MutexGuard};
 
-use crate::{
-    bit_manipulation::{bytes, ptrlist_to_num, u16_to_u8},
-};
+use crate::bit_manipulation::{bytes, ptrlist_to_num, u16_to_u8};
 
 
 use crate::x86_64::instructions::port::{PortRead, PortWrite};
 
 use super::DiskError;
 
-const ATA_IDENT_DEVICETYPE: u8 = 0;
-const ATA_IDENT_CYLINDERS: u8 = 2;
-const ATA_IDENT_HEADS: u8 = 6;
-const ATA_IDENT_SERIAL: u8 = 20;
-const ATA_IDENT_SECTORS: u8 = 12;
-const ATA_IDENT_CAPABILITIES: u8 = 98;
-const ATA_IDENT_MODEL: u8 = 54;
-const ATA_IDENT_MAX_LBA: u8 = 120;
-const ATA_IDENT_FIELDVALID: u8 = 106;
-const ATA_IDENT_MAX_LBA_EXT: u8 = 200;
-const ATA_IDENT_COMMANDSETS: u8 = 164;
-
-//TODO Find real number
 pub const SECTOR_SIZE: u16 = 512;
+//TODO Is it really needed to store constants like this ?!
 pub const SSECTOR_SIZE: usize = SECTOR_SIZE as usize;
 pub const SECTOR_SIZEWORD: u16 = SECTOR_SIZE / 2;
 pub const SSECTOR_SIZEWORD: usize = SECTOR_SIZEWORD as usize;
@@ -175,7 +161,7 @@ pub fn read_from_disk(
     sector_count: u16,
 ) -> DResult<Sectors> {
     disk_manager()
-        .as_ref()
+        .as_mut()
         .unwrap()
         .read_disk(addr, start_sector, sector_count)
 }
@@ -278,55 +264,66 @@ impl DiskAddress for u64 {
         (*self).try_into().expect("Disk address is unrecognised")
     }
 }
+impl Into<DiskLoc> for usize {
+    fn into(self) -> DiskLoc {
+        match self {
+            0 => {DiskLoc(Channel::Primary,   Drive::Master)},
+            1 => {DiskLoc(Channel::Primary,   Drive::Slave)},
+            2 => {DiskLoc(Channel::Secondary, Drive::Master)},
+            3 => {DiskLoc(Channel::Secondary, Drive::Slave)},
+            _ => {panic!("Disk address is to big !")}
+        }
+    }
+}
 #[derive(Debug)]
 pub struct DiskManager {
     pub disks: [Option<Disk>; 4],
-    selected_disk: usize,
+    selected_disk: usize, // u8 but usize because used for indexation
 }
 impl DiskManager {
     pub fn new() -> Self {
         unsafe { u8::write_to_port(0x3f6, (1 << 1) | (1 << 2)) }
         unsafe { u8::write_to_port(0x376, (1 << 1) | (1 << 2)) }
         Self {
-            disks: [detect(0u8), detect(1u8), detect(2u8), detect(3u8)],
+            disks: [detect(0u8), 
+                    detect(1u8),
+                    detect(2u8), 
+                    detect(3u8),
+            ],
             selected_disk: 0,
         }
     }
-    fn get_selected_disk(&mut self) -> &mut Disk {
-        self.disks[self.selected_disk].as_mut().unwrap()
-    }
     //TODO Return result
-    fn select_disk(&mut self, disk_address: impl DiskAddress) -> Result<&mut Disk, DiskError> {
-        if disk_address.as_index() >= 4 || self.disks[disk_address.as_index()].is_none() {
+    fn select_disk(&mut self, disk_address: usize) -> Result<&mut Disk, DiskError> {
+        let disk = self.disks[disk_address].as_mut();
+        if disk_address==self.selected_disk {
+            return Ok(disk.unwrap())
+        }
+        if disk_address >= 4 || disk.is_none() {
             return Err(DiskError::DiskNotFound);
         }
-        // if self.selected_disk == disk_address.as_index() {trace!("Drive is already selected: {:?}", self.get_selected_disk());return true;}
+        
+        self.selected_disk = disk_address;
+
+        let disk_address = Into::<DiskLoc>::into(disk_address);
         let base = disk_address.channel_addr();
         let drive = disk_address.drive_select_addr();
-
-        unsafe { bsy(self.get_selected_disk().base()) };
-        // unsafe { check_drq_or_err(self.get_selected_disk().base()) };
+        unsafe { bsy(base) };
         unsafe { u8::write_to_port(base + 6, drive) }; // Select drive of channel
-        self.selected_disk = disk_address.as_index();
         for _i in 0..14 {
-            unsafe { u8::read_from_port(self.get_selected_disk().command_reg()) };
+            unsafe { u8::read_from_port(disk_address.base()+7) };
         }
-        unsafe { bsy(self.get_selected_disk().base()) };
-        // if unsafe { check_drq_or_err(self.get_selected_disk().base()) }.is_err() {
-        //     return Err(DiskError::DRQRead);
-        // }
-        Ok(self.get_selected_disk())
+        unsafe { bsy(disk_address.base()) };
+        Ok(disk.unwrap())
     }
     pub fn read_disk(
-        &self,
+        &mut self,
         disk_address: &impl DiskAddress,
         start_sector: u64,
         sector_count: u16,
     ) -> Result<Sectors, DiskError> {
-        let sectors = self.disks[disk_address.as_index()]
-            .as_ref()
-            .unwrap()
-            .read_sectors(start_sector, sector_count);
+        let selected_disk = self.select_disk(disk_address.as_index())?;
+        let sectors = selected_disk.read_sectors(start_sector, sector_count);
         if sectors.is_err() {
             let err = sectors.unwrap_err();
             if err == DiskError::DRQRead {
@@ -421,34 +418,34 @@ impl Disk {
             loc: addr.as_diskloc(),
         }
     }
-    fn base(&self) -> u16 {
+    pub fn base(&self) -> u16 {
         self.loc.base()
     }
-    fn data_reg(&self) -> u16 {
+    pub fn data_reg(&self) -> u16 {
         self.base() + 0
     }
-    fn error_reg(&self) -> u16 {
+    pub fn error_reg(&self) -> u16 {
         self.base() + 1
     }
-    fn features_reg(&self) -> u16 {
+    pub fn features_reg(&self) -> u16 {
         self.base() + 1
     }
-    fn sector_count_reg(&self) -> u16 {
+    pub fn sector_count_reg(&self) -> u16 {
         self.base() + 2
     }
-    fn lbalo_reg(&self) -> u16 {
+    pub fn lbalo_reg(&self) -> u16 {
         self.base() + 3
     }
-    fn lbamid_reg(&self) -> u16 {
+    pub fn lbamid_reg(&self) -> u16 {
         self.base() + 4
     }
-    fn lbahi_reg(&self) -> u16 {
+    pub fn lbahi_reg(&self) -> u16 {
         self.base() + 5
     }
-    fn device_select_reg(&self) -> u16 {
+    pub fn device_select_reg(&self) -> u16 {
         self.base() + 6
     }
-    fn command_reg(&self) -> u16 {
+    pub fn command_reg(&self) -> u16 {
         self.base() + 7
     }
 
@@ -485,10 +482,10 @@ impl Disk {
         }
         self.retrieve_read(sector_count.into())
     }
-    fn flush_cache(&self) {
-        unsafe { u8::write_to_port(self.command_reg(), 0xE7) };
-        unsafe { check_drq_or_err(self.base()) };
-    }
+    // fn flush_cache(&self) {
+    //     unsafe { u8::write_to_port(self.command_reg(), 0xE7) };
+    //     unsafe { check_drq_or_err(self.base()) };
+    // }
     //48Bit Lba PIO mode
     // 0 for sector_count is equals to u16::MAX
     pub fn read48(&self, lba: u64, sector_count: u16) -> DResult<Sectors> {

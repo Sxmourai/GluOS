@@ -35,7 +35,7 @@ impl FixedSizeBlockAllocator {
     pub unsafe fn init(&mut self, heap_start: usize, heap_size: usize) {
         unsafe {
             self.fallback_allocator
-                .init(unsafe { &mut *(heap_start as *mut u8) }, heap_size)
+                .init(&mut *(heap_start as *mut u8), heap_size)
         };
     }
     /// Allocates using the fallback allocator.

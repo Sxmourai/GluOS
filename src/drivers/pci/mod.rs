@@ -20,34 +20,34 @@ use crate::serial_println;
 
 // The below constants define the PCI configuration space.
 // More info here: <http://wiki.osdev.org/PCI#PCI_Device_Structure>
-const PCI_VENDOR_ID: u8 = 0x0;
-const PCI_DEVICE_ID: u8 = 0x2;
-const PCI_COMMAND: u8 = 0x4;
-const PCI_STATUS: u8 = 0x6;
-const PCI_REVISION_ID: u8 = 0x8;
-const PCI_PROG_IF: u8 = 0x9;
-const PCI_SUBCLASS: u8 = 0xA;
-const PCI_CLASS: u8 = 0xB;
-const PCI_CACHE_LINE_SIZE: u8 = 0xC;
-const PCI_LATENCY_TIMER: u8 = 0xD;
-const PCI_HEADER_TYPE: u8 = 0xE;
-const PCI_BIST: u8 = 0xF;
-const PCI_BAR0: u8 = 0x10;
-const PCI_BAR1: u8 = 0x14;
-const PCI_BAR2: u8 = 0x18;
-const PCI_BAR3: u8 = 0x1C;
-const PCI_BAR4: u8 = 0x20;
-const PCI_BAR5: u8 = 0x24;
-const PCI_CARDBUS_CIS: u8 = 0x28;
-const PCI_SUBSYSTEM_VENDOR_ID: u8 = 0x2C;
-const PCI_SUBSYSTEM_ID: u8 = 0x2E;
-const PCI_EXPANSION_ROM_BASE: u8 = 0x30;
-const PCI_CAPABILITIES: u8 = 0x34;
+pub const PCI_VENDOR_ID: u8 = 0x0;
+pub const PCI_DEVICE_ID: u8 = 0x2;
+pub const PCI_COMMAND: u8 = 0x4;
+pub const PCI_STATUS: u8 = 0x6;
+pub const PCI_REVISION_ID: u8 = 0x8;
+pub const PCI_PROG_IF: u8 = 0x9;
+pub const PCI_SUBCLASS: u8 = 0xA;
+pub const PCI_CLASS: u8 = 0xB;
+pub const PCI_CACHE_LINE_SIZE: u8 = 0xC;
+pub const PCI_LATENCY_TIMER: u8 = 0xD;
+pub const PCI_HEADER_TYPE: u8 = 0xE;
+pub const PCI_BIST: u8 = 0xF;
+pub const PCI_BAR0: u8 = 0x10;
+pub const PCI_BAR1: u8 = 0x14;
+pub const PCI_BAR2: u8 = 0x18;
+pub const PCI_BAR3: u8 = 0x1C;
+pub const PCI_BAR4: u8 = 0x20;
+pub const PCI_BAR5: u8 = 0x24;
+pub const PCI_CARDBUS_CIS: u8 = 0x28;
+pub const PCI_SUBSYSTEM_VENDOR_ID: u8 = 0x2C;
+pub const PCI_SUBSYSTEM_ID: u8 = 0x2E;
+pub const PCI_EXPANSION_ROM_BASE: u8 = 0x30;
+pub const PCI_CAPABILITIES: u8 = 0x34;
 // 0x35 through 0x3B are reserved
-const PCI_INTERRUPT_LINE: u8 = 0x3C;
-const PCI_INTERRUPT_PIN: u8 = 0x3D;
-const PCI_MIN_GRANT: u8 = 0x3E;
-const PCI_MAX_LATENCY: u8 = 0x3F;
+pub const PCI_INTERRUPT_LINE: u8 = 0x3C;
+pub const PCI_INTERRUPT_PIN: u8 = 0x3D;
+pub const PCI_MIN_GRANT: u8 = 0x3E;
+pub const PCI_MAX_LATENCY: u8 = 0x3F;
 
 #[repr(u8)]
 pub enum PciCapability {
@@ -700,10 +700,10 @@ pub enum PciConfigSpaceAccessMechanism {
 // Basically the crates 'pci' and 'pci_ids' are kinda bad, so I'm making a wrapper around both
 // Maybe make it a entire new library named 'pci_no_std' that we publish on crates.io ?
 // We'll see
-struct Device {
+pub struct Device {
     class: &'static Class,
     device: &'static pci_ids::Device,
-    bus_device: PciDevice,
+    pub bus_device: PciDevice,
 }
 
 impl Device {

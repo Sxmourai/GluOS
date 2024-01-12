@@ -1,6 +1,3 @@
-use alloc::{boxed::Box, vec::Vec};
-
-
 use super::{
     frame_buffer::{put_pixel_lock, ScreenLock},
     Color,
@@ -33,7 +30,6 @@ impl Pos {
         Self::new(320, 200)
     }
 }
-type Shapes = Vec<(Box<dyn Shape>, Color)>;
 pub trait Shape {
     fn draw(&mut self, color: Color, screen: &mut ScreenLock);
 }

@@ -5,7 +5,7 @@ use x86_64::{
     PhysAddr, VirtAddr,
 };
 
-use crate::state::{get_state};
+use crate::state::get_state;
 
 /// A FrameAllocator that returns usable frames from the bootloader's memory map.
 #[derive(Debug, Clone)]
@@ -39,7 +39,7 @@ impl BootInfoFrameAllocator {
         frame_addresses.map(|addr| PhysFrame::containing_address(PhysAddr::new(addr)))
     }
 
-    unsafe fn map_physical_region(
+    pub unsafe fn map_physical_region(
         &mut self,
         physical_address: usize,
     ) -> x86_64::structures::paging::Page {

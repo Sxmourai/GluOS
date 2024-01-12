@@ -1,11 +1,8 @@
 
 
-use alloc::vec::{Vec};
+use alloc::vec::Vec;
 
-use super::{
-    console::{ScreenChar},
-    writer::ScreenPos,
-};
+use super::{console::ScreenChar,writer::ScreenPos};
 
 
 pub const BUFFER_HEIGHT: u8 = 25;

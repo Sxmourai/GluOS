@@ -7,7 +7,7 @@
 #![feature(const_mut_refs)]
 #![feature(linkage)]
 #![feature(naked_functions)]
-// #![allow(unused, dead_code)] //TODO: Only for debug (#[cfg(debug_assertions)])
+#![allow(unused, dead_code)] //TODO: Only for debug (#[cfg(debug_assertions)])
 #![deny(unsafe_op_in_unsafe_fn)]
 
 pub mod bit_manipulation;
