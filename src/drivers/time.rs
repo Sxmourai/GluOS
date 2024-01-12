@@ -1,12 +1,15 @@
-use core::{cell::Cell, fmt::Display};
+use core::{cell::Cell, fmt::Display, time::Duration};
 
 use spin::Mutex;
-use x86_64::instructions::port::Port;
+use x86_64::instructions::{port::Port, hlt};
 
 use crate::serial_println;
 
 static ELAPSED_TICKS_SINCE_BOOT: Mutex<usize> = Mutex::new(0);
 static DATE: Mutex<usize> = Mutex::new(0);
+
+
+
 
 pub struct Date {
     pub seconds: u8,
@@ -98,6 +101,14 @@ pub fn init() {
         serial_println!("Current time is {}",date);
     });
 }
+
+pub fn sleep(time: Duration) {
+    loop {
+
+        hlt()
+    }
+}
+
 
 pub fn tick() {
     *ELAPSED_TICKS_SINCE_BOOT.lock() += 1;
