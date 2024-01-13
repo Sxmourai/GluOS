@@ -1,10 +1,10 @@
 use bootloader::BootInfo;
 use spin::{Mutex, RwLock, RwLockWriteGuard};
 
-use crate::drivers::{
+use crate::{drivers::{
     fs::fs_driver::FsDriver,
-    memory::{handler::MemoryHandler, rsdp::DescriptorTablesHandler},
-};
+    memory::handler::MemoryHandler,
+}, memory::tables::DescriptorTablesHandler};
 
 pub static STATE: RwLock<Kernel> = RwLock::new(Kernel::new());
 
