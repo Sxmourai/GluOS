@@ -24,6 +24,7 @@ bit_field = "0.10.2"
 # Our libs
 pci-ids = { git = "https://github.com/Sxmourai/auto-pci-ids.rs.git" } # Pci ids to discover what is connected via pci
 shell_macro = { path = "src/user/shell_macro" }
+raw-cpuid = "11.0.1"
 
 [package.metadata.bootimage]
 run-args = [

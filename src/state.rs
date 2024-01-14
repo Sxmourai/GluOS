@@ -27,14 +27,14 @@ impl Kernel {
     pub fn init(
         &mut self,
         boot_info: &'static bootloader::BootInfo,
-        mem_handler: MemoryHandler,
+        mut mem_handler: MemoryHandler,
         fs_driver: FsDriver,
     ) {
         self.boot_info.replace(boot_info);
-        // self.descriptor_tables.replace(Mutex::new(DescriptorTablesHandler::new(
-        //     &mut mem_handler,
-        //     boot_info.physical_memory_offset,
-        // )));
+        self.descriptor_tables.replace(Mutex::new(DescriptorTablesHandler::new(
+            &mut mem_handler,
+            boot_info.physical_memory_offset,
+        )));
         self.mem_handler.replace(Mutex::new(mem_handler));
         self.fs.replace(Mutex::new(fs_driver));
     }

@@ -1,37 +1,108 @@
 use alloc::vec::Vec;
+use log::debug;
+
+use crate::serial_println;
 
 use super::ACPISDTHeader;
 
+pub type Core = (usize, u8);
 
 #[repr(C, packed)]
-// #[derive(Debug)] Can't derive debug because packed struct
-struct RawMADT {
-    h: ACPISDTHeader,
+pub struct RawMADT {
+    h: ACPISDTHeader, // h.signature == [65, 80, 73, 67] == APIC
     local_apic_addr: u32,
     flags: u32,
     //Entries https://wiki.osdev.org/MADT
     //Entry Type 0: Processor Local APIC
     // ETC
 }
+impl core::fmt::Debug for RawMADT {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let local_apic_addr = self.local_apic_addr;
+        let flags = self.flags;
+        f.debug_struct("RawMADT").field("h", &self.h).field("local_apic_addr", &local_apic_addr).field("flags", &flags).finish()
+    }
+}
+#[derive(Debug)]
 pub struct MADT {
-    #[allow(unused)]
-    // Do the parsing of MADT in new
     pub inner: &'static RawMADT,
     pub fields: Vec<&'static dyn APICRecord>,
-    pub num_core: Vec<(usize, u8)>, // (core id, apic id)
+    pub cores: Vec<Core>, // (core id, apic id)
 }
 impl MADT {
-    pub unsafe fn new(bytes: &[u8]) -> Self {
+    pub unsafe fn new(bytes: &[u8]) -> Option<Self> {
         let inner = unsafe { &*(bytes.as_ptr() as *const RawMADT) };
-        Self {
-            inner,
-            fields: Vec::new(),
-            num_core: Vec::new(),
+        let mut fields: Vec<&'static dyn APICRecord> = Vec::new();
+        let mut cores = Vec::new();
+        let mut start_idx = core::mem::size_of::<RawMADT>(); // Fields start at end of RawMADT
+        let mut num_core = 0;
+        loop {
+            if start_idx + 1 >= bytes.len() {// Done looping over all records
+                break;
+            } 
+            let record_type = &bytes[start_idx + 0];
+            let record_length = &bytes[start_idx + 1];
+            start_idx += match record_type {
+                0 => {// Entry Type 0: Processor Local APIC
+                    let proc_local_apic =
+                        unsafe { &*(bytes[start_idx..].as_ptr() as *const ProcLocalAPIC) };
+                    fields.push(proc_local_apic);
+                    cores.push((num_core, proc_local_apic.acpi_proc_id));
+                    num_core += 1;
+                    8
+                }
+                1 => {// Entry Type 1: I/O APIC
+                    fields
+                        .push(unsafe { &*(bytes[start_idx..].as_ptr() as *const IOAPIC) });
+                    12
+                }
+                2 => {// Entry Type 2: IO/APIC Interrupt Source Override
+                    fields.push(unsafe {
+                        &*(bytes[start_idx..].as_ptr() as *const IOAPICInterruptSourceOverride)
+                    });
+                    10
+                }
+                3 => {// Entry type 3: IO/APIC Non-maskable interrupt source
+                    fields.push(unsafe {
+                        &*(bytes[start_idx..].as_ptr() as *const IOAPICNonMaskableInterruptSource)
+                    });
+                    10
+                }
+                4 => {// Entry Type 4: Local APIC Non-maskable interrupts
+                    fields.push(unsafe {
+                        &*(bytes[start_idx..].as_ptr() as *const LocalAPICNonMaskableInterrupts)
+                    });
+                    5
+                }
+                5 => {// Entry Type 5: Local APIC Address Override
+                    fields.push(unsafe {
+                        &*(bytes[start_idx..].as_ptr() as *const LocalAPICAddressOverride)
+                    });
+                    12
+                }
+                9 => {// Entry Type 9: Processor Local x2APIC
+                    fields
+                        .push(unsafe { &*(bytes[start_idx..].as_ptr() as *const ProcLocalx2Apic) });
+                    16
+                }
+
+                _ => {
+                    panic!(
+                        "Unrecognised record entry type: {} | length: {record_length}",
+                        record_type
+                    )
+                }
+            }
         }
+        Some(Self {
+            inner,
+            fields,
+            cores,
+        })
     }
 }
 
-trait APICRecord: core::fmt::Debug + Sync {}
+pub trait APICRecord: core::fmt::Debug + Sync {}
 
 #[repr(C, packed)]
 #[derive(Debug)]
@@ -105,78 +176,3 @@ struct ProcLocalx2Apic {
     acpi_id: u32,
 }
 impl APICRecord for ProcLocalx2Apic {}
-
-
-pub unsafe fn handle_apic(bytes: &[u8]) -> Option<MADT> {
-    let mut madt = unsafe { MADT::new(bytes) };
-
-    let mut start_idx = core::mem::size_of::<RawMADT>(); // Start at size of MADT - fields
-                                                       //TODO Make proper stop handling (rn it stops when there are no more bytes, but if the provided bytes is too long, kernel panic)
-    let mut num_core: usize = 0;
-    loop {
-        if start_idx + 1 >= bytes.len() {
-            break;
-        } // Done looping over all records
-        let record_type = &bytes[start_idx + 0];
-        let record_length = &bytes[start_idx + 1];
-        start_idx += match record_type {
-            0 => {
-                // Entry Type 0: Processor Local APIC
-                let proc_local_apic =
-                    unsafe { &*(bytes[start_idx..].as_ptr() as *const ProcLocalAPIC) };
-                madt.fields.push(proc_local_apic);
-                madt.num_core.push((num_core, proc_local_apic.acpi_proc_id));
-                num_core += 1;
-                8
-            }
-            1 => {
-                // Entry Type 1: I/O APIC
-                madt.fields
-                    .push(unsafe { &*(bytes[start_idx..].as_ptr() as *const IOAPIC) });
-                12
-            }
-            2 => {
-                // Entry Type 2: IO/APIC Interrupt Source Override
-                madt.fields.push(unsafe {
-                    &*(bytes[start_idx..].as_ptr() as *const IOAPICInterruptSourceOverride)
-                });
-                10
-            }
-            3 => {
-                // Entry type 3: IO/APIC Non-maskable interrupt source
-                madt.fields.push(unsafe {
-                    &*(bytes[start_idx..].as_ptr() as *const IOAPICNonMaskableInterruptSource)
-                });
-                10
-            }
-            4 => {
-                // Entry Type 4: Local APIC Non-maskable interrupts
-                madt.fields.push(unsafe {
-                    &*(bytes[start_idx..].as_ptr() as *const LocalAPICNonMaskableInterrupts)
-                });
-                5
-            }
-            5 => {
-                // Entry Type 5: Local APIC Address Override
-                madt.fields.push(unsafe {
-                    &*(bytes[start_idx..].as_ptr() as *const LocalAPICAddressOverride)
-                });
-                12
-            }
-            9 => {
-                // Entry Type 9: Processor Local x2APIC
-                madt.fields
-                    .push(unsafe { &*(bytes[start_idx..].as_ptr() as *const ProcLocalx2Apic) });
-                16
-            }
-
-            _ => {
-                panic!(
-                    "Unrecognised record entry type: {} | length: {record_length}",
-                    record_type
-                )
-            } //TODO Improve error handling
-        }
-    }
-    Some(madt)
-}

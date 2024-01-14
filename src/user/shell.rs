@@ -7,6 +7,7 @@ use alloc::{
 };
 use hashbrown::HashMap;
 
+use raw_cpuid::{CpuId, VendorInfo};
 use shell_macro::command;
 
 
@@ -274,6 +275,38 @@ fn lspci(args: String) -> Result<(), String> {
 
     Ok(())
 }
+
+#[command("sysinfo", "Gets info about computer")]
+fn sysinfo(args: String) -> Result<(), String> {
+    let mut ram_size = 0; //TODO Update bootloader, maybe we will be able to get mem size (cuz its a BIOS function)
+    println!("RAM: {}", ram_size);
+    let cpuid = CpuId::new();
+    
+    let vendor = match cpuid.get_vendor_info() {
+        Some(vendor) => vendor.to_string(),
+        None => "Unknown".to_string(),
+    };
+    let freq = match cpuid.get_processor_frequency_info() {
+        Some(freq) => format!("Max: {} - Base: {}", freq.processor_max_frequency(), freq.processor_base_frequency()),
+        None => "Unknown".to_string(),
+    };
+    let brand = match cpuid.get_processor_brand_string() {
+        Some(brand) => brand.as_str().to_string(),
+        None => "Unknown".to_string(),
+    };
+    
+    println!("CPU:\n- Vendor: {vendor}\n- Brand: {brand}\n- Frequency: {freq}");
+    if let Some(cparams) = cpuid.get_cache_parameters() {
+        for cache in cparams {
+            let size = cache.associativity() * cache.physical_line_partitions() * cache.coherency_line_size() * cache.sets();
+            println!("- L{}-Cache size: {}", cache.level(), size);
+        }
+    } else {
+        println!("- No cache parameter information available")
+    }
+    Ok(())
+}
+
 
 pub struct CommandRunner {
     previous: Vec<String>,
