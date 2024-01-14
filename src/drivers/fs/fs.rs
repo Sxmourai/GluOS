@@ -3,16 +3,10 @@
 use alloc::{
     format,
     string::{String, ToString},
-    vec::{Vec},
+    vec::Vec,
 };
 
-
-
-
-
-use super::{
-    userland::FatAttributes,
-};
+use super::userland::FatAttributes;
 
 #[derive(Default, Debug, Clone)]
 #[repr(packed)]

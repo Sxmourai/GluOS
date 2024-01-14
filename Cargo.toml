@@ -29,7 +29,10 @@ raw-cpuid = "11.0.1"
 [package.metadata.bootimage]
 run-args = [
     "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04", "-serial", "stdio",
-    "-drive", "file=build/fat-disk,format=raw"
+    # DISKFLAG for build script (see /build/disk_create.py)
+"-drive", "file=build/gpt-disk.img,format=raw",
+"-drive", "file=build/fat-disk.img,format=raw",
+    # ENDDISKFLAG
 ]
 test-args = [
     "-display", "none"
