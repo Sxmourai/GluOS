@@ -82,9 +82,9 @@ pub struct RSDT {
 }
 
 
-fn get_rsdt(mem_handler: &mut MemoryHandler, rsdt_addr: u64) -> RSDT {
+fn get_rsdt(rsdt_addr: u64) -> RSDT {
     trace!("Getting RSDT at {}", rsdt_addr);
-    let (rsdt_header, raw) = read_sdt(mem_handler, rsdt_addr, rsdt_addr);
+    let (rsdt_header, raw) = read_sdt(rsdt_addr, rsdt_addr);
 
     let sdts_size = rsdt_header.length as usize - ACPI_HEAD_SIZE; // / core::mem::size_of::<u32>();
     let sdts_offset = ACPI_HEAD_SIZE;
@@ -100,6 +100,6 @@ fn get_rsdt(mem_handler: &mut MemoryHandler, rsdt_addr: u64) -> RSDT {
         pointer_to_other_sdt,
     }
 }
-pub fn search_rsdt(mem_handler: &mut MemoryHandler, physical_memory_offset: u64) -> RSDT {
-    get_rsdt(mem_handler, search_rsdp(physical_memory_offset).rsdt_addr.into())
+pub fn search_rsdt(physical_memory_offset: u64) -> RSDT {
+    get_rsdt(search_rsdp(physical_memory_offset).rsdt_addr.into())
 }

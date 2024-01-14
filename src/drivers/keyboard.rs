@@ -1,12 +1,10 @@
 use alloc::{boxed::Box, string::String, vec::Vec};
 use lazy_static::lazy_static;
 use pc_keyboard::{layouts, DecodedKey, HandleControl, KeyCode, KeyState, Keyboard, ScancodeSet1};
-use spin::Mutex;
+use spin::{Mutex, RwLock};
+use x86_64::{instructions::port::PortReadOnly, structures::idt::InterruptStackFrame};
 
-use crate::{terminal::writer::WRITER, user::prompt::KbInput};
-
-// static WAKER: AtomicWaker = AtomicWaker::new();
-// static SCANCODE_QUEUE: OnceCell<ArrayQueue<u8>> = OnceCell::uninit();
+use crate::{terminal::writer::WRITER, user::prompt::KbInput, print, interrupts::hardware::InterruptIndex};
 
 lazy_static! {
     pub static ref DEFAULT_KEYBOARD: Mutex<KeyboardHandler> = Mutex::new(KeyboardHandler {
@@ -19,7 +17,25 @@ lazy_static! {
     });
 }
 
-static KB_INPUTS: Mutex<Vec<Box<SendSyncWrapper<dyn KbInput>>>> = Mutex::new(Vec::new());
+pub trait KeyboardListener: Sync+Send {
+    fn read_scancode(&mut self, scancode: u8);
+}
+//TODO Do we need thread-safety ?
+pub static KEYBOARD_LISTENERS: RwLock<Vec<Box<dyn KeyboardListener>>> = RwLock::new(Vec::new());
+
+pub struct Input {
+    pressed: Vec<char>,
+}
+impl KeyboardListener for Input {
+    fn read_scancode(&mut self, scancode: u8) {
+
+        
+    }
+}
+
+
+
+
 pub struct KeyboardHandler {
     inner: Keyboard<layouts::AnyLayout, ScancodeSet1>,
     pressed: Vec<KeyCode>,
@@ -28,8 +44,7 @@ impl KeyboardHandler {
     pub fn is_pressed(&self, code: &KeyCode) -> bool {
         self.pressed.contains(code)
     }
-
-    pub fn process_keyevent(&mut self, scancode: u8) {
+    pub fn process_keyevent(&mut self, scancode: u8) -> Option<char> {
         if let Ok(Some(key_event)) = self.inner.add_byte(scancode) {
             let state = key_event.state;
             if state == KeyState::Down {
@@ -69,32 +84,12 @@ impl KeyboardHandler {
                     }
                 }
                 if !key_handled {
-                    for input in KB_INPUTS.lock().iter_mut() {
-                        input.0.handle_key(key);
-                    }
+                    Some(match key {
+                        DecodedKey::RawKey(_) => todo!(),
+                        DecodedKey::Unicode(_) => todo!(),
+                    })
                 }
             }
         }
     }
-}
-
-#[derive(Debug)]
-pub struct SendSyncWrapper<T: ?Sized>(pub T);
-unsafe impl<T: ?Sized> Sync for SendSyncWrapper<T> {}
-unsafe impl<T: ?Sized> Send for SendSyncWrapper<T> {}
-
-// Adds prompt to list and returns its index
-pub fn add_input(input: impl KbInput + 'static) -> usize {
-    KB_INPUTS.lock().push(Box::new(SendSyncWrapper(input)));
-    KB_INPUTS.lock().len() - 1
-}
-// Removes prompt from list and returns it
-pub fn remove_input(idx: usize) -> Box<SendSyncWrapper<dyn KbInput>> {
-    KB_INPUTS.lock().remove(idx)
-}
-pub fn get_input_msg(idx: usize) -> Option<String> {
-    if let Some(input) = KB_INPUTS.lock().get(idx) {
-        return Some(input.0.get_return_message());
-    }
-    None
 }

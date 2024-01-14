@@ -1,3 +1,5 @@
+use core::cell::Cell;
+
 use bootloader::BootInfo;
 use spin::{Mutex, RwLock, RwLockWriteGuard};
 
@@ -6,57 +8,39 @@ use crate::{drivers::{
     memory::handler::MemoryHandler,
 }, memory::tables::DescriptorTablesHandler};
 
-pub static STATE: RwLock<Kernel> = RwLock::new(Kernel::new());
+pub static mut BOOT_INFO: Option<&'static bootloader::BootInfo> = None;
+pub static mut MEM_HANDLER: Option<MemoryHandler> = None;
+pub static mut FS_DRIVER: Option<FsDriver> = None;
+pub static mut DESCRIPTOR_TABLES: Option<DescriptorTablesHandler> = None;
 
-pub struct Kernel {
-    mem_handler: Option<Mutex<MemoryHandler>>,
-    pub boot_info: Option<&'static BootInfo>,
-    #[allow(unused)]
-    descriptor_tables: Option<Mutex<DescriptorTablesHandler>>,
-    fs: Option<Mutex<FsDriver>>,
-}
-impl Kernel {
-    pub const fn new() -> Self {
-        Self {
-            mem_handler: None,
-            boot_info: None,
-            descriptor_tables: None,
-            fs: None,
-        }
-    }
-    pub fn init(
-        &mut self,
-        boot_info: &'static bootloader::BootInfo,
-        mut mem_handler: MemoryHandler,
-        fs_driver: FsDriver,
-    ) {
-        self.boot_info.replace(boot_info);
-        self.descriptor_tables.replace(Mutex::new(DescriptorTablesHandler::new(
-            &mut mem_handler,
-            boot_info.physical_memory_offset,
-        )));
-        self.mem_handler.replace(Mutex::new(mem_handler));
-        self.fs.replace(Mutex::new(fs_driver));
-    }
-    pub fn mem_handler(&mut self) -> &mut Mutex<MemoryHandler> {
-        self.mem_handler.as_mut().unwrap()
-    }
-    pub fn fs(&mut self) -> &mut Mutex<FsDriver> {
-        self.fs.as_mut().unwrap()
-    }
-}
+
 // don't use before kernel init
-pub fn mem_handler() -> u64 {
-    todo!()
+#[macro_export]
+macro_rules! boot_info {
+    () => {
+        &mut crate::state::BOOT_INFO.as_mut().unwrap()
+    };
 }
-pub fn fs_driver() -> u64 {
-    todo!()
+
+#[macro_export]
+macro_rules! mem_handler {
+    () => {
+        &mut crate::state::MEM_HANDLER.as_mut().unwrap()
+    };
 }
-pub fn get_boot_info() -> &'static BootInfo {
-    get_state().boot_info.unwrap()
+
+#[macro_export]
+macro_rules! fs_driver {
+    () => {
+        crate::state::FS_DRIVER.as_mut().unwrap()
+    };
 }
-pub fn get_state<'a>() -> RwLockWriteGuard<'a, Kernel> {
-    STATE.write()
+
+#[macro_export]
+macro_rules! descriptor_tables {
+    () => {
+        crate::state::DESCRIPTOR_TABLES.as_mut().unwrap()
+    };
 }
 
 /*

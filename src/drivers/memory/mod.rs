@@ -21,10 +21,7 @@ pub mod frame_allocator;
 pub mod handler;
 pub mod tables;
 
-pub use frame_allocator::BootInfoFrameAllocator;
-
-
-
+use crate::mem_handler;
 
 use self::handler::MemoryHandler;
 
@@ -81,7 +78,6 @@ unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut
 // end_page is using .containing address
 //TODO Map a page when a page fault occurs (in interrupts/exceptions.rs)
 pub unsafe fn read_phys_memory_and_map(
-    mem_handler: &mut MemoryHandler,
     location: u64,
     size: usize,
     end_page: u64,
@@ -93,6 +89,7 @@ pub unsafe fn read_phys_memory_and_map(
         .start_address()
         .as_u64();
     let mut offset = 0;
+    let mut mem_handler = unsafe{mem_handler!()};
     for i in (start_frame_addr..start_frame_addr + size as u64).step_by(4096) {
         // Map all frames that might be used
         let page: Page<Size4KiB> = Page::containing_address(VirtAddr::new(end_page + offset));
@@ -102,6 +99,7 @@ pub unsafe fn read_phys_memory_and_map(
         // Computed location {:X}\t-\tFrame to page: {:X} (Provided (unaligned): {:X})
         // Currently mapping: Physical({:X}-{:X})\t-\tVirtual({:X}-{:X})
         // ", phys_frame.start_address().as_u64(), location, end_page, page.start_address().as_u64(),end_page, i,i+4096, end_page+offset, end_page+offset+4096);
+        
         mem_handler.map_to(page, phys_frame, flags);
         offset += 4096;
     }

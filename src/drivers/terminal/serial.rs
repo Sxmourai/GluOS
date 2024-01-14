@@ -11,9 +11,7 @@ lazy_static! {
     };
 }
 
-use core::{
-    fmt::{Write},
-};
+use core::fmt::Write;
 use x86_64::instructions::interrupts;
 
 

@@ -5,7 +5,8 @@ use x86_64::{
     PhysAddr, VirtAddr,
 };
 
-use crate::state::get_state;
+use crate::mem_handler;
+
 
 /// A FrameAllocator that returns usable frames from the bootloader's memory map.
 #[derive(Debug, Clone)]
@@ -50,14 +51,11 @@ impl BootInfoFrameAllocator {
 
         let page = Page::containing_address(VirtAddr::new(0xfffffff9));
 
-        let mut binding = get_state();
-        let binding = binding.mem_handler();
-        let mut binding = binding.lock();
+        let mut mem_handler = unsafe {mem_handler!()};
         let map_to_result = unsafe {
             // FIXME: this is not safe, we do it only for testing
-            binding.mapper.map_to(page, frame, flags, self)
+            mem_handler.map_to(page, frame, flags)
         };
-        map_to_result.expect("map_to failed").flush();
         page
     }
 }

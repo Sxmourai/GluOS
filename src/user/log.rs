@@ -49,26 +49,21 @@ impl Codes {
 struct Logger;
 impl Log for Logger {
     fn enabled(&self, metadata: &Metadata) -> bool {
-        // Implement your own logic to determine if the log level is enabled
         metadata.level() <= MAX_LEVEL
     }
     fn log(&self, record: &Record) {
-        // Implement your own logic to handle the log record
         let _buffer = [0u8; 128];
-        let color = format!("\x1b[1;3{}m", Color::from(record.level() as u8) as u8);
         serial_println!(
-            "[{}{}{}] {}",
-            color,
+            "[\x1b[1;3{}m{}{}] {}",
+            Color::from(record.level() as u8) as u8,
             record.level(),
             Codes::reset(),
             record.args()
         );
-        // Your logic to write to an output (e.g., a memory buffer)
     }
     //TODO
     fn flush(&self) {
         todo!("Flush log");
-        // Implement your own logic to flush the log messages
     }
 }
 const MAX_LEVEL: Level = Level::Trace;
@@ -76,10 +71,6 @@ pub fn initialize_logger() {
     static LOGGER: Logger = Logger;
     log::set_logger(&LOGGER).unwrap();
     log::set_max_level(LevelFilter::Debug);
-}
-
-pub fn point() {
-    log::debug!("Code went all the way there !");
 }
 
 #[macro_export]

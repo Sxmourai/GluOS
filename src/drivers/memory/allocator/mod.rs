@@ -10,9 +10,9 @@ use x86_64::{
     VirtAddr,
 };
 
-use crate::drivers::memory::BootInfoFrameAllocator;
-
 use self::fixed_size_block::FixedSizeBlockAllocator;
+
+use super::handler::MemoryHandler;
 
 #[global_allocator]
 static ALLOCATOR: Locked<FixedSizeBlockAllocator> = Locked::new(FixedSizeBlockAllocator::new());
@@ -31,10 +31,7 @@ unsafe impl GlobalAlloc for Dummy {
     }
 }
 
-pub fn init_heap(
-    mapper: &mut OffsetPageTable,
-    frame_allocator: &mut BootInfoFrameAllocator,
-) -> Result<(), MapToError<Size4KiB>> {
+pub fn init_heap(mem_handler: &mut MemoryHandler) -> Result<(), MapToError<Size4KiB>> {
     let page_range = {
         let heap_start = VirtAddr::new(HEAP_START as u64);
         let heap_end = heap_start + HEAP_SIZE - 1u64;
@@ -43,11 +40,11 @@ pub fn init_heap(
         Page::range_inclusive(heap_start_page, heap_end_page)
     };
     for page in page_range {
-        let frame = frame_allocator
+        let frame = mem_handler.frame_allocator
             .allocate_frame()
             .ok_or(MapToError::FrameAllocationFailed)?;
         let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
-        unsafe { mapper.map_to(page, frame, flags, frame_allocator)?.flush() };
+        unsafe { mem_handler.map_to(page, frame, flags) };
     }
 
     unsafe {

@@ -1,13 +1,11 @@
-use crate::{drivers::time};
+use crate::drivers::time;
 
 
 use pic8259::ChainedPics;
 use spin::Mutex;
 use x86_64::{
     instructions::port::PortReadOnly,
-    structures::{
-        idt::{InterruptStackFrame},
-    },
+    structures::idt::InterruptStackFrame,
 };
 
 pub const PIC_1_OFFSET: u8 = 32;

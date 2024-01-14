@@ -1,3 +1,6 @@
+use log::info;
+use spin::Mutex;
+
 use crate::{
     drivers::{
         self,
@@ -5,29 +8,21 @@ use crate::{
         fs::fs_driver::FsDriver,
         memory::handler::MemoryHandler,
     },
-    serial_println,
-    state::get_state,
-    task::executor::Executor,
-    user::{self, shell::Shell},
+    task::{executor::Executor, Task},
+    user::{self, shell::Shell}, memory::tables::DescriptorTablesHandler, state::{self, MEM_HANDLER},
 };
 
 pub fn boot(boot_info: &'static bootloader::BootInfo) {
     //TODO Can't use vecs, Strings before heap init (in memoryHandler init), which means we can't do trace... Use a constant-size list ?
-    drivers::gdt::init();
-    let mem_handler = MemoryHandler::init_heap_and_frame_allocator(
-        boot_info.physical_memory_offset,
-        &boot_info.memory_map,
-    );
-    drivers::interrupts::init();
-    user::log::initialize_logger();
-    drivers::disk::ata::init();
-    drivers::time::init();
-    drivers::video::init_graphics();
-    let fs_driver = FsDriver::new(DiskLoc(Channel::Primary, Drive::Slave));
-    get_state().init(boot_info, mem_handler, fs_driver);
-    serial_println!("\t[Done booting]\n");
-    // get_state().fs().lock().write_dir("hello");
-    Shell::new();
+    unsafe { state::BOOT_INFO.replace(boot_info) };
+    drivers::init_drivers();
+    
+    let mut executor = Executor::new();
+    info!("Initialising shell");
+    executor.spawn(Task::new(Shell::new()));
+    // executor.spawn(Task::new());
+    info!("Done booting !");
+    executor.run();
 }
 
 pub fn end() -> ! {

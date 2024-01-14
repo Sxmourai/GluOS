@@ -1,13 +1,9 @@
-use alloc::{
-    vec::Vec,
-};
-use core::{fmt};
+use alloc::vec::Vec;
+use core::fmt;
 use lazy_static::lazy_static;
 
 use spin::Mutex;
-use x86_64::{
-    structures::port::{PortWrite},
-};
+use x86_64::structures::port::PortWrite;
 
 use crate::{serial_println, terminal::buffer::VgaBuffer};
 

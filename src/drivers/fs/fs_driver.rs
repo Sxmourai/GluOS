@@ -30,7 +30,8 @@ pub struct FsDriver {
     fat_table: FatTable,
 }
 impl FsDriver {
-    pub fn new(disk: DiskLoc) -> Self {
+    pub fn init() {
+        let disk = DiskLoc(crate::disk::ata::Channel::Primary, crate::disk::ata::Drive::Slave); //TODO search all disks & partitions to find available filesystems
         let fat_info = Self::get_fat_info(&disk).unwrap();
         let first_fat_sector = fat_info.first_fat_sector();
         let first_data_sector = fat_info.get_first_data_sector();
@@ -41,13 +42,13 @@ impl FsDriver {
             first_data_sector,
         );
         let files = Self::read_dirs_structure(&fat_info, &disk).unwrap();
-        let _self = Self {
+        
+        unsafe { crate::state::FS_DRIVER.replace(Self {
             files,
             fat_info,
             disk,
             fat_table,
-        };
-        _self
+        }) };
     }
     pub fn read_file(&self, path: &FilePath) -> Option<String> {
         let file = match self.files.get(path)? {

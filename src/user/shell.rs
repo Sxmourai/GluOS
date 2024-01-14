@@ -15,8 +15,7 @@ use crate::{
     drivers::disk::ata::{self, read_from_disk, write_to_disk, Channel, DiskLoc, Drive},
     fs::fs::Fat32Entry,
     print, println, serial_print, serial_println,
-    state::get_state,
-    terminal::console::{ScreenChar, DEFAULT_CHAR},
+    terminal::console::{ScreenChar, DEFAULT_CHAR}, fs_driver,
 };
 
 use super::prompt::{input, COMMANDS_HISTORY, COMMANDS_INDEX};
@@ -133,8 +132,7 @@ fn write_sector(raw_args: String) -> Result<(), String> {
 fn read(raw_args: String) -> Result<(), String> {
     let mut args = raw_args.split(" ");
     let path = args.next().unwrap();
-    let mut binding = get_state();
-    let fs_driver = binding.fs().lock();
+    let fs_driver = unsafe{fs_driver!()};
     if let Some(entry) = fs_driver.get_entry(&path.into()) {
         match entry {
             Fat32Entry::File(_file) => {
@@ -165,8 +163,7 @@ fn write(args: String) -> Result<(), String> {
     let mut args = args.split(" ");
     let entry_type = args.next().unwrap();
     let path = args.next().unwrap();
-    let mut binding = get_state();
-    let mut fs_driver = binding.fs().lock();
+    let mut fs_driver = unsafe{fs_driver!()};
     if let Some(_entry) = fs_driver.get_entry(&path.into()) {
         println!("File already exists !");
         return Ok(());
@@ -391,7 +388,7 @@ pub struct Command {
 }
 
 impl Shell {
-    pub fn new() -> () {
+    pub async fn new() -> () {
         let commands = {
             let commands = shell_macro::command_list!();
             let mut res = HashMap::new();
