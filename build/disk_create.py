@@ -1,4 +1,5 @@
 # Example: python3 disk_create.py fat-disk.img 30M -format fat32
+# Example: python3 disk_create.py fat-disk.img 30M -format fat32
 import sys,os
 def cmd(command):
     print(">",command)
@@ -27,6 +28,7 @@ if __name__ == "__main__":
     parser.add_argument('-partition', action='store_true')
     parser.add_argument('-header_type', default="gpt")
     parser.add_argument('--header_type')
+>>>>>>> bfb22e7b59b990cf578dcbadfa4ab6d92673f899
     args = parser.parse_args(sys.argv[1:])
     if args.format.lower() in filesystems.keys():
         format = filesystems[args.format.lower()]

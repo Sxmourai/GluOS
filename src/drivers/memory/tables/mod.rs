@@ -33,10 +33,10 @@ pub struct ACPISDTHeader {
 }
 
 pub struct DescriptorTablesHandler {
-    acpi: AcpiHandler,
-    madt: madt::MADT,
-    hpet: &'static hpet::HPET,
-    waet: &'static waet::WAET,
+    pub acpi: AcpiHandler,
+    pub madt: madt::MADT,
+    pub hpet: &'static hpet::HPET,
+    pub waet: &'static waet::WAET,
 }
 impl DescriptorTablesHandler {
     /// Initialises the descriptor tables handler, and makes it accessible via descriptor_tables!()

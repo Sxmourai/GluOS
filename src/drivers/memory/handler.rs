@@ -1,6 +1,6 @@
 use bootloader::bootinfo::MemoryMap;
 use x86_64::{
-    structures::paging::{Mapper, OffsetPageTable, Page, PageTableFlags, PhysFrame, Size4KiB},
+    structures::paging::{Mapper, OffsetPageTable, Page, PageTableFlags, PhysFrame, Size4KiB, FrameAllocator},
     VirtAddr,
 };
 
@@ -45,13 +45,25 @@ impl MemoryHandler {
         trace!("Finished initializing heap, can now begin tracing !");
         _self
     }
-    pub fn map_to(&mut self, page: Page<Size4KiB>, phys_frame: PhysFrame, flags: PageTableFlags) {
+    pub unsafe fn map_to(&mut self, page: Page<Size4KiB>, phys_frame: PhysFrame, flags: PageTableFlags) {
         unsafe {
             self.mapper
                 .map_to(page, phys_frame, flags, &mut self.frame_allocator)
                 .unwrap()
                 .flush()
         }
+    }
+    pub unsafe fn map(&mut self, page: Page<Size4KiB>, flags: PageTableFlags) -> Result<(), MapFrameError> {
+        let frame = self.frame_allocator.allocate_frame();
+        if frame.is_none() {return Err(MapFrameError::CantAllocateFrame)}
+        let frame = frame.unwrap();
+        unsafe {
+            self.mapper
+                .map_to(page, frame, flags, &mut self.frame_allocator)
+                .unwrap()
+                .flush()
+        }
+        Ok(())
     }
 
     // pub fn frame_allocator(&mut self) -> &mut BootInfoFrameAllocator {
@@ -61,4 +73,8 @@ impl MemoryHandler {
     // pub fn mapper(&mut self) -> Arc<Mutex<OffsetPageTable<'static>>> {
     //     Arc::clone(self.mapper.as_mut().unwrap())
     // }
+}
+
+pub enum MapFrameError {
+    CantAllocateFrame
 }

@@ -44,6 +44,7 @@ pub const DRIVERS: &[(&'static str, fn() -> ())] = &[
     ("graphics", super::video::init_graphics),
     // ("filesystem (indexing disk)", fs::fs_driver::FsDriver::init),
     ("descriptor tables", super::memory::tables::DescriptorTablesHandler::init),
+    ("APIC", || unsafe { super::interrupts::apic::init().expect("Failed to init apic"); }),
 ];
 
 //TODO Specify a bit more what is a driver... Cuz rn it's just smth that needs to be initialised

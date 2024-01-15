@@ -9,9 +9,9 @@ pub type Core = (usize, u8);
 
 #[repr(C, packed)]
 pub struct RawMADT {
-    h: ACPISDTHeader, // h.signature == [65, 80, 73, 67] == APIC
-    local_apic_addr: u32,
-    flags: u32,
+    pub h: ACPISDTHeader, // h.signature == [65, 80, 73, 67] == APIC
+    pub local_apic_addr: u32,
+    pub flags: u32,
     //Entries https://wiki.osdev.org/MADT
     //Entry Type 0: Processor Local APIC
     // ETC
