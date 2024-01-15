@@ -4,7 +4,6 @@ pub mod disk;
 pub mod fs;
 pub mod gdt;
 pub mod graphics;
-pub mod id;
 pub mod interrupts;
 pub mod memory;
 pub mod pci;// pci id's Adds 2MB to kernel size !
@@ -43,7 +42,7 @@ pub const DRIVERS: &[(&'static str, fn() -> ())] = &[
     ("disks", super::disk::ata::init),
     ("timer", super::time::init),
     ("graphics", super::video::init_graphics),
-    ("filesystem (indexing disk)", fs::fs_driver::FsDriver::init),
+    // ("filesystem (indexing disk)", fs::fs_driver::FsDriver::init),
     ("descriptor tables", super::memory::tables::DescriptorTablesHandler::init),
 ];
 

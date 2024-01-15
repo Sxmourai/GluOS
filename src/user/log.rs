@@ -76,7 +76,7 @@ pub fn initialize_logger() {
 #[macro_export]
 macro_rules! dbg {
     ($variable:expr) => {
-        serial_println!(
+        crate::serial_println!(
             "{} = {:?} at {}:{}",
             stringify!($variable),
             $variable,
