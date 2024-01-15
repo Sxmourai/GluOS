@@ -15,7 +15,7 @@ use crate::{
     drivers::disk::ata::{self, read_from_disk, write_to_disk, Channel, DiskLoc, Drive},
     fs::fs::Fat32Entry,
     print, println, serial_print, serial_println,
-    terminal::console::{ScreenChar, DEFAULT_CHAR}, fs_driver,
+    terminal::console::{ScreenChar, DEFAULT_CHAR}, fs_driver, descriptor_tables,
 };
 
 use super::prompt::{input, COMMANDS_HISTORY, COMMANDS_INDEX};
@@ -291,8 +291,8 @@ fn sysinfo(args: String) -> Result<(), String> {
         Some(brand) => brand.as_str().to_string(),
         None => "Unknown".to_string(),
     };
-    
-    println!("CPU:\n- Vendor: {vendor}\n- Brand: {brand}\n- Frequency: {freq}");
+    let cores = unsafe{descriptor_tables!().num_core()};
+    println!("CPU:\n- Vendor: {vendor}\n- Brand: {brand}\n- Frequency: {freq}\n- Cores: {cores}");
     if let Some(cparams) = cpuid.get_cache_parameters() {
         for cache in cparams {
             let size = cache.associativity() * cache.physical_line_partitions() * cache.coherency_line_size() * cache.sets();
