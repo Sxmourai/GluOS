@@ -215,10 +215,12 @@ fn dump_disk(args: String) -> Result<(), String> {
     };
     let mut i = 0;
     loop {
-        serial_println!("\n\n-----------{}----------", i);
         let sectors = read_from_disk(&DiskLoc(channel, drive), i, 3);
         if sectors.is_err() {break}
-        for b in sectors.unwrap() {
+        let sectors = sectors.unwrap();
+        if sectors.iter().all(|x| *x==0){continue}
+        serial_println!("\n\n-----------{}----------", i);
+        for b in sectors {
             if b != 0 {
                 serial_print!("{}", b as char)
             }

@@ -3,6 +3,7 @@ use core::{
     panic,
 };
 
+use alloc::string::ToString;
 use alloc::{
     format,
     vec::Vec,
@@ -13,6 +14,8 @@ use spin::{Mutex, MutexGuard};
 use crate::bit_manipulation::{bytes, ptrlist_to_num, u16_to_u8};
 
 
+use crate::fs::fs::FilePath;
+use crate::fs::fs_driver::Partition;
 use crate::x86_64::instructions::port::{PortRead, PortWrite};
 
 use super::DiskError;
@@ -25,7 +28,7 @@ pub const SSECTOR_SIZEWORD: usize = SECTOR_SIZEWORD as usize;
 pub type Sectors = Vec<u8>;
 pub type DResult<T> = Result<T, DiskError>;
 
-static mut DISK_MANAGER: Mutex<Option<DiskManager>> = Mutex::new(None); // Uninitialised
+pub static mut DISK_MANAGER: Mutex<Option<DiskManager>> = Mutex::new(None); // Uninitialised
                                                                         // Don't call before disk_manager is initialised
 pub fn disk_manager() -> MutexGuard<'static, Option<DiskManager>> {
     unsafe { DISK_MANAGER.lock() }
@@ -154,7 +157,6 @@ fn get_selected_drive_type(channel: Channel) -> DriveType {
         }
     }
 }
-//TODO Return a result, but for now it's for debugging so...
 pub fn read_from_disk(
     addr: &impl DiskAddress,
     start_sector: u64,
@@ -165,11 +167,29 @@ pub fn read_from_disk(
         .unwrap()
         .read_disk(addr, start_sector, sector_count)
 }
+pub fn read_from_partition(
+    partition: &Partition,
+    start_sector: u64,
+    sector_count: u16,
+) -> DResult<Sectors> {
+    let start_sector = start_sector+partition.1;
+    assert!((start_sector+sector_count as u64)<partition.1+partition.2, "Trying to read outside of partition");
+    crate::dbg!("Read", partition, start_sector);
+    read_from_disk(&partition.0, start_sector, sector_count)
+}
 pub fn write_to_disk(addr: impl DiskAddress, start_sector: u64, content: Sectors) -> DResult<()> {
     disk_manager()
         .as_ref()
         .unwrap()
         .write_disk(addr, start_sector, content)
+}
+pub fn write_to_partition(partition: &Partition, start_sector: u64, content: Sectors) -> DResult<()> {
+    let start_sector = start_sector+partition.1;
+    assert!((start_sector+content.len() as u64)<partition.1+partition.2, "Trying to write outside of partition");
+    disk_manager()
+        .as_ref()
+        .unwrap()
+        .write_disk(partition.0, start_sector, content)
 }
 // Read disk sectors by iterating on it. Usefull when you want to read a lot and can't store everything in memory
 // pub struct ReadDiskIterator {
@@ -194,6 +214,7 @@ pub fn write_to_disk(addr: impl DiskAddress, start_sector: u64, content: Sectors
 
 pub trait DiskAddress: Copy {
     fn as_index(&self) -> usize;
+    fn as_path(&self) -> Option<FilePath>;
     fn as_diskloc(&self) -> DiskLoc {
         DiskLoc(self.channel(), self.drive())
     }
@@ -245,11 +266,30 @@ impl DiskAddress for u8 {
         assert!(*self <= 4);
         (*self).try_into().expect("Disk address is unrecognised")
     }
+
+    fn as_path(&self) -> Option<FilePath> {
+        match self {
+            0 => Some(FilePath::new("0".to_string())),
+            1 => Some(FilePath::new("1".to_string())),
+            2 => Some(FilePath::new("2".to_string())),
+            3 => Some(FilePath::new("3".to_string())),
+            _ => None,
+        }
+    }
 }
 impl DiskAddress for u16 {
     fn as_index(&self) -> usize {
         assert!(*self <= 4);
         (*self).try_into().expect("Disk address is unrecognised")
+    }
+    fn as_path(&self) -> Option<FilePath> {
+        match self {
+            0 => Some(FilePath::new("0".to_string())),
+            1 => Some(FilePath::new("1".to_string())),
+            2 => Some(FilePath::new("2".to_string())),
+            3 => Some(FilePath::new("3".to_string())),
+            _ => None,
+        }
     }
 }
 impl DiskAddress for u32 {
@@ -257,11 +297,29 @@ impl DiskAddress for u32 {
         assert!(*self <= 4);
         (*self).try_into().expect("Disk address is unrecognised")
     }
+    fn as_path(&self) -> Option<FilePath> {
+        match self {
+            0 => Some(FilePath::new("0".to_string())),
+            1 => Some(FilePath::new("1".to_string())),
+            2 => Some(FilePath::new("2".to_string())),
+            3 => Some(FilePath::new("3".to_string())),
+            _ => None,
+        }
+    }
 }
 impl DiskAddress for u64 {
     fn as_index(&self) -> usize {
         assert!(*self <= 4);
         (*self).try_into().expect("Disk address is unrecognised")
+    }
+    fn as_path(&self) -> Option<FilePath> {
+        match self {
+            0 => Some(FilePath::new("0".to_string())),
+            1 => Some(FilePath::new("1".to_string())),
+            2 => Some(FilePath::new("2".to_string())),
+            3 => Some(FilePath::new("3".to_string())),
+            _ => None,
+        }
     }
 }
 impl Into<DiskLoc> for usize {
@@ -351,18 +409,18 @@ impl DiskManager {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub enum Channel {
     Primary = 0x1F0,
     Secondary = 0x170,
 }
-#[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub enum Drive {
     Master,
     Slave,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub enum DriveType {
     PATA,
     PATAPI,
@@ -378,7 +436,7 @@ pub struct AddressingModes {
     lba48: u64,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct DiskLoc(pub Channel, pub Drive);
 impl DiskAddress for DiskLoc {
     fn as_index(&self) -> usize {
@@ -390,6 +448,14 @@ impl DiskAddress for DiskLoc {
             i += 1
         }
         i
+    }
+    fn as_path(&self) -> Option<FilePath> {
+        match self {
+            DiskLoc(Channel::Primary, Drive::Master) => Some(FilePath::new("0".to_string())),
+            DiskLoc(Channel::Primary, Drive::Slave) => Some(FilePath::new("1".to_string())),
+            DiskLoc(Channel::Secondary, Drive::Master) => Some(FilePath::new("2".to_string())),
+            DiskLoc(Channel::Secondary, Drive::Slave) => Some(FilePath::new("3".to_string())),
+        }
     }
 }
 #[derive(Debug)]
@@ -654,7 +720,7 @@ impl Disk {
         if self.addressing_modes.lba48 != 0 {
             if sector_address + (sector_count as u64) > self.addressing_modes.lba48 {
                 // > or >= ?
-                error!("Sector not in disk ({} - {})", sector_address, sector_count);
+                error!("Sector not in disk ({} - {}) -> {:?}", sector_address, sector_count, self.loc);
                 return Err(DiskError::NotFound);
             }
             self.read48(sector_address, sector_count)

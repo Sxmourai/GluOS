@@ -30,9 +30,15 @@ raw-cpuid = "11.0.1"
 run-args = [
     "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04", "-serial", "stdio",
     # DISKFLAG for build script (see /build/disk_create.py)
+<<<<<<< HEAD
+"-drive", "file=build/mbr-disk.img,format=raw",
+"-drive", "file=build/gpt-disk.img,format=raw",
+"-drive", "file=build/fat-disk.img,format=raw",
+=======
 "-drive", "file=build/fat-mbr-disk.img,format=raw",
 "-drive", "file=build/fat-gpt-disk.img,format=raw",
 "-drive", "file=build/ext4-mbr-disk.img,format=raw",
+>>>>>>> bfb22e7b59b990cf578dcbadfa4ab6d92673f899
     # ENDDISKFLAG
 ]
 test-args = [
