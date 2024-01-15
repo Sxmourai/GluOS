@@ -84,4 +84,18 @@ macro_rules! dbg {
             line!(),
         )
     };
+    ($($var:expr),+ $(,)?) => {
+        $(
+            crate::serial_print!(
+                "{} = {:?}, ",
+                stringify!($var),
+                $var,
+            );
+        )+
+        crate::serial_println!(
+            "at {}:{}",
+            file!(),
+            line!(),
+        );
+    };
 }

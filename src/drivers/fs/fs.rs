@@ -6,9 +6,11 @@ use alloc::{
     vec::Vec,
 };
 
-use super::userland::FatAttributes;
+use crate::{disk::ata::DiskLoc, fs_driver};
 
-#[derive(Default, Debug, Clone)]
+use super::{userland::FatAttributes, fs_driver::{Partition, PartitionId}};
+
+#[derive(Default, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(packed)]
 pub struct BiosParameterBlock {
     pub bootjmp: [u8; 3],
@@ -87,9 +89,21 @@ impl FilePath {
         path.extend(other_path.path().chars());
         Self::new(path.replace("//", "/").replace("\\", "/"))
     }
-    // pub fn open_file(&self) -> Result<Fat32Entry, FileSystemError> {
-    //     Fat32Entry::open(self)
-    // }
+    pub fn disk_loc(&self) -> Option<DiskLoc> {
+        match self.raw_path.chars().nth(0).unwrap() {
+            '0' => Some(DiskLoc(crate::disk::ata::Channel::Primary, crate::disk::ata::Drive::Master)),
+            '1' => Some(DiskLoc(crate::disk::ata::Channel::Primary, crate::disk::ata::Drive::Slave)),
+            '2' => Some(DiskLoc(crate::disk::ata::Channel::Secondary, crate::disk::ata::Drive::Master)),
+            '3' => Some(DiskLoc(crate::disk::ata::Channel::Secondary, crate::disk::ata::Drive::Slave)),
+            _ => None,
+        }
+    }
+    pub fn part_loc(&self) -> Option<PartitionId> {
+        let part: u8 = self.raw_path.chars().nth(1).unwrap().to_string().parse().ok()?;
+        if unsafe{fs_driver!().disks.contains_key(&(self.disk_loc()?, part))} {
+            Some((self.disk_loc()?, part))
+        } else {None}
+    }
     pub fn name(&self) -> &str {
         self.splitted().last().unwrap()
     }
@@ -177,7 +191,7 @@ pub enum FatType {
     Fat16,
     Fat32,
 }
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FatInfo(pub BiosParameterBlock);
 impl FatInfo {
     pub fn first_sector_of_cluster(&self) -> u64 {
@@ -247,4 +261,10 @@ pub enum ClusterEnum {
     EndOfChain,
     BadCluster,
     Cluster(u32),
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Copy)]
+pub enum DiskType {
+    MBR,
+    GPT,
 }
