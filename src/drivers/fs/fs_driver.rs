@@ -90,7 +90,6 @@ impl FsDriver {
                                 if partition.part_type_guid.into_iter().all(|x| x==0) {break}
                                 let start_lba = partition.start_lba;
                                 let end_lba = partition.end_lba;
-                                log::debug!("GPT {} {}", start_lba,end_lba);
                                 locs[i].0.push((disk.loc.clone(), partition.start_lba, partition.end_lba));
                             }
                         }
@@ -107,8 +106,6 @@ impl FsDriver {
                             }
                             let lba_start = mbr_part.lba_start;
                             let sector_count = mbr_part.sector_count;
-                            log::debug!("MBR {} {}", lba_start,sector_count);
-                            dbg!(mbr_part);
                             locs[i].0.push((disk.loc.clone(), mbr_part.lba_start as u64, mbr_part.sector_count as u64));
                         }
                     }
@@ -127,7 +124,15 @@ impl FsDriver {
                 if kind==DiskType::MBR {
                     dbg!(partition, kind);
                     let fat_info = Self::get_fat_boot(&partition).unwrap();
-                    dbg!(fat_info);
+                    if fat_info.0.fs_type_label[0..5] == [70, 65, 84, 51, 50] {
+                        // Fat32
+                    } else if fat_info.0.fs_type_label.iter().all(|x|*x==0) {
+                        let rawsuper_block = read_from_partition(&partition, 2, 2);
+                        let superblock = unsafe { &*(rawsuper_block.as_ptr() as *const ExtSuperBlock) };
+                    } else {
+                        let name = String::from_utf8_lossy(&fat_info.0.fs_type_label.to_vec()).to_string();
+                        error!("Unknown fs: {name}");
+                    }
                     // let first_fat_sector = fat_info.first_fat_sector();
                     // let first_data_sector = fat_info.get_first_data_sector();
                     // let fat_table = FsDriver::read_fat(

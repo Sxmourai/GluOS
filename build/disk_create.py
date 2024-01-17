@@ -27,6 +27,7 @@ if __name__ == "__main__":
     parser.add_argument('-partition', action='store_true')
     parser.add_argument('-header_type', default="gpt")
     args = parser.parse_args(sys.argv[1:])
+    if not args.filename.endswith(".img"):args.filename+=".img"
     if args.format.lower() in filesystems.keys():
         format = filesystems[args.format.lower()]
     else:
@@ -41,8 +42,15 @@ if __name__ == "__main__":
     else:
         print(f"\n\tCreating label on disk ({args.header_type})")
         cmd(f"parted {args.filename} mklabel {args.header_type} --script")
-        print(f"\n\tFormating disk")
+        print(f"\n\tCreating partition")
         cmd(fr"parted {args.filename} mkpart primary {args.format} 0% 100% --script")
+        print(f"\n\tMounting partition")
+        cmd(fr"sudo losetup -o 512 /dev/loop3 {args.filename}")
+        print(f"\n\tCreating fs on partition")
+        cmd(fr"{format} /dev/loop3")
+        print(f"\n\tUnmounting partition")
+        cmd(fr"sudo losetup -d /dev/loop3")
+        
 
     drives = []
 

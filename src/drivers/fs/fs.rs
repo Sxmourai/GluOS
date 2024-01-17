@@ -268,3 +268,8 @@ pub enum DiskType {
     MBR,
     GPT,
 }
+
+#[repr(C, packed)]
+pub struct ExtSuperBlock {
+
+}
