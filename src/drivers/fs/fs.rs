@@ -1,5 +1,3 @@
-
-
 use alloc::{
     format,
     string::{String, ToString},
@@ -267,9 +265,4 @@ pub enum ClusterEnum {
 pub enum DiskType {
     MBR,
     GPT,
-}
-
-#[repr(C, packed)]
-pub struct ExtSuperBlock {
-
 }

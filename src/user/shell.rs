@@ -214,22 +214,58 @@ fn dump_disk(args: String) -> Result<(), String> {
         _ => return Err("Wrong drive: Master//0 or Slave//1".to_string()),
     };
     let mut i = 0;
+    let loc = DiskLoc(channel, drive);
     loop {
-        let sectors = read_from_disk(&DiskLoc(channel, drive), i, 3);
+        let sectors = read_from_disk(&loc, i, 1);
         if sectors.is_err() {break}
         let sectors = sectors.unwrap();
-        if sectors.iter().all(|x| *x==0){continue}
-        serial_println!("\n\n-----------{}----------", i);
-        for b in sectors {
-            if b != 0 {
-                serial_print!("{}", b as char)
+        if sectors.iter().all(|x| *x==0){
+            if i%1000==0{
+                serial_println!("-----------{}----------", i);
             }
+        } else {
+            serial_println!("\n\n-----------{}----------", i);
+            serial_println!("{}", String::from_utf8_lossy(&sectors));
         }
         i += 1;
     }
 
     Ok(())
 }
+
+// #[command("test_disk", "Reads multiple times some sectors to see if same content is returned")]
+// fn test_disk(args: String) -> Result<(), String> {
+//     let mut args = args.split(" ");
+//     let channel = match args
+//         .next()
+//         .ok_or("Invalid argument: missing channel (Primary/0, Secondary/1)")?
+//     {
+//         "Primary" => Channel::Primary,
+//         "0" => Channel::Primary,
+//         "Secondary" => Channel::Secondary,
+//         "1" => Channel::Secondary,
+//         _ => return Err("Wrong channel: Primary//0 or Secondary//1".to_string()),
+//     };
+//     let drive = match args
+//         .next()
+//         .ok_or("Invalid argument: missing drive (Master/0, Slave/1)")?
+//     {
+//         "Master" => Drive::Master,
+//         "0" => Drive::Master,
+//         "Slave" => Drive::Slave,
+//         "1" => Drive::Slave,
+//         _ => return Err("Wrong drive: Master//0 or Slave//1".to_string()),
+//     };
+//     let loc = DiskLoc(channel, drive);
+//     let sector = read_from_disk(&loc, 5, 1).unwrap();
+//     for i in 0..1_000 {
+//         if read_from_disk(&loc, 5, 1).unwrap()!=sector {
+//             println!("DISK / ATA CODE IS WRONG!");
+//             return Ok(())
+//         }
+//     }
+//     Ok(())
+// }
 
 #[command("lspci", "Lists pci devices connected to computer")]
 fn lspci(args: String) -> Result<(), String> {

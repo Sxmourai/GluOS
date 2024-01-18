@@ -14,6 +14,7 @@ use spin::{Mutex, MutexGuard};
 use crate::bit_manipulation::{bytes, ptrlist_to_num, u16_to_u8};
 
 
+use crate::dbg;
 use crate::fs::fs::FilePath;
 use crate::fs::fs_driver::Partition;
 use crate::x86_64::instructions::port::{PortRead, PortWrite};
@@ -174,7 +175,7 @@ pub fn read_from_partition(
 ) -> DResult<Sectors> {
     let start_sector = start_sector+partition.1;
     assert!((start_sector+sector_count as u64)<partition.1+partition.2, "Trying to read outside of partition");
-    crate::dbg!("Read", partition, start_sector);
+    dbg!(start_sector, partition.1);
     read_from_disk(&partition.0, start_sector, sector_count)
 }
 pub fn write_to_disk(addr: impl DiskAddress, start_sector: u64, content: Sectors) -> DResult<()> {
@@ -351,7 +352,6 @@ impl DiskManager {
             selected_disk: 0,
         }
     }
-    //TODO Return result
     fn select_disk(&mut self, disk_address: usize) -> Result<&mut Disk, DiskError> {
         let disk = self.disks[disk_address].as_mut();
         if disk_address==self.selected_disk {
@@ -517,6 +517,7 @@ impl Disk {
 
     //28Bit Lba PIO mode
     pub fn read28(&self, _lba: u32, sector_count: u8) -> DResult<Sectors> {
+        log::debug!("Reading 28, will it work ?");
         let drive_addr = self.loc.drive_lba28_addr() as u32;
         let base = self.loc.channel_addr();
         unsafe {
@@ -578,7 +579,7 @@ impl Disk {
         trace!("Retrieving read !");
         let mut buffer = alloc::vec![];
         for _sector in 0..sector_count {
-            self.polling(true, line!())?;
+            self.poll()?;
             for _i in 0..SSECTOR_SIZEWORD / 2 {
                 let data = unsafe { u32::read_from_port(self.data_reg()) };
                 buffer.push((data >> 0) as u8);
@@ -586,6 +587,7 @@ impl Disk {
                 buffer.push((data >> 16) as u8);
                 buffer.push((data >> 24) as u8);
             }
+
         }
         Ok(buffer)
     }
@@ -645,7 +647,7 @@ impl Disk {
             len += 1
         }
         for sector in 0..len {
-            self.polling(false, line!())?;
+            self.poll()?;
 
             for i in 0..128 {
                 let mut data = 0;
@@ -658,10 +660,10 @@ impl Disk {
         }
         // Cache flush
         unsafe { u8::write_to_port(self.command_reg(), 0xEA) }
-        self.polling(false, line!())?;
+        self.poll()?;
         Ok(())
     }
-    fn polling(&self, read: bool, line: u32) -> Result<(), DiskError> {
+    
         /*
         #define ATA_SR_BSY     0x80    // Busy
         #define ATA_SR_DRDY    0x40    // Drive ready
@@ -672,6 +674,7 @@ impl Disk {
         #define ATA_SR_IDX     0x02    // Index
         #define ATA_SR_ERR     0x01    // Error
         */
+    fn poll(&self) -> Result<(), DiskError> {
         for _ in 0..4 {
             // Doing this 4 times creates a 400ns delay
             unsafe { u8::read_from_port(self.base()) };
@@ -679,19 +682,20 @@ impl Disk {
         for i in 0..100_000 {
             let status = self.check_status()?;
             if status & 0x80 == 0 {
-                if read && status & 0x08 == 0 {
-                    log::error!("IDE read data not ready");
-                    return Err(DiskError::ReadDataNotAvailable);
+                if status & 0x08 == 0x08 {
+                    return Ok(()); // Read data available
                 }
-                break;
+                else if status & 0x01 == 0x1 { // Error reading
+                    error!("Error reading disk !");
+                    return Err(DiskError::ReadDataNotAvailable)
+                }
+                else if status & 0x20 == 0x20 { // Error reading
+                    error!("Error reading disk !");
+                    return Err(DiskError::ReadDataNotAvailable)
+                }
             }
             if i == 100_000 - 1 {
-                log::error!(
-                    "DRQ read timed out line {}, polling {} with status 0x{:02X}",
-                    line,
-                    if read { "read" } else { "write" },
-                    status
-                );
+                log::error!("DRQ read timed out, polling with status 0x{:02X}",status);
                 return Err(DiskError::ReadDataNotAvailable);
             }
         }

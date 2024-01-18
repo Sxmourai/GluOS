@@ -122,13 +122,11 @@ impl FsDriver {
             for (part_id, partition) in partitions.into_iter().enumerate() {
                 let part_id = (partition.0, part_id as u8);
                 if kind==DiskType::MBR {
-                    dbg!(partition, kind);
                     let fat_info = Self::get_fat_boot(&partition).unwrap();
                     if fat_info.0.fs_type_label[0..5] == [70, 65, 84, 51, 50] {
                         // Fat32
                     } else if fat_info.0.fs_type_label.iter().all(|x|*x==0) {
-                        let rawsuper_block = read_from_partition(&partition, 2, 2);
-                        let superblock = unsafe { &*(rawsuper_block.as_ptr() as *const ExtSuperBlock) };
+                        
                     } else {
                         let name = String::from_utf8_lossy(&fat_info.0.fs_type_label.to_vec()).to_string();
                         error!("Unknown fs: {name}");
