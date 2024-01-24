@@ -40,24 +40,24 @@ impl BootInfoFrameAllocator {
         frame_addresses.map(|addr| PhysFrame::containing_address(PhysAddr::new(addr)))
     }
 
-    pub unsafe fn map_physical_region(
-        &mut self,
-        physical_address: usize,
-    ) -> x86_64::structures::paging::Page {
-        let frame =
-            PhysFrame::from_start_address(PhysAddr::new(physical_address.try_into().unwrap()))
-                .unwrap();
-        let flags = Flags::PRESENT | Flags::WRITABLE;
+    // pub unsafe fn map_physical_region(
+    //     &mut self,
+    //     physical_address: usize,
+    // ) -> x86_64::structures::paging::Page {
+    //     let frame =
+    //         PhysFrame::from_start_address(PhysAddr::new(physical_address.try_into().unwrap()))
+    //             .unwrap();
+    //     let flags = Flags::PRESENT | Flags::WRITABLE;
 
-        let page = Page::containing_address(VirtAddr::new(0xfffffff9));
+    //     let page = Page::containing_address(VirtAddr::new(0xfffffff9));
 
-        let mut mem_handler = unsafe {mem_handler!()};
-        let map_to_result = unsafe {
-            // FIXME: this is not safe, we do it only for testing
-            mem_handler.map_to(page, frame, flags)
-        };
-        page
-    }
+    //     let mut mem_handler = unsafe {mem_handler!()};
+    //     let map_to_result = unsafe {
+    //         // FIXME: this is not safe, we do it only for testing
+    //         mem_handler.mapper.map_to(page, frame, flags)
+    //     };
+    //     page
+    // }
 }
 // impl AcpiHandler for BootInfoFrameAllocator {
 //     unsafe fn map_physical_region<T>(&self, physical_address: usize, size: usize) -> rsdp::handler::PhysicalMapping<Self, T> {

@@ -1,3 +1,5 @@
+use alloc::string::String;
+
 use crate::{dbg, disk::ata::read_from_partition};
 
 use super::fs_driver::Partition;
@@ -5,14 +7,29 @@ use super::fs_driver::Partition;
 pub fn read_root(partition: &Partition) {
     let rawsuper_block = read_from_partition(&partition, 2, 2).expect("Failed reading partition on disk");
     let superblock = unsafe { &*(rawsuper_block.as_ptr() as *const ExtSuperBlock) };
-    if superblock.major_portion_version<1 {log::error!("Superblock is to old, don't support it"); return}
+    if superblock.major_portion_version<1 {log::error!("Superblock version is to old, don't support it"); return}
     let extsuperblock = unsafe { &*(rawsuper_block.as_ptr() as *const ExtendedExtSuperblock) };
-    
+    // let n_b_gs = extsuperblock.super_block.total_blocks.div_ceil(extsuperblock.super_block.blocks_per_group);
+    // let n_b_gs = extsuperblock.super_block.total_inodes.div_ceil(extsuperblock.super_block.inodes_per_group);
+    // dbg!(extsuperblock.flex_blocks());
+    if extsuperblock.required_feat_present&0x1!=0 {
+        log::error!("Compression used !");
+        return
+    }
     let block_size = extsuperblock.super_block.block_size();
     let inode_size = extsuperblock.size_inode_struct as u32;
     let bg_size = extsuperblock.block_descriptor_group_size() as usize;
     
     let raw_bgdt = read_from_partition(&partition, ((block_size/512)*2).into(), 1).expect("Failed reading Block Group Descriptor");
+    let root_blkgrp = block_group_of_inode(2, superblock.inodes_per_group);
+    let root_bgd = get_blkgrp64(root_blkgrp, &raw_bgdt).unwrap();
+    dbg!(root_bgd.inode_table_addr());
+    let inode_table_sec = (root_bgd.inode_table_addr()+1)*(block_size as u64/512);
+    // dbg!(inode_table_sec);
+    // let root_indtable = read_from_partition(partition, inode_table_sec, 1).unwrap();
+    // dbg!(unsafe { &*(root_indtable.as_ptr() as *const InodeTable) });
+    
+    
     for raw_bgd in raw_bgdt.chunks_exact(bg_size) {
         if raw_bgd.iter().all(|x|*x==0) {break}
         if bg_size==32 {
@@ -24,12 +41,14 @@ pub fn read_root(partition: &Partition) {
             dbg!("a", inode_table);
         } else if bg_size==64 {
             let bgd = unsafe { &*(raw_bgd.as_ptr() as *const BlockGroupDescriptor64) };
-            let raw_inode_tables = read_from_partition(&partition, (bgd.inode_table_addr()+1)*(block_size as u64/512), 1).expect("Failed reading inode table");
+            let inode_table_sec = (bgd.inode_table_addr()+1)*(block_size as u64/512);
+            dbg!(inode_table_sec);
+            let raw_inode_tables = read_from_partition(&partition, 109, 2).expect("Failed reading inode table");
             for raw_table in raw_inode_tables.chunks_exact(128) {
-                if raw_table.iter().all(|x|*x==0) {break}
+                // if raw_table.iter().all(|x|*x==0) {continue}
                 let inode_table = unsafe { &*(raw_table.as_ptr() as *const InodeTable) };
                 if inode_table.type_n_perms&0x4000!=0 {
-                    dbg!("Dir");
+                    dbg!("Dir");    
                 }
                 if inode_table.type_n_perms&0x8000!=0 {
                     dbg!("File");
@@ -46,6 +65,17 @@ pub fn read_root(partition: &Partition) {
     dbg!(root_sec, root_bg, root_idx);
 }
 
+fn block_group_of_inode(inode_number: u64, inodes_per_group: u32) -> u64 {
+    (inode_number - 1) / inodes_per_group as u64
+}
+fn get_blkgrp64<'a>(block_group: u64, bgd: &'a [u8]) -> Option<&'a BlockGroupDescriptor64> {
+    let raw_bgd = bgd.chunks_exact(64).nth(block_group as usize)?;
+    Some(unsafe { &*(raw_bgd.as_ptr() as *const BlockGroupDescriptor64) })
+}
+// fn read_inode(inode_number: u64) -> String {
+    
+//     String::new()
+// }
 
 
 #[repr(C, packed)]
@@ -105,13 +135,45 @@ pub struct ExtendedExtSuperblock {
     pub journal_inode: u32,
     pub journal_device: u32,
     pub head_orphan_inode_list: u32,
-    // pub unused: [u8; 1023]
+    pub htree_hash_seed_array_32bit_ints: u128,
+    pub hash_algo_for_dirs: u8,
+    pub journal_blocks_fied_contains_copy_inode_block_array_size: u8,
+    pub size_group_descriptors_bytes_in_64bit_mode: u16,
+    pub mount_opts: u32,
+    pub fst_metablock_block_group: u32, // if enabled
+    pub fs_creation_time: u32,
+    pub journal_inode_backup_array_32bit_integers: [u8; 68],
+    // ! ONLY if 64bit feature is set
+    pub e4_hi_total_n_blocks: u32,
+    pub e4_hi_total_n_reserved_blocks: u32,
+    pub e4_hi_total_n_unallocated_blocks: u32,
+    pub e4_min_inode_size: u16,
+    pub e4_min_inode_reservation_size: u16,
+    pub e4_misc_flags: u32,
+    pub e4_log_blocks_rw_perdisk_in_raid_array: u16,
+    pub e4_n_secs_wait_in_mmp_check: u16,
+    pub e4_block_multi_mount_prevent:u64,
+    pub e4_n_block_rw_before_returning_current_disk_raid_array: u32, //amount of disks * stride
+    pub e4_n_flex_groups: u8,
+    pub e4_meta_checksum_algo_used: u8, //Linux only CRC32
+    pub e4_encryption_version_lvl: u8,
+    pub e4_reserved_padding:u8,
+    pub e4_n_kilo_written_over_fs_lifetime:u64,
+    pub e4_inode_n_of_active_snapshot:u32,
+    pub e4_sequential_id_active_snapshot:u32,
+    pub e4_n_block_reserved_active_snapshot:u64,
+    pub e4_inode_number_of_head_of_disk_snapshot_list:u32,
+    //TODO rest of fields
+    
 }
 impl ExtendedExtSuperblock {
     pub fn block_descriptor_group_size(&self) -> u8 {
         if self.required_feat_present&0x80==0x80 { // Fs uses 64 bit features
             64
         } else {32}
+    }
+    pub fn flex_blocks(&self) -> u32 {
+        (self.e4_n_flex_groups as u32)<<10
     }
 }
 impl core::fmt::Debug for ExtendedExtSuperblock {
@@ -176,7 +238,7 @@ pub enum ReadOnlyFeaturesFlagsExt2 {
     DirContentBinaryTree=4,
 }
 #[repr(C, packed)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BlockGroupDescriptor {
     pub lo_block_addr_block: u32,
     pub lo_block_addr_inode: u32,

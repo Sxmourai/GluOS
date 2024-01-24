@@ -175,7 +175,6 @@ pub fn read_from_partition(
 ) -> DResult<Sectors> {
     let start_sector = start_sector+partition.1;
     assert!((start_sector+sector_count as u64)<partition.1+partition.2, "Trying to read outside of partition");
-    dbg!(start_sector, partition.1);
     read_from_disk(&partition.0, start_sector, sector_count)
 }
 pub fn write_to_disk(addr: impl DiskAddress, start_sector: u64, content: Sectors) -> DResult<()> {

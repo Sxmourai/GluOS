@@ -6,7 +6,7 @@ use x86_64::{
 
 use log::trace;
 
-use crate::boot_info;
+use crate::{boot_info, mem_handler};
 
 use super::{active_level_4_table, frame_allocator::BootInfoFrameAllocator};
 
@@ -45,18 +45,15 @@ impl MemoryHandler {
         trace!("Finished initializing heap, can now begin tracing !");
         _self
     }
-    pub unsafe fn map_to(&mut self, page: Page<Size4KiB>, phys_frame: PhysFrame, flags: PageTableFlags) {
-        unsafe {
-            self.mapper
-                .map_to(page, phys_frame, flags, &mut self.frame_allocator)
-                .unwrap()
-                .flush()
-        }
-    }
     pub unsafe fn map(&mut self, page: Page<Size4KiB>, flags: PageTableFlags) -> Result<(), MapFrameError> {
         let frame = self.frame_allocator.allocate_frame();
         if frame.is_none() {return Err(MapFrameError::CantAllocateFrame)}
         let frame = frame.unwrap();
+        unsafe {
+            self.map_frame(page, frame, flags)
+        }
+    }
+    pub unsafe fn map_frame(&mut self, page: Page<Size4KiB>,frame: PhysFrame, flags: PageTableFlags) -> Result<(), MapFrameError> {
         unsafe {
             self.mapper
                 .map_to(page, frame, flags, &mut self.frame_allocator)
@@ -65,14 +62,10 @@ impl MemoryHandler {
         }
         Ok(())
     }
-
-    // pub fn frame_allocator(&mut self) -> &mut BootInfoFrameAllocator {
-    //     serial_println!("{:?}",self.frame_allocator);
-    //     Arc::clone(self.frame_allocator.as_mut().unwrap())
-    // }
-    // pub fn mapper(&mut self) -> Arc<Mutex<OffsetPageTable<'static>>> {
-    //     Arc::clone(self.mapper.as_mut().unwrap())
-    // }
+}
+// Must have mem_handler setted
+pub unsafe fn map(page: Page<Size4KiB>, flags: PageTableFlags) -> Result<(), MapFrameError> {
+    unsafe{mem_handler!().map(page, flags)}
 }
 
 pub enum MapFrameError {

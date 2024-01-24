@@ -1,6 +1,6 @@
 use x86_64::structures::{idt::{InterruptStackFrame, PageFaultErrorCode}, paging::{FrameAllocator, PageTableFlags, Page}};
 
-use crate::{println, mem_handler};
+use crate::{println, mem_handler, memory::handler::map};
 use log::error;
 
 pub extern "x86-interrupt" fn alignment_check(stack_frame: InterruptStackFrame, error_code: u64) {
@@ -115,7 +115,7 @@ pub extern "x86-interrupt" fn page_fault_handler(
     use x86_64::registers::control::Cr2;
     //TODO Map a page to a frame when page fault
     let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
-    unsafe { mem_handler!().map_to(Page::containing_address(Cr2::read()), mem_handler!().frame_allocator.allocate_frame().unwrap() , flags) };
+    unsafe { map(Page::containing_address(Cr2::read()), flags) };
     error!(
         "EXCEPTION: PAGE FAULT
     Accessed Address: {:?}

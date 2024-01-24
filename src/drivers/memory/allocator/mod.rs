@@ -40,11 +40,8 @@ pub fn init_heap(mem_handler: &mut MemoryHandler) -> Result<(), MapToError<Size4
         Page::range_inclusive(heap_start_page, heap_end_page)
     };
     for page in page_range {
-        let frame = mem_handler.frame_allocator
-            .allocate_frame()
-            .ok_or(MapToError::FrameAllocationFailed)?;
         let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
-        unsafe { mem_handler.map_to(page, frame, flags) };
+        unsafe { mem_handler.map(page, flags) };
     }
 
     unsafe {

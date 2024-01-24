@@ -38,6 +38,11 @@ pub struct RSDPDescriptor {
     oemid: [u8; 6],
     revision: u8,
     rsdt_addr: u32,
+    // ! XSDT
+    len:u32,
+    xsdt_addr:u64,
+    ext_chcksum: u8,
+    reserved: [u8; 3],
 }
 
 fn search_rsdp_in_page(page: u64, physical_memory_offset: u64) -> Option<&'static RSDPDescriptor> {
@@ -61,15 +66,9 @@ fn search_rsdp_in_page(page: u64, physical_memory_offset: u64) -> Option<&'stati
 
 //TODO Support ACPI version 2 https://wiki.osdev.org/RSDP
 pub fn search_rsdp(physical_memory_offset: u64) -> &'static RSDPDescriptor {
-    trace!("Searching RSDP in first memory region");
-    for i in (0x80000..0x9ffff).step_by(4096) {
+    trace!("Searching RSDP in first&second memory region");
+    for i in (0x80000..0x9ffff).chain(0xe0000..0xfffff).step_by(4096) {
         if let Some(rsdp) = search_rsdp_in_page(i, physical_memory_offset) {
-            return rsdp;
-        }
-    }
-    trace!("Searching RSDP in second memory region");
-    for j in (0xe0000..0xfffff).step_by(4096) {
-        if let Some(rsdp) = search_rsdp_in_page(j, physical_memory_offset) {
             return rsdp;
         }
     }
@@ -101,5 +100,10 @@ fn get_rsdt(rsdt_addr: u64) -> RSDT {
     }
 }
 pub fn search_rsdt(physical_memory_offset: u64) -> RSDT {
-    get_rsdt(search_rsdp(physical_memory_offset).rsdt_addr.into())
+    let rsdp = search_rsdp(physical_memory_offset);
+    if rsdp.xsdt_addr != 0{
+        let xsdt_addr = rsdp.xsdt_addr;
+        log::debug!("Xsdt address is set, we should maybe use it ?!");
+    }
+    get_rsdt(rsdp.rsdt_addr.into())
 }

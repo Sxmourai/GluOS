@@ -47,7 +47,7 @@ if __name__ == "__main__":
         print(f"\n\tMounting partition on loop device")
         cmd(fr"sudo losetup -o 512 /dev/loop3 {args.filename}")
         print(f"\n\tCreating fs on partition")
-        cmd(fr"{format} /dev/loop3")
+        cmd(fr"sudo {format} /dev/loop3") # Sudo because sometimes it's needed
         print(f"\n\tMounting partition")
         cmd(fr"sudo mount /dev/loop3 mounted_disk")
         print(f"\n\tCreating a test file")
