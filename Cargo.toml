@@ -19,20 +19,21 @@ log = {version="0.4.20", default-features = false} # Logging facility (not that 
 crossbeam-queue = { version = "0.3.10", default-features = false, features = ["alloc"]}
 conquer-once = { version = "0.4.0", default-features = false }
 futures-util = { version = "0.3.4", default-features = false, features = ["alloc"]}
-bit_field = "0.10.2"
+bit_field = "0.10.2" # Usefull to read specific flags in u8...
+bytemuck = {version="1.14.1", features = ["derive"]} # Very usefull for converting between types (Vec<u8> -> ExtSuperblock)
+raw-cpuid = "11.0.1" # Gets some cpuid infos
 
 # Our libs
 pci-ids = { git = "https://github.com/Sxmourai/auto-pci-ids.rs.git" } # Pci ids to discover what is connected via pci
 shell_macro = { path = "src/user/shell_macro" }
-raw-cpuid = "11.0.1"
 
 [package.metadata.bootimage]
 run-args = [
     "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04", "-serial", "stdio",
     # DISKFLAG for build script (see /build/disk_create.py)
-"-drive", "file=build/fat-gpt.img,format=raw",
 "-drive", "file=build/fat-mbr.img,format=raw",
 "-drive", "file=build/ext2gpt.img,format=raw",
+"-drive", "file=build/fat-gpt.img,format=raw",
     # ENDDISKFLAG
     # If working on APIC and IPI/SMP: (sets amount of cores to 4)
     "-smp","4"

@@ -69,6 +69,10 @@ where
 pub unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
     unsafe { core::slice::from_raw_parts((p as *const T) as *const u8, core::mem::size_of::<T>()) }
 }
+// mut iter: impl Iterator<Item=impl PartialEq<u8>>
+pub fn all_zeroes(mut iter: &[u8]) -> bool {
+    iter.iter().all(|x| *x==0)
+}
 
 ///! DANGER ZONE DONT GO THERE 🤣
 pub fn list_to_num<T, R>(content: impl Iterator<Item = T> + DoubleEndedIterator) -> R

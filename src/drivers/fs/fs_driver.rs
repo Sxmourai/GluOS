@@ -9,7 +9,7 @@ use x86_64::registers::rflags::read;
 use super::{
     entry::{RawFat32Entry, LFN32},
     fs::*,
-    userland::FatAttributes, ext::{ExtSuperBlock, self},
+    userland::FatAttributes, ext::{self, ExtDriver, ExtSuperBlock},
 };
 use crate::{
     bit_manipulation::any_as_u8_slice,
@@ -126,7 +126,7 @@ impl FsDriver {
                     if fat_info.0.fs_type_label[0..5] == [70, 65, 84, 51, 50] {
                         // Fat32
                     } else if fat_info.0.fs_type_label.iter().all(|x|*x==0) {
-                        // ext::read_root(&partition)
+                        let driver = ExtDriver::new(&partition).unwrap();
                     } else {
                         let name = String::from_utf8_lossy(&fat_info.0.fs_type_label.to_vec()).to_string();
                         error!("Unknown fs: {name}");

@@ -225,7 +225,7 @@ fn dump_disk(args: String) -> Result<(), String> {
             }
         } else {
             serial_println!("\n\n-----------{}----------", i);
-            serial_println!("{}", String::from_utf8_lossy(&sectors));
+            serial_println!("{}", String::from_utf8_lossy(&sectors).to_string());
         }
         i += 1;
     }
