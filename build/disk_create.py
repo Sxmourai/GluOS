@@ -43,9 +43,9 @@ if __name__ == "__main__":
         print(f"\n\tCreating label on disk ({args.header_type})")
         cmd(f"parted {args.filename} mklabel {args.header_type} --script")
         print(f"\n\tCreating partition")
-        cmd(fr"parted {args.filename} mkpart primary {args.format} 0% 100% --script")
+        cmd(fr"parted {args.filename} mkpart primary {args.format} 18432B 100% --script")
         print(f"\n\tMounting partition on loop device")
-        cmd(fr"sudo losetup -o 512 /dev/loop3 {args.filename}")
+        cmd(fr"sudo losetup -o 18432 /dev/loop3 {args.filename}")
         print(f"\n\tCreating fs on partition")
         cmd(fr"sudo {format} /dev/loop3") # Sudo because sometimes it's needed
         print(f"\n\tMounting partition")

@@ -6,7 +6,7 @@ use alloc::{
 
 use crate::{disk::ata::DiskLoc, fs_driver};
 
-use super::{userland::FatAttributes, fs_driver::{Partition, PartitionId}};
+use super::{partition::Partition, userland::FatAttributes};
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(packed)]
@@ -51,14 +51,16 @@ pub enum FileSystemError {
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct FilePath {
     raw_path: String,
+    pub partition: Partition,
 }
 impl FilePath {
-    pub fn new(mut full_path: String) -> Self {
+    pub fn new(mut full_path: String, partition: Partition) -> Self {
         if !full_path.starts_with("/") {
             full_path.insert(0, '/');
         }
         Self {
             raw_path: full_path.replace("\u{ffff}", ""),
+            partition,
         }
     }
     pub fn splitted(&self) -> core::str::Split<'_, &str> {
@@ -75,32 +77,29 @@ impl FilePath {
         let mut splitted = self.splitted();
         splitted.next().unwrap()
     }
+    /// Creates a new filepath poiting to parent
     pub fn parent(&self) -> FilePath {
         let splitted: Vec<&str> = self.splitted().collect();
-        splitted[0..splitted.len() - 2].join("/").into()
+        FilePath::new(splitted[0..splitted.len() - 2].join("/"), self.partition.clone())
     }
     pub fn path(&self) -> &String {
         &self.raw_path
     }
-    pub fn join(self, other_path: FilePath) -> FilePath {
-        let mut path = self.raw_path;
+    // Both paths must be on same partition !
+    pub fn join(&self, other_path: FilePath) -> FilePath {
+        let mut path = self.raw_path.clone();
+        assert_eq!(self.partition, other_path.partition);
         path.extend(other_path.path().chars());
-        Self::new(path.replace("//", "/").replace("\\", "/"))
+        Self::new(path.replace("//", "/").replace("\\", "/"), self.partition.clone())
     }
-    pub fn disk_loc(&self) -> Option<DiskLoc> {
-        match self.raw_path.chars().nth(0).unwrap() {
-            '0' => Some(DiskLoc(crate::disk::ata::Channel::Primary, crate::disk::ata::Drive::Master)),
-            '1' => Some(DiskLoc(crate::disk::ata::Channel::Primary, crate::disk::ata::Drive::Slave)),
-            '2' => Some(DiskLoc(crate::disk::ata::Channel::Secondary, crate::disk::ata::Drive::Master)),
-            '3' => Some(DiskLoc(crate::disk::ata::Channel::Secondary, crate::disk::ata::Drive::Slave)),
-            _ => None,
-        }
+    //TODO Return new or mutate self ?
+    pub fn join_str(&self, other_path: String) -> FilePath {
+        let mut path = self.raw_path.clone();
+        path.extend(other_path.chars());
+        Self::new(path.replace("//", "/").replace("\\", "/"), self.partition.clone())
     }
-    pub fn part_loc(&self) -> Option<PartitionId> {
-        let part: u8 = self.raw_path.chars().nth(1).unwrap().to_string().parse().ok()?;
-        if unsafe{fs_driver!().disks.contains_key(&(self.disk_loc()?, part))} {
-            Some((self.disk_loc()?, part))
-        } else {None}
+    pub fn disk_loc(&self) -> DiskLoc {
+        self.partition.0
     }
     pub fn name(&self) -> &str {
         self.splitted().last().unwrap()
@@ -115,154 +114,4 @@ impl core::fmt::Display for FilePath {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str(format!("{}", self.path()).as_str())
     }
-}
-impl Into<FilePath> for String {
-    fn into(self) -> FilePath {
-        FilePath::new(self)
-    }
-}
-impl Into<FilePath> for &str {
-    fn into(self) -> FilePath {
-        FilePath::new(self.to_string())
-    }
-}
-#[derive(Debug, Clone)]
-pub enum Fat32Entry {
-    File(Fat32File),
-    Dir(Fat32Dir),
-}
-#[derive(Debug, Clone)]
-pub struct Fat32File {
-    pub path: FilePath,
-    pub size: u64,
-    pub attributes: FatAttributes,
-    pub sector: u32,
-}
-impl Fat32File {
-    pub fn path(&self) -> &FilePath {
-        &self.path
-    }
-    pub fn name(&self) -> &str {
-        &self.path.name()
-    }
-    pub fn sector(&self) -> u32 {
-        self.sector
-    }
-    pub fn attributes(&self) -> &FatAttributes {
-        &self.attributes
-    }
-}
-#[derive(Debug, Clone)]
-pub struct Fat32Dir {
-    pub path: FilePath,
-    pub attributes: FatAttributes,
-    pub sector: u32,
-    // pub dirs: HashMap<FilePath, Fat32Dir>,
-}
-impl Fat32Dir {
-    pub fn path(&self) -> &FilePath {
-        &self.path
-    }
-    pub fn name(&self) -> &str {
-        &self.path.name()
-    }
-    pub fn sector(&self) -> u32 {
-        self.sector
-    }
-    pub fn attributes(&self) -> &FatAttributes {
-        &self.attributes
-    }
-}
-
-//TODO Mult by sectors_per_cluster
-// All safely to u32
-pub fn cluster_to_sector(cluster_number: u64, first_data_sector: u64) -> u64 {
-    (cluster_number - 2) + first_data_sector
-}
-pub fn sector_to_cluster(sector_number: u64, first_data_sector: u64) -> u64 {
-    (sector_number - first_data_sector) + 2
-}
-
-pub enum FatType {
-    ExFat,
-    Fat12,
-    Fat16,
-    Fat32,
-}
-#[derive(Default, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct FatInfo(pub BiosParameterBlock);
-impl FatInfo {
-    pub fn first_sector_of_cluster(&self) -> u64 {
-        let first_data_sector = self.get_first_data_sector();
-        cluster_to_sector(self.0.root_dir_first_cluster as u64, first_data_sector)
-        // , self.0.sectors_per_cluster as u64
-    }
-    pub fn get_first_data_sector(&self) -> u64 {
-        let fat_size = self.get_fat_size();
-        let root_dir_sectors = self.get_root_dir_sectors();
-        let reserved_sector_count = self.0.reserved_sectors;
-        reserved_sector_count as u64 + (self.0.fats as u64 * fat_size as u64) + root_dir_sectors
-    }
-    pub fn fat_type(&self) -> FatType {
-        let total_clusters = self.get_total_clusters();
-        if total_clusters < 4085 {
-            FatType::Fat12
-        } else if total_clusters < 65525 {
-            FatType::Fat16
-        } else {
-            FatType::Fat32
-        }
-    }
-    pub fn get_total_clusters(&self) -> u64 {
-        self.get_data_sectors() as u64 / self.0.sectors_per_cluster as u64
-    }
-    pub fn get_data_sectors(&self) -> u64 {
-        self.get_total_sectors() as u64
-            - (self.0.reserved_sectors as u64
-                + (self.0.fats as u64 * self.get_fat_size() as u64)
-                + self.get_root_dir_sectors()) as u64
-    }
-    pub fn get_total_sectors(&self) -> u32 {
-        if self.0.total_sectors_16 == 0 {
-            self.0.total_sectors_32
-        } else {
-            self.0.total_sectors_16.into()
-        }
-    }
-    // Gets fat size in sectors
-    pub fn get_fat_size(&self) -> u32 {
-        if self.0.sectors_per_fat_16 == 0 {
-            self.0.sectors_per_fat_32
-        } else {
-            self.0.sectors_per_fat_16 as u32
-        }
-    }
-    pub fn get_root_dir_sectors(&self) -> u64 {
-        ((self.0.root_entries as u64 * 32 as u64) + (self.0.bytes_per_sector as u64 - 1))
-            / self.0.bytes_per_sector as u64
-    }
-    pub fn first_fat_sector(&self) -> u16 {
-        self.0.reserved_sectors
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct FatTable {
-    pub size: u32,
-    pub first_sector: u16,
-    pub last_sector: u16,
-    pub last_offset: u16, // u16 even though in range 0..512
-    pub last_used_sector: u32,
-}
-#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Copy)]
-pub enum ClusterEnum {
-    EndOfChain,
-    BadCluster,
-    Cluster(u32),
-}
-
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Copy)]
-pub enum DiskType {
-    MBR,
-    GPT,
 }

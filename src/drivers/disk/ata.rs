@@ -16,7 +16,7 @@ use crate::bit_manipulation::{bytes, ptrlist_to_num, u16_to_u8};
 
 use crate::dbg;
 use crate::fs::fs::FilePath;
-use crate::fs::fs_driver::Partition;
+use crate::fs::partition::Partition;
 use crate::x86_64::instructions::port::{PortRead, PortWrite};
 
 use super::DiskError;
@@ -214,7 +214,7 @@ pub fn write_to_partition(partition: &Partition, start_sector: u64, content: Sec
 
 pub trait DiskAddress: Copy {
     fn as_index(&self) -> usize;
-    fn as_path(&self) -> Option<FilePath>;
+    fn as_path(&self, partition: Partition) -> Option<FilePath>;
     fn as_diskloc(&self) -> DiskLoc {
         DiskLoc(self.channel(), self.drive())
     }
@@ -261,67 +261,6 @@ pub trait DiskAddress: Copy {
         self.channel_addr()
     }
 }
-impl DiskAddress for u8 {
-    fn as_index(&self) -> usize {
-        assert!(*self <= 4);
-        (*self).try_into().expect("Disk address is unrecognised")
-    }
-
-    fn as_path(&self) -> Option<FilePath> {
-        match self {
-            0 => Some(FilePath::new("0".to_string())),
-            1 => Some(FilePath::new("1".to_string())),
-            2 => Some(FilePath::new("2".to_string())),
-            3 => Some(FilePath::new("3".to_string())),
-            _ => None,
-        }
-    }
-}
-impl DiskAddress for u16 {
-    fn as_index(&self) -> usize {
-        assert!(*self <= 4);
-        (*self).try_into().expect("Disk address is unrecognised")
-    }
-    fn as_path(&self) -> Option<FilePath> {
-        match self {
-            0 => Some(FilePath::new("0".to_string())),
-            1 => Some(FilePath::new("1".to_string())),
-            2 => Some(FilePath::new("2".to_string())),
-            3 => Some(FilePath::new("3".to_string())),
-            _ => None,
-        }
-    }
-}
-impl DiskAddress for u32 {
-    fn as_index(&self) -> usize {
-        assert!(*self <= 4);
-        (*self).try_into().expect("Disk address is unrecognised")
-    }
-    fn as_path(&self) -> Option<FilePath> {
-        match self {
-            0 => Some(FilePath::new("0".to_string())),
-            1 => Some(FilePath::new("1".to_string())),
-            2 => Some(FilePath::new("2".to_string())),
-            3 => Some(FilePath::new("3".to_string())),
-            _ => None,
-        }
-    }
-}
-impl DiskAddress for u64 {
-    fn as_index(&self) -> usize {
-        assert!(*self <= 4);
-        (*self).try_into().expect("Disk address is unrecognised")
-    }
-    fn as_path(&self) -> Option<FilePath> {
-        match self {
-            0 => Some(FilePath::new("0".to_string())),
-            1 => Some(FilePath::new("1".to_string())),
-            2 => Some(FilePath::new("2".to_string())),
-            3 => Some(FilePath::new("3".to_string())),
-            _ => None,
-        }
-    }
-}
 impl Into<DiskLoc> for usize {
     fn into(self) -> DiskLoc {
         match self {
@@ -343,10 +282,11 @@ impl DiskManager {
         unsafe { u8::write_to_port(0x3f6, (1 << 1) | (1 << 2)) }
         unsafe { u8::write_to_port(0x376, (1 << 1) | (1 << 2)) }
         Self {
-            disks: [detect(0u8), 
-                    detect(1u8),
-                    detect(2u8), 
-                    detect(3u8),
+            disks: [
+                detect(DiskLoc(Channel::Primary, Drive::Master)), 
+                detect(DiskLoc(Channel::Primary, Drive::Slave)),
+                detect(DiskLoc(Channel::Secondary, Drive::Master)), 
+                detect(DiskLoc(Channel::Secondary, Drive::Slave)),
             ],
             selected_disk: 0,
         }
@@ -435,7 +375,7 @@ pub struct AddressingModes {
     lba48: u64,
 }
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DiskLoc(pub Channel, pub Drive);
 impl DiskAddress for DiskLoc {
     fn as_index(&self) -> usize {
@@ -448,13 +388,20 @@ impl DiskAddress for DiskLoc {
         }
         i
     }
-    fn as_path(&self) -> Option<FilePath> {
-        match self {
-            DiskLoc(Channel::Primary, Drive::Master) => Some(FilePath::new("0".to_string())),
-            DiskLoc(Channel::Primary, Drive::Slave) => Some(FilePath::new("1".to_string())),
-            DiskLoc(Channel::Secondary, Drive::Master) => Some(FilePath::new("2".to_string())),
-            DiskLoc(Channel::Secondary, Drive::Slave) => Some(FilePath::new("3".to_string())),
-        }
+
+    fn as_path(&self, partition: Partition) -> Option<FilePath> {
+        Some(FilePath::new("/".to_string(), partition))
+    }
+}
+impl DiskLoc {
+    pub fn from_idx(idx: u8) -> Option<Self> {
+        Some(match idx {
+                0 => Self(Channel::Primary,  Drive::Master),
+                1 => Self(Channel::Primary,  Drive::Slave),
+                2 => Self(Channel::Secondary,Drive::Master),
+                3 => Self(Channel::Secondary,Drive::Slave),
+                _ => return None,
+        })
     }
 }
 #[derive(Debug)]

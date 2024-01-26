@@ -13,7 +13,7 @@ use shell_macro::command;
 
 use crate::{
     drivers::disk::ata::{self, read_from_disk, write_to_disk, Channel, DiskLoc, Drive},
-    fs::fs::Fat32Entry,
+    fs::{fs::FilePath, fs_driver::{Entry, FsDriverEnum}, partition::Partition},
     print, println, serial_print, serial_println,
     terminal::console::{ScreenChar, DEFAULT_CHAR}, fs_driver, descriptor_tables,
 };
@@ -22,9 +22,29 @@ use super::prompt::{input, COMMANDS_HISTORY, COMMANDS_INDEX};
 
 #[command("lsdisk", "Lists plugged disks with size & slot")]
 fn lsdisk(_args: String) -> Result<(), String> {
-    for disk in &ata::disk_manager().as_ref().unwrap().disks {
+    let drvs = fs_driver!();
+    for (i, disk) in ata::disk_manager().as_ref().unwrap().disks.iter().enumerate() {
         if let Some(disk) = disk.as_ref() {
-            println!("-> {}", disk);
+            println!("- {}", disk);
+            if let Some(partitions) = drvs.partitions.get(&disk.loc) {
+                // If the partition start is 1 we know it's MBR because on GPT the first 33 sectors are reserved !
+                let start_lba = partitions.get(0).and_then(|x| Some(x.1)).unwrap_or(0);
+                if start_lba == 1 {
+                    println!("--MBR--");
+                }
+                for part in partitions {
+                    print!("|-> {}Kb ({} - {})",(part.2-part.1)/2, part.1, part.2);
+                    if let Some(drv) = drvs.drivers.get(part) {
+                        let fs = match &drv.as_enum() {
+                            FsDriverEnum::Fat32 => "Fat32",
+                            FsDriverEnum::Ext => "Ext2",
+                        };
+                        print!(" {}", fs);
+                    }
+                    println!();
+                }
+                println!();
+            }
         }
     }
     Ok(())
@@ -128,67 +148,71 @@ fn write_sector(raw_args: String) -> Result<(), String> {
     Ok(())
 }
 
+/// n = DriveLoc
+/// p = Partition id
+/// [n][p]/[path]
+fn parse_path(path: &str) -> Option<FilePath> {
+    let loc_idx = path.chars().nth(0)?.to_string().parse::<u8>().ok()?;
+    let loc = DiskLoc::from_idx(loc_idx)?;
+    let part_idx = path.chars().nth(1)?.to_string().parse::<u8>().ok()?;
+    let part = Partition::from_idx(&loc, part_idx)?;
+    Some(FilePath::new(path[2..].to_string(), part.clone()))
+}
+
 #[command("read", "Reads a file/dir from disk")]
 fn read(raw_args: String) -> Result<(), String> {
     let mut args = raw_args.split(" ");
-    let path = args.next().unwrap();
+    let path = parse_path(args.next().unwrap()).unwrap();
     let fs_driver = unsafe{fs_driver!()};
-    if let Some(entry) = fs_driver.get_entry(&path.into()) {
+    if let Ok(entry) = fs_driver.read(&path) {
         match entry {
-            Fat32Entry::File(_file) => {
-                let content = fs_driver.read_file(&path.into());
-                println!("{}", content.unwrap()); // Can safely unwrap because we know the file exists
-            }
-            Fat32Entry::Dir(dir) => {
-                if let Some(entries) = fs_driver.read_dir_at_sector(&dir.path, dir.sector as u64) {
-                    for (path, inner_entry) in entries.iter() {
-                        let name = match inner_entry {
-                            Fat32Entry::File(file) => ("File ", file.path(), file.size),
-                            Fat32Entry::Dir(dir) => ("Dir ", dir.path(), dir.sector as u64),
-                        };
-                        println!("- {:?} -> {:?}", path.path(), name);
-                    }
+            Entry::File(mut f) => {
+                println!("{}",f.content());
+            },
+            Entry::Dir(mut d) => {
+                for sub in d.entries() {
+                    println!("- {} ({}Kb)", sub.name(), sub.size());
                 }
-            }
+            },
         }
     } else {
-        println!("Specified path couldn't be found")
+        println!("Error reading file ! Maybe specified path couldn't be found")
     }
     Ok(())
 }
 
-#[command("write", "Writes a file to disk")]
-fn write(args: String) -> Result<(), String> {
-    // TODO Refactor input/output for PROPER error handling
-    let mut args = args.split(" ");
-    let entry_type = args.next().unwrap();
-    let path = args.next().unwrap();
-    let mut fs_driver = unsafe{fs_driver!()};
-    if let Some(_entry) = fs_driver.get_entry(&path.into()) {
-        println!("File already exists !");
-        return Ok(());
-    }
-    let content = args.collect::<String>();
-    match entry_type {
-        "dir" => {
-            if !content.is_empty() {
-                println!("Useless to specify content, created a empty dir");
-            }
-            fs_driver.write_dir(path).unwrap()
-        }
-        "file" => {
-            if content.is_empty() {
-                println!("Created a empty file");
-                return Ok(());
-            }
-            fs_driver.write_file(path, content).unwrap()
-        }
-        _ => {
-            println!("Invalid entry type ! dir/file")
-        }
-    };
-    Ok(())
-}
+// #[command("write", "Writes a file to disk")]
+// fn write(args: String) -> Result<(), String> {
+//     // TODO Refactor input/output for PROPER error handling
+//     let mut args = args.split(" ");
+//     let entry_type = args.next().unwrap();
+//     let path = parse_path(args.next().unwrap()).unwrap();
+//     let mut fs_driver = unsafe{fs_driver!()};
+//     if let Some(_entry) = fs_driver.get_entry(&path) {
+//         println!("File already exists !");
+//         return Ok(());
+//     }
+//     let content = args.collect::<String>();
+//     match entry_type {
+//         "dir" => {
+//             if !content.is_empty() {
+//                 println!("Useless to specify content, created a empty dir");
+//             }
+//             fs_driver.write_dir(path).unwrap()
+//         }
+//         "file" => {
+//             if content.is_empty() {
+//                 println!("Created a empty file");
+//                 return Ok(());
+//             }
+//             fs_driver.write_file(path, content).unwrap()
+//         }
+//         _ => {
+//             println!("Invalid entry type ! dir/file")
+//         }
+//     };
+//     Ok(())
+// }
 
 #[command("dump_disk", "Dumps disk to serial output (QEMU ONLY)")]
 fn dump_disk(args: String) -> Result<(), String> {

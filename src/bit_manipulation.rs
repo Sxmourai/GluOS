@@ -142,3 +142,15 @@ impl Display for CharSlicePtr<'_> {
         write!(f, "[{}]", s)
     }
 }
+
+pub fn as_chars(list: &[u8]) -> String {
+    let mut r = String::new();
+    for byte in list {
+        r.push(*byte as char);
+    }
+    r
+}
+
+// pub fn is_set<T: core::ops::BitAnd<usize>>(value: T,n: usize) -> bool {
+//     Into::<<T as core::ops::BitAnd<usize>>::Output>::into(value & n) != 0
+// }

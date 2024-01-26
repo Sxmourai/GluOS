@@ -31,9 +31,9 @@ shell_macro = { path = "src/user/shell_macro" }
 run-args = [
     "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04", "-serial", "stdio",
     # DISKFLAG for build script (see /build/disk_create.py)
-"-drive", "file=build/fat-mbr.img,format=raw",
+"-drive", "file=build/ext2mbr.img,format=raw",
+"-drive", "file=build/fat32mbr.img,format=raw",
 "-drive", "file=build/ext2gpt.img,format=raw",
-"-drive", "file=build/fat-gpt.img,format=raw",
     # ENDDISKFLAG
     # If working on APIC and IPI/SMP: (sets amount of cores to 4)
     "-smp","4"

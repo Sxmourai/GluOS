@@ -1,14 +1,15 @@
 use core::str::FromStr;
 
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{boxed::Box, string::{String, ToString}, vec::Vec};
 use bytemuck::Zeroable;
+use hashbrown::HashMap;
 
 use crate::{dbg, disk::ata::read_from_partition, bit_manipulation::{all_zeroes, any_as_u8_slice}};
 
-use super::fs_driver::Partition;
+use super::{fs::FilePath, fs_driver::FsDriver, partition::Partition};
 
 pub struct InodeNumber(u64);
-
+#[derive(Debug)]
 pub struct ExtDriver{
     partition: Partition,
     ///TODO Know how to handle the superblock (if it's extended or not)
@@ -16,6 +17,7 @@ pub struct ExtDriver{
     ///TODO Know how to handle the block group descriptors (if it's 64 or 32 bytes) (we can use a "combinator" that combines 2 block_group_descriptors into a 64 bytes one)
     blk_grp_desc_table: Vec<BlockGroupDescriptor>,
     //TODO Hold a cached root info
+    files: HashMap<FilePath, ExtEntry>
 }
 impl ExtDriver {
     //TODO Return result
@@ -23,7 +25,7 @@ impl ExtDriver {
         let superblock = read_superblock(partition).unwrap();
         let extsuperblock = match superblock.as_super_block().major_portion_version {
             0 => {
-                log::error!("Superblock version is to old, don't support it"); 
+                log::error!("Superblock version is to old, don't support it {:?} {:?}", superblock.as_super_block(), partition); 
                 return None
             },
             _ => {
@@ -51,6 +53,7 @@ impl ExtDriver {
             partition: partition.clone(),
             superblock,
             blk_grp_desc_table: bgds,
+            files: HashMap::new(),
         };
         _self.init();
         Some(_self)
@@ -66,29 +69,36 @@ impl ExtDriver {
     }
     //TODO Return result
     fn init(&mut self) {
-        (self.read_inode(2));
-        dbg!(self.read_inode(11));
-        dbg!(self.read_inode(12));
-        dbg!(self.read_inode(13));
+        self.index_disk();
+    }
+    fn index_disk(&mut self) {
+        let root = self.read_inode(&ExtEntry::new_raw(2, "root".to_string(), false)).unwrap();
+        let root_entries = match root {
+            ExtEntryEnum::Dir(d) => d.entries,
+            ExtEntryEnum::File(f) => {
+                log::error!("Root(2) is a file ?!");
+                return
+            },
+        };
+        let root_path = FilePath::new("".to_string(), self.partition.clone());
+        for entry in root_entries {
+            let entry_path = root_path.join_str(entry.name.clone());
+            self.files.insert(entry_path, entry);
+        }
     }
     fn dir_entries_contain_type(&self) -> bool {
         self.extsuperblock().required_feat_present & 0x2!=0
     }
-    fn read_inode(&self, inode_number: u64) -> Option<ExtEntryEnum> {
-        let blk_grp_number = block_group_of_inode(inode_number, self.superblock().inodes_per_group);
-        let blk_grp = &self.blk_grp_desc_table[blk_grp_number as usize];
+    pub fn read(&self, path: &FilePath) -> Option<ExtEntryEnum> {
+        let entry = self.files.get(path)?;
+        self.read_inode(entry)
+    }
+    fn read_inode(&self, inode: &ExtEntry) -> Option<ExtEntryEnum> {
+        let inode = self.get_inode(inode)?;
         let block_size = self.block_size();
-        let inode_table_start_sector = (blk_grp.lo_block_addr_of_inode_start*block_size) as u64;
-        let inode_size = self.extsuperblock().size_inode_struct as usize;
-        let inode_table_start_sector = inode_table_start_sector+((inode_number as u64-1)/(512/inode_size as u64));
-        let tables = read_inode_table(&self.partition, inode_table_start_sector, inode_size).unwrap();
-        let inode = &tables[(inode_number as usize-1)%(512/inode_size)];
-        let inode_type = inode.type_n_perms;
         let data_blk = read_from_partition(&self.partition, (inode.direct_blk_ptr_0*block_size) as u64, block_size.try_into().unwrap()).unwrap();
-        let inode_entry = ExtEntry {
-            inner: RawExtEntry { inode: inode_number as u32, entry_size: 8+2, name_length: 2, type_indicator: 1 },
-            name: "hi".to_string(),
-        };
+        let inode_entry = ExtEntry::new(&data_blk, self.dir_entries_contain_type());
+        let inode_type = inode.type_n_perms;
         if inode_type&0x4000==0x4000 { //DIR
             let mut idx = 0; // usize cuz slice indexing
             let mut entries = Vec::new();
@@ -113,12 +123,51 @@ impl ExtDriver {
             }))
         } else {
             let typ = inode_type;
-            log::error!("Unknown inode type: {:b} {}", typ, inode_table_start_sector);
-            dbg!(inode, tables);
+            log::error!("Unknown inode type: {:b}", typ);
+            dbg!(inode);
             None
         }
     }
+
+    fn get_inode(&self, inode_entry: &ExtEntry) -> Option<InodeTable> {
+        let blk_grp_number = block_group_of_inode(inode_entry.inner.inode as u64, self.superblock().inodes_per_group);
+        let blk_grp = &self.blk_grp_desc_table[blk_grp_number as usize];
+        let block_size = self.block_size();
+        let inode_table_start_sector = (blk_grp.lo_block_addr_of_inode_start*block_size) as u64;
+        let inode_size = self.extsuperblock().size_inode_struct as usize;
+        let inode_table_start_sector = inode_table_start_sector+((inode_entry.inner.inode as u64-1)/(512/inode_size as u64));
+        let tables = get_inode_table(&self.partition, inode_table_start_sector, inode_size).unwrap();
+        let inode = &tables[(inode_entry.inner.inode as usize-1)%(512/inode_size)];
+        Some(inode.clone())
+    }
 }
+
+impl FsDriver for ExtDriver {
+    fn read(&self, path: &FilePath) -> Result<super::fs_driver::Entry, super::fs_driver::FsReadError> {
+        todo!()
+    }
+
+    fn read_file(&self,filepath: &FilePath) -> Result<alloc::boxed::Box<dyn super::fs_driver::FileEntry>, super::fs_driver::FsReadError> {
+        todo!()
+    }
+
+    fn read_dir (&self, dirpath: &FilePath) -> Result<alloc::boxed::Box<dyn super::fs_driver::DirEntry>,  super::fs_driver::FsReadError> {
+        todo!()
+    }
+
+    fn get_partition(&self, partition_id: u8) -> Option<Partition> {
+        todo!()
+    }
+
+    fn try_init(partition: &Partition) -> Option<alloc::boxed::Box<Self>> where Self: Sized {
+        Some(Box::new(Self::new(partition)?))
+    }
+
+    fn as_enum(&self) -> super::fs_driver::FsDriverEnum {
+        super::fs_driver::FsDriverEnum::Ext
+    }
+}
+
 #[derive(Debug)]
 pub enum ExtEntryEnum {
     Dir(ExtDir),
@@ -143,7 +192,7 @@ fn read_bgdt(partition: &Partition, block_size: u32) -> Vec<u8> {
 }
 //TODO Not use vec but [InodeTable; 4]
 /// inode_size should be u16
-fn read_inode_table(partition: &Partition, inode_table_start_sector: u64, inode_size: usize) -> Option<Vec<InodeTable>> {
+fn get_inode_table(partition: &Partition, inode_table_start_sector: u64, inode_size: usize) -> Option<Vec<InodeTable>> {
     let raw_inode_table = read_from_partition(&partition, inode_table_start_sector, 1).unwrap();
     let mut tables = Vec::new();
     for i in 0..raw_inode_table.len()/inode_size {
@@ -156,9 +205,6 @@ fn read_inode_table(partition: &Partition, inode_table_start_sector: u64, inode_
 fn read_superblock(partition: &Partition) -> Option<Superblock> {
     let mut rawsuper_block = read_from_partition(&partition, 2, 2).expect("Failed reading partition on disk");
     let superblock = Superblock::new(rawsuper_block);
-    if superblock.as_super_block().major_portion_version<1 {
-        log::error!("Superblock version is to old, don't support it"); 
-    }
     Some(superblock)
 }
 
@@ -177,6 +223,15 @@ impl Superblock {
     }
     pub fn as_ext_super_block(&self) -> &ExtendedExtSuperblock {
         bytemuck::from_bytes(&self.data[..core::mem::size_of::<ExtendedExtSuperblock>()])
+    }
+}
+impl core::fmt::Debug for Superblock {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        if self.as_super_block().major_portion_version>=1 {
+            f.debug_struct("Superblock").field("data", &self.as_ext_super_block()).finish()
+        } else {
+            f.debug_struct("Superblock").field("data", &self.as_super_block()).finish()
+        }
     }
 }
 
@@ -201,7 +256,7 @@ fn get_blkgrp64<'a>(block_group: u64, bgd: &'a [u8]) -> Option<&'a BlockGroupDes
     let raw_bgd = bgd.chunks_exact(64).nth(block_group as usize)?;
     Some(unsafe { &*(raw_bgd.as_ptr() as *const BlockGroupDescriptor64) })
 }
-// fn read_inode(inode_number: u64) -> String {
+// fn get_inode(inode_number: u64) -> String {
     
 // TODO When we will impl ext4
 //* } else if bg_size==64 {
@@ -376,7 +431,7 @@ impl core::fmt::Debug for ExtendedExtSuperblock {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash)]
 #[repr(C, packed)]
 struct RawExtEntry {
     pub inode: u32,
@@ -386,7 +441,7 @@ struct RawExtEntry {
     type_indicator: u8, // https://wiki.osdev.org/Ext2#Directory_Entry_Type_Indicators
 }
 
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct ExtEntry {
     inner: RawExtEntry,
     name: String,// Name characters size: N
@@ -409,6 +464,15 @@ impl<'a> ExtEntry {
             name
         }
     }
+    /// Name.len() u8
+    pub fn new_raw(inode_number: u32, name: String, file: bool) -> Self {
+        let type_indicator = if file {1} else {2};
+        Self {
+            inner: RawExtEntry { inode: inode_number, entry_size: 8+name.len() as u16, name_length: name.len() as u8, type_indicator },
+            name,
+        }
+    }
+
     pub fn type_indicator(&self) -> ExtInodeType {
         match self.inner.type_indicator {
             0 => ExtInodeType::Unknown,
