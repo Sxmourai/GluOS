@@ -38,3 +38,11 @@ Move it into /home/\[user\] instead
 - The "hub" of os deving: https://wiki.osdev.org
 - -> List of os's made with Rust https://wiki.osdev.org/Rust
 - (a better one): https://github.com/flosse/rust-os-comparison
+
+## Stuff to check
+- `cargo audit`
+- `cargo tree --duplicate`
+- Kernel size, compile times, and speed (the most significant way of seeing speed is the time it takes to init descriptor tables for now)
+- Speed: https://corrode.dev/blog/tips-for-faster-rust-compile-times/
+- Size: https://github.com/johnthagen/min-sized-rust
+- Fast: 

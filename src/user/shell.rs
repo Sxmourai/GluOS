@@ -296,6 +296,7 @@ fn dump_disk(args: String) -> Result<(), String> {
 //     Ok(())
 // }
 
+#[cfg(feature="pci")]
 #[command("lspci", "Lists pci devices connected to computer")]
 fn lspci(args: String) -> Result<(), String> {
     let mut verbose = 0;

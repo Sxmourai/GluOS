@@ -7,6 +7,7 @@ pub mod gdt;
 pub mod graphics;
 pub mod interrupts;
 pub mod memory;
+#[cfg(feature="pci")]
 pub mod pci;// pci id's Adds 2MB to kernel size !
 pub mod task;
 pub mod terminal;

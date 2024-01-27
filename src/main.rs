@@ -5,14 +5,9 @@
 #![test_runner(kernel::test::runner)]
 #![reexport_test_harness_main = "test_main"]
 
-extern crate alloc;
-extern crate bootloader;
-extern crate kernel;
-extern crate log;
-extern crate x86_64;
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
-use kernel::serial_print;
+use kernel::{serial_print, test::exit_qemu};
 use log::{error, info};
 
 // const CONFIG: bootloader_api::BootloaderConfig = {
@@ -24,11 +19,10 @@ use log::{error, info};
 #[cfg(not(test))]
 entry_point!(kernel_main);
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
-    kernel::boot::boot(boot_info);
-
+    let executor = kernel::boot::boot(boot_info);
     info!("Done booting !");
 
-    kernel::boot::end()
+    kernel::boot::end(executor)
 }
 
 #[panic_handler]
