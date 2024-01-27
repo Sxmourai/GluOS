@@ -13,6 +13,7 @@ pub mod task;
 pub mod terminal;
 pub mod time;
 pub mod video; 
+pub mod userland;
 
 pub trait Driver: Sync + Send {
     fn new() -> Self
@@ -47,7 +48,8 @@ pub const DRIVERS: &[(&'static str, fn() -> ())] = &[
     #[cfg(feature="fs")]
     ("filesystem (indexing disk)", fs::init),
     ("descriptor tables", super::memory::tables::DescriptorTablesHandler::init),
-    ("APIC", || unsafe { super::interrupts::apic::init().expect("Failed to init apic"); }),
+    // ("APIC", || unsafe { super::interrupts::apic::init().expect("Failed to init apic"); }),
+    ("Userland (Ring 3)", super::userland::go_ring3),
 ];
 
 //TODO Specify a bit more what is a driver... Cuz rn it's just smth that needs to be initialised
