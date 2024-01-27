@@ -46,7 +46,7 @@ pub enum Entry {
     Dir(Box<dyn DirEntry>),
 }
 impl Entry {
-    pub fn name(&self) -> String {
+    pub fn name(&self) -> &String {
         match self {
             Entry::File(f) => f.name(),
             Entry::Dir(d) => d.name(),
@@ -62,13 +62,13 @@ impl Entry {
 
 pub trait FileEntry {
     // Returns mut because the file could impl caching ?
-    fn content(&mut self) -> String;
+    fn content(&mut self) -> &String;
     fn size(&self) -> usize;
-    fn name(&self) -> String;
+    fn name(&self) -> &String;
 }
 pub trait DirEntry {
-    fn entries(&mut self) -> Vec<Entry>;
+    fn entries(&mut self) -> &Vec<Entry>;
     /// Size of all sub elements
     fn size(&self) -> usize;
-    fn name(&self) -> String;
+    fn name(&self) -> &String;
 }

@@ -94,8 +94,7 @@ impl FilePath {
     }
     //TODO Return new or mutate self ?
     pub fn join_str(&self, other_path: String) -> FilePath {
-        let mut path = self.raw_path.clone();
-        path.extend(other_path.chars());
+        let path = &format!("{}/{}", self.path(), other_path);
         Self::new(path.replace("//", "/").replace("\\", "/"), self.partition.clone())
     }
     pub fn disk_loc(&self) -> DiskLoc {

@@ -6,7 +6,7 @@ use hashbrown::HashMap;
 
 use crate::{dbg, disk::ata::read_from_partition, bit_manipulation::{all_zeroes, any_as_u8_slice}};
 
-use super::{fs::FilePath, fs_driver::FsDriver, partition::Partition};
+use super::{fs::FilePath, fs_driver::{DirEntry, Entry, FileEntry, FsDriver, FsReadError}, partition::Partition};
 
 pub struct InodeNumber(u64);
 #[derive(Debug)]
@@ -72,26 +72,38 @@ impl ExtDriver {
         self.index_disk();
     }
     fn index_disk(&mut self) {
-        let root = self.read_inode(&ExtEntry::new_raw(2, "root".to_string(), false)).unwrap();
-        let root_entries = match root {
+        let root = ExtEntry::new_raw(2, "/".to_string(), false);
+        self.files = self.walk_dir(&root).unwrap();
+    }
+    fn walk_dir(&self, dir: &ExtEntry) -> Option<HashMap<FilePath, ExtEntry>> {
+        let mut files = HashMap::new();
+        let entry = self.read_inode(dir).unwrap();
+        let inner_entries = match entry {
             ExtEntryEnum::Dir(d) => d.entries,
             ExtEntryEnum::File(f) => {
-                log::error!("Root(2) is a file ?!");
-                return
+                log::error!("Trying to walk a file");
+                return None
             },
         };
-        let root_path = FilePath::new("".to_string(), self.partition.clone());
-        for entry in root_entries {
-            let entry_path = root_path.join_str(entry.name.clone());
-            self.files.insert(entry_path, entry);
+        let path = FilePath::new(dir.name.clone(), self.partition.clone());
+        for entry in inner_entries {
+            if entry.type_indicator()==ExtInodeType::Dir && (entry.name!="." && entry.name!="..") {
+                files.extend(self.walk_dir(&entry)?);
+            }
+            let entry_path = if path.path()=="/" {
+                FilePath::new(entry.name.clone(), self.partition.clone())
+            } else {
+                path.join_str(entry.name.clone())
+            };
+            dbg!(entry_path);
+            files.insert(entry_path, entry);
         }
+        // log::debug!("{:#?}", files);
+
+        Some(files)
     }
     fn dir_entries_contain_type(&self) -> bool {
         self.extsuperblock().required_feat_present & 0x2!=0
-    }
-    pub fn read(&self, path: &FilePath) -> Option<ExtEntryEnum> {
-        let entry = self.files.get(path)?;
-        self.read_inode(entry)
     }
     fn read_inode(&self, inode: &ExtEntry) -> Option<ExtEntryEnum> {
         let inode = self.get_inode(inode)?;
@@ -144,7 +156,11 @@ impl ExtDriver {
 
 impl FsDriver for ExtDriver {
     fn read(&self, path: &FilePath) -> Result<super::fs_driver::Entry, super::fs_driver::FsReadError> {
-        todo!()
+        let entry = self.files.get(path).ok_or(FsReadError::EntryNotFound)?;
+        Ok(match self.read_inode(entry).ok_or(FsReadError::ParsingError)? {
+            ExtEntryEnum::Dir(d) => Entry::Dir(Box::new(d)),
+            ExtEntryEnum::File(f) => Entry::File(Box::new(f)),
+        })
     }
 
     fn read_file(&self,filepath: &FilePath) -> Result<alloc::boxed::Box<dyn super::fs_driver::FileEntry>, super::fs_driver::FsReadError> {
@@ -178,10 +194,38 @@ pub struct ExtDir {
     inner: ExtEntry,
     entries: Vec<ExtEntry>,
 }
+impl DirEntry for ExtDir {
+    fn entries(&mut self) -> &Vec<Entry> {
+        // self.entries;
+        //TODO Vec<Entry> needs we need to walk the dir ?
+        todo!()
+    }
+
+    fn size(&self) -> usize {
+        todo!()
+    }
+
+    fn name(&self) -> &String {
+        &self.inner.name
+    }
+}
 #[derive(Debug)]
 pub struct ExtFile {
     inner: ExtEntry,
     content: String
+}
+impl FileEntry for ExtFile {
+    fn content(&mut self) -> &String {
+        &self.content
+    }
+
+    fn size(&self) -> usize {
+        todo!()
+    }
+
+    fn name(&self) -> &String {
+        &self.inner.name
+    }
 }
 
 //Block size in sectors
@@ -490,7 +534,7 @@ impl<'a> ExtEntry {
         }
     }
 }
-
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ExtInodeType {
 	Unknown=0,
 	File=1,
