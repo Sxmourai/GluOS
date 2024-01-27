@@ -1,6 +1,7 @@
 use self::memory::handler::MemoryHandler;
 
 pub mod disk;
+#[cfg(feature="fs")]
 pub mod fs;
 pub mod gdt;
 pub mod graphics;
@@ -42,6 +43,7 @@ pub const DRIVERS: &[(&'static str, fn() -> ())] = &[
     ("disks", super::disk::ata::init),
     ("timer", super::time::init),
     ("graphics", super::video::init_graphics),
+    #[cfg(feature="fs")]
     ("filesystem (indexing disk)", fs::init),
     ("descriptor tables", super::memory::tables::DescriptorTablesHandler::init),
     ("APIC", || unsafe { super::interrupts::apic::init().expect("Failed to init apic"); }),

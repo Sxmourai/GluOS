@@ -15,7 +15,9 @@ use crate::bit_manipulation::{bytes, ptrlist_to_num, u16_to_u8};
 
 
 use crate::dbg;
+#[cfg(feature="fs")]
 use crate::fs::fs::FilePath;
+#[cfg(feature="fs")]
 use crate::fs::partition::Partition;
 use crate::x86_64::instructions::port::{PortRead, PortWrite};
 
@@ -168,6 +170,7 @@ pub fn read_from_disk(
         .unwrap()
         .read_disk(addr, start_sector, sector_count)
 }
+#[cfg(feature="fs")]
 pub fn read_from_partition(
     partition: &Partition,
     start_sector: u64,
@@ -183,6 +186,7 @@ pub fn write_to_disk(addr: impl DiskAddress, start_sector: u64, content: Sectors
         .unwrap()
         .write_disk(addr, start_sector, content)
 }
+#[cfg(feature="fs")]
 pub fn write_to_partition(partition: &Partition, start_sector: u64, content: Sectors) -> DResult<()> {
     let start_sector = start_sector+partition.1;
     assert!((start_sector+content.len() as u64)<partition.1+partition.2, "Trying to write outside of partition");
@@ -214,6 +218,7 @@ pub fn write_to_partition(partition: &Partition, start_sector: u64, content: Sec
 
 pub trait DiskAddress: Copy {
     fn as_index(&self) -> usize;
+    #[cfg(feature="fs")]
     fn as_path(&self, partition: Partition) -> Option<FilePath>;
     fn as_diskloc(&self) -> DiskLoc {
         DiskLoc(self.channel(), self.drive())
@@ -388,7 +393,7 @@ impl DiskAddress for DiskLoc {
         }
         i
     }
-
+    #[cfg(feature="fs")]
     fn as_path(&self, partition: Partition) -> Option<FilePath> {
         Some(FilePath::new("/".to_string(), partition))
     }

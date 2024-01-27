@@ -1,3 +1,4 @@
+use alloc::string::ToString;
 use log::info;
 use spin::Mutex;
 
@@ -5,7 +6,6 @@ use crate::{
     drivers::{
         self,
         disk::ata::{Channel, DiskLoc, Drive},
-        fs::fs_driver::FsDriver,
         memory::handler::MemoryHandler,
     },
     task::{executor::Executor, Task},
@@ -19,7 +19,7 @@ pub fn boot(boot_info: &'static bootloader::BootInfo) {
     
     let mut executor = Executor::new();
     info!("Initialising shell");
-    executor.spawn(Task::new(Shell::new()));
+    executor.spawn(Task::new(Shell::new().run_with_command("read 30/".to_string())));
     // executor.spawn(Task::new());
     info!("Done booting !");
     executor.run();

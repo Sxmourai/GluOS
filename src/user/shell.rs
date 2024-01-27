@@ -12,20 +12,19 @@ use shell_macro::command;
 
 
 use crate::{
-    drivers::disk::ata::{self, read_from_disk, write_to_disk, Channel, DiskLoc, Drive},
-    fs::{fs::FilePath, fs_driver::{Entry, FsDriverEnum}, partition::Partition},
-    print, println, serial_print, serial_println,
-    terminal::console::{ScreenChar, DEFAULT_CHAR}, fs_driver, descriptor_tables,
+    dbg, descriptor_tables, drivers::disk::ata::{self, read_from_disk, write_to_disk, Channel, DiskLoc, Drive}, fs_driver, print, println, serial_print, serial_println, terminal::console::{ScreenChar, DEFAULT_CHAR}
 };
 
 use super::prompt::{input, COMMANDS_HISTORY, COMMANDS_INDEX};
 
 #[command("lsdisk", "Lists plugged disks with size & slot")]
 fn lsdisk(_args: String) -> Result<(), String> {
+    #[cfg(feature="fs")]
     let drvs = fs_driver!();
     for (i, disk) in ata::disk_manager().as_ref().unwrap().disks.iter().enumerate() {
         if let Some(disk) = disk.as_ref() {
             println!("- {}", disk);
+            #[cfg(feature="fs")]
             if let Some(partitions) = drvs.partitions.get(&disk.loc) {
                 // If the partition start is 1 we know it's MBR because on GPT the first 33 sectors are reserved !
                 let start_lba = partitions.get(0).and_then(|x| Some(x.1)).unwrap_or(0);
@@ -151,6 +150,7 @@ fn write_sector(raw_args: String) -> Result<(), String> {
 /// n = DriveLoc
 /// p = Partition id
 /// [n][p]/[path]
+#[cfg(feature="fs")]
 fn parse_path(path: &str) -> Option<FilePath> {
     let loc_idx = path.chars().nth(0)?.to_string().parse::<u8>().ok()?;
     let loc = DiskLoc::from_idx(loc_idx)?;
@@ -158,12 +158,17 @@ fn parse_path(path: &str) -> Option<FilePath> {
     let part = Partition::from_idx(&loc, part_idx)?;
     Some(FilePath::new(path[2..].to_string(), part.clone()))
 }
-
+#[cfg(feature="fs")]
 #[command("read", "Reads a file/dir from disk")]
 fn read(raw_args: String) -> Result<(), String> {
     let mut args = raw_args.split(" ");
-    let path = parse_path(args.next().unwrap()).unwrap();
-    let fs_driver = unsafe{fs_driver!()};
+    let path = parse_path(args.next().unwrap_or("0"));
+    if path.is_none() {
+        println!("Invalid path");
+        return Ok(())
+    }
+    let path = path.unwrap();
+    let fs_driver = fs_driver!();
     if let Ok(entry) = fs_driver.read(&path) {
         match entry {
             Entry::File(mut f) => {
@@ -397,46 +402,49 @@ impl CommandRunner {
     }
     pub fn run(mut self) {
         loop {
-            let b = input(&self.prefix); // Binding for longer lived value
-            let mut command = Vec::new();
-            for char in b.bytes() {
-                command.push(ScreenChar::new(char, DEFAULT_CHAR.color_code));
-            }
-            unsafe {
-                COMMANDS_HISTORY.write().push(command);
-                let history_len = COMMANDS_HISTORY.read().len();
-                if history_len > 1 {
-                    if COMMANDS_HISTORY.read().get(history_len - 2).unwrap().len() == 0 {
-                        COMMANDS_HISTORY
-                            .write()
-                            .swap(history_len - 2, history_len - 1);
-                    }
-                }
-            }
-            unsafe { *COMMANDS_INDEX.write() += 1 };
-
-            let mut c = b.split(" ");
-            let program = c.next().unwrap(); //TODO Crash if user types nothing, handle error
-            if let Some(Command {
-                name: _,
-                description: _,
-                run: fun,
-            }) = self.commands.get(program)
-            {
-                let args = c
-                    .into_iter()
-                    .map(|s| alloc::string::ToString::to_string(&s))
-                    .collect::<Vec<String>>()
-                    .join(" ");
-                if let Err(error_message) = fun(args) {
-                    println!("Error: {}", error_message);
-                }
-            } else {
-                print!("\nUnsupported command, mispelled ? These are the ");
-                self.print_help()
-            }
-            self.previous.push(b);
+            let cmd = input(&self.prefix); // Binding for longer lived value
+            self.run_command(cmd)
         }
+    }
+    pub fn run_command(&mut self, cmd: String) {
+        let mut command = Vec::new();
+        for char in cmd.bytes() {
+            command.push(ScreenChar::new(char, DEFAULT_CHAR.color_code));
+        }
+        unsafe {
+            COMMANDS_HISTORY.write().push(command);
+            let history_len = COMMANDS_HISTORY.read().len();
+            if history_len > 1 {
+                if COMMANDS_HISTORY.read().get(history_len - 2).unwrap().len() == 0 {
+                    COMMANDS_HISTORY
+                        .write()
+                        .swap(history_len - 2, history_len - 1);
+                }
+            }
+        }
+        unsafe { *COMMANDS_INDEX.write() += 1 };
+
+        let mut args = cmd.split(" ");
+        let program = args.next().unwrap(); //TODO Crash if user types nothing, handle error
+        if let Some(Command {
+            name: _,
+            description: _,
+            run: fun,
+        }) = self.commands.get(program)
+        {
+            let args = args
+                .into_iter()
+                .map(|s| alloc::string::ToString::to_string(&s))
+                .collect::<Vec<String>>()
+                .join(" ");
+            if let Err(error_message) = fun(args) {
+                println!("Error: {}", error_message);
+            }
+        } else {
+            print!("\nUnsupported command, mispelled ? These are the ");
+            self.print_help()
+        }
+        self.previous.push(cmd);
     }
 }
 pub struct Shell {
@@ -450,7 +458,7 @@ pub struct Command {
 }
 
 impl Shell {
-    pub async fn new() -> () {
+    pub fn new() -> Self {
         let commands = {
             let commands = shell_macro::command_list!();
             let mut res = HashMap::new();
@@ -462,7 +470,12 @@ impl Shell {
         Self {
             inner: CommandRunner::new("> ", commands),
         }
-        .inner
-        .run()
+    }
+    pub async fn run(self) {
+        self.inner.run()
+    }
+    pub async fn run_with_command(mut self, cmd: String) {
+        self.inner.run_command(cmd);
+        self.inner.run()
     }
 }

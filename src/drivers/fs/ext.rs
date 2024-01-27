@@ -74,6 +74,7 @@ impl ExtDriver {
     fn index_disk(&mut self) {
         let root = ExtEntry::new_raw(2, "/".to_string(), false);
         self.files = self.walk_dir(&root).unwrap();
+        self.files.insert(FilePath::new("/".to_string(), self.partition.clone()), root);
     }
     fn walk_dir(&self, dir: &ExtEntry) -> Option<HashMap<FilePath, ExtEntry>> {
         let mut files = HashMap::new();
@@ -95,10 +96,8 @@ impl ExtDriver {
             } else {
                 path.join_str(entry.name.clone())
             };
-            dbg!(entry_path);
             files.insert(entry_path, entry);
         }
-        // log::debug!("{:#?}", files);
 
         Some(files)
     }
@@ -119,8 +118,13 @@ impl ExtDriver {
                 if sl.len()<=12 || all_zeroes(&sl[..12]) {
                     break
                 };
-                let entry = ExtEntry::new(sl, self.dir_entries_contain_type());
-                idx+=entry.inner.entry_size as usize;
+                let ext_entry = ExtEntry::new(sl, self.dir_entries_contain_type());
+                idx+=ext_entry.inner.entry_size as usize;
+                let entry = match ext_entry.type_indicator() {
+                    ExtInodeType::File => todo!(),
+                    ExtInodeType::Dir => todo!(),
+                    _ => todo!(),
+                };
                 entries.push(entry);
             };
             Some(ExtEntryEnum::Dir(ExtDir {
@@ -156,7 +160,9 @@ impl ExtDriver {
 
 impl FsDriver for ExtDriver {
     fn read(&self, path: &FilePath) -> Result<super::fs_driver::Entry, super::fs_driver::FsReadError> {
+        dbg!(path, self.files);
         let entry = self.files.get(path).ok_or(FsReadError::EntryNotFound)?;
+        dbg!(entry);
         Ok(match self.read_inode(entry).ok_or(FsReadError::ParsingError)? {
             ExtEntryEnum::Dir(d) => Entry::Dir(Box::new(d)),
             ExtEntryEnum::File(f) => Entry::File(Box::new(f)),
@@ -192,13 +198,11 @@ pub enum ExtEntryEnum {
 #[derive(Debug)]
 pub struct ExtDir {
     inner: ExtEntry,
-    entries: Vec<ExtEntry>,
+    entries: Vec<Entry>,
 }
 impl DirEntry for ExtDir {
     fn entries(&mut self) -> &Vec<Entry> {
-        // self.entries;
-        //TODO Vec<Entry> needs we need to walk the dir ?
-        todo!()
+        &self.entries
     }
 
     fn size(&self) -> usize {

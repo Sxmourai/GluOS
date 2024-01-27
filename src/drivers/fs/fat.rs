@@ -472,22 +472,10 @@ impl Fat32Driver {
     }
 }
 impl FsDriver for Fat32Driver {
-    fn read(&self, path: &FilePath) -> Result<Entry, FsReadError> {
-        todo!()
-    }
-
-    fn read_file(&self,filepath: &FilePath) -> Result<Box<dyn FileEntry>, FsReadError> {
-        todo!()
-    }
-
-    fn read_dir (&self, dirpath: &FilePath) -> Result<Box<dyn DirEntry>,  FsReadError> {
-        todo!()
-    }
-
-    fn get_partition(&self, partition_id: u8) -> Option<Partition> {
-        todo!()
-    }
-
+    type Entry = Fat32Entry;
+    type SoftEntry = Fat32SoftEntry;
+    type Files = HashMap<FilePath, Fat32Entry>;
+    
     fn try_init(partition: &Partition) -> Option<Box<Self>> where Self: Sized {
         Some(Box::new(Self::new(partition)?))
     }
@@ -495,8 +483,27 @@ impl FsDriver for Fat32Driver {
     fn as_enum(&self) -> super::fs_driver::FsDriverEnum {
         super::fs_driver::FsDriverEnum::Fat32
     }
-}
 
+    fn read(&self, path: &FilePath) -> Result<Entry, FsReadError> {
+        todo!()
+    }
+    fn read_file(&self,filepath: &FilePath) -> Result<Box<dyn FileEntry>, FsReadError> {
+        todo!()
+    }
+    fn read_dir (&self, dirpath: &FilePath) -> Result<Box<dyn DirEntry>,  FsReadError> {
+        todo!()
+    }
+    fn soft_read(&self, entry: &Self::Entry) -> Result<dyn super::fs_driver::SoftEntry, FsReadError> {
+        todo!()
+    }
+    fn mut_files(&mut self) -> &mut Self::Files {
+        &mut self.files
+    }
+    fn partition(&self) -> &Partition {
+        &self.partition
+    }
+}
+pub struct Fat32SoftEntry;
 
 
 #[derive(Debug, Clone)]

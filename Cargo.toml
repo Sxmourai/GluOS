@@ -36,6 +36,7 @@ run-args = [
 "-drive", "file=build/ext2gpt.img,format=raw",
     # ENDDISKFLAG
     # If working on APIC and IPI/SMP: (sets amount of cores to 4)
+    #TODO When APIC feature automatically set -smp 4
     "-smp","4"
 
 ]
@@ -48,6 +49,8 @@ test-timeout = 300
 [features]
 default = []
 print_trace = []
+ata = []
+fs = ["ata"]
 
 
 # [profile.dev]

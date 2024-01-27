@@ -24,6 +24,7 @@ impl FsDriverManager {
         if let Some(driver) = self.drivers.get(&path.partition) {
             driver.read(path)
         } else {
+            dbg!(self.drivers);
             Err(FsReadError::EntryNotFound)
         }
     }

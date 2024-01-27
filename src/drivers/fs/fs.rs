@@ -48,7 +48,7 @@ pub enum FileSystemError {
     CantWrite,
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Debug)]
 pub struct FilePath {
     raw_path: String,
     pub partition: Partition,
@@ -102,11 +102,6 @@ impl FilePath {
     }
     pub fn name(&self) -> &str {
         self.splitted().last().unwrap()
-    }
-}
-impl core::fmt::Debug for FilePath {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str(format!("FilePath {:?}", self.path()).as_str())
     }
 }
 impl core::fmt::Display for FilePath {

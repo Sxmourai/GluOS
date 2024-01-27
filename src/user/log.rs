@@ -99,3 +99,30 @@ macro_rules! dbg {
         );
     };
 }
+
+#[macro_export]
+macro_rules! pretty_dbg {
+    ($variable:expr) => {
+        crate::serial_println!(
+            "{} = {:#?} at {}:{}",
+            stringify!($variable),
+            $variable,
+            file!(),
+            line!(),
+        )
+    };
+    ($($var:expr),+ $(,)?) => {
+        $(
+            crate::serial_print!(
+                "{} = {:#?}, ",
+                stringify!($var),
+                $var,
+            );
+        )+
+        crate::serial_println!(
+            "at {}:{}",
+            file!(),
+            line!(),
+        );
+    };
+}
