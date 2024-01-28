@@ -18,6 +18,8 @@ pub mod userland;
 pub mod smp;
 #[cfg(feature="pit")]
 pub mod pit;
+pub mod qemu_in;
+pub mod rand;
 
 pub trait Driver: Sync + Send {
     fn new() -> Self
@@ -58,6 +60,7 @@ pub const DRIVERS: &[(&str, fn() -> ())] = &[
     #[cfg(feature="smp")]
     ("multiprocessing (SMP)", super::smp::init),
     // ("Userland (Ring 3)", super::userland::go_ring3),
+    ("Random numbers", super::rand::init),
 ];
 
 //TODO Specify a bit more what is a driver... Cuz rn it's just smth that needs to be initialised

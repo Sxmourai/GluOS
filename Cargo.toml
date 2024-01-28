@@ -12,7 +12,7 @@ bootloader = { version = "0.9.23", features = ["map_physical_memory", ]} #"map_p
 spin = "0.9.8" # We have our allocator, so we can use std::spin
 hashbrown = "0.14.0" # A hashmap/hashset & all implementation
 crossbeam-queue = { version = "0.3.10", default-features = false, features = ["alloc"]}
-conquer-once = { version = "0.4.0", default-features = false }
+conquer-once = "0.4.0"
 futures-util = { version = "0.3.4", default-features = false, features = ["alloc"]}
 lazy_static = { version = "1.4.0", features=["spin_no_std"]} # Helps us with static mut's & all
 
@@ -39,9 +39,9 @@ shell_macro = { path = "src/user/shell_macro" }
 run-args = [
     "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04", "-serial", "stdio",
     # DISKFLAG for build script (see /build/disk_create.py)
-"-drive", "file=build/fatgpt.img,format=raw",
-"-drive", "file=build/ntfsgpt.img,format=raw",
+"-drive", "file=build/ntfs.img,format=raw",
 "-drive", "file=build/ext2gpt.img,format=raw",
+"-drive", "file=build/fatgpt.img,format=raw",
     # ENDDISKFLAG
     # If working on APIC and IPI/SMP: (sets amount of cores to 4)
     #TODO When APIC feature automatically set -smp 4

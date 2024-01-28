@@ -20,14 +20,14 @@ filesystems = {
         "ntfs": "mkfs.ntfs",
 }
 
-if __name__ == "__main__":
+def main(args):
     parser = argparse.ArgumentParser("Disk creator", description="Creates disk to test my kernel !")
     parser.add_argument("filename", default="disk.img")
     parser.add_argument("size",)
     parser.add_argument("-format")
     parser.add_argument('-partition', action='store_true')
     parser.add_argument('-header_type', default="gpt")
-    args = parser.parse_args(sys.argv[1:])
+    args = parser.parse_args(args)
     if not args.filename.endswith(".img"):args.filename+=".img"
     if args.format.lower() in filesystems.keys():
         format = filesystems[args.format.lower()]
@@ -63,7 +63,6 @@ if __name__ == "__main__":
         cmd(fr"sudo umount mounted_disk")
         print(f"\n\tUnmounting partition from loop device")
         cmd(fr"sudo losetup -d /dev/loop3")
-        
 
     drives = []
 
@@ -93,3 +92,15 @@ if __name__ == "__main__":
     with open("../Cargo.toml", "w") as f:
         f.writelines(lines)
     
+DISKS = [
+    "fatgpt 25M -format fat32",
+    "ext2gpt 30M -format ext2",
+    "ntfs 100M -format NTFS",
+]
+
+if __name__ == "__main__":
+    if "create-all-disks" in sys.argv:
+        for disk in DISKS:
+            main(disk.split(" "))
+    else:
+        main(sys.argv[1:])
