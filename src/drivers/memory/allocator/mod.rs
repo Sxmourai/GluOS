@@ -41,7 +41,7 @@ pub fn init_heap(mem_handler: &mut MemoryHandler) -> Result<(), MapToError<Size4
     };
     for page in page_range {
         let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
-        unsafe { mem_handler.map(page, flags) };
+        unsafe { mem_handler.map(page, flags) }.unwrap();
     }
 
     unsafe {

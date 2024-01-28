@@ -67,7 +67,7 @@ impl BlockingPrompt {
             .collect();
         self.return_message.push(' '); // Flag for the run fn
     }
-    fn cursor_pos(&self) -> ScreenPos {
+    pub fn cursor_pos(&self) -> ScreenPos {
         ScreenPos(
             (self.pos / BUFFER_WIDTH as usize) as u8,
             (self.pos % SBUFFER_WIDTH) as u8,

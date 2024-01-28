@@ -45,6 +45,9 @@ impl MemoryHandler {
         trace!("Finished initializing heap, can now begin tracing !");
         _self
     }
+    pub unsafe fn try_map(&mut self, page: Page<Size4KiB>, flags: PageTableFlags) {
+        unsafe{self.map(page, flags)}.unwrap()
+    }
     pub unsafe fn map(&mut self, page: Page<Size4KiB>, flags: PageTableFlags) -> Result<(), MapFrameError> {
         let frame = self.frame_allocator.allocate_frame();
         if frame.is_none() {return Err(MapFrameError::CantAllocateFrame)}
@@ -71,11 +74,14 @@ impl MemoryHandler {
         Ok(())
     }
 }
-// Must have mem_handler setted
-pub unsafe fn map(page: Page<Size4KiB>, flags: PageTableFlags) -> Result<(), MapFrameError> {
-    unsafe{mem_handler!().map(page, flags)}
+///TODO Is it unsafe ?
+pub fn map(page: Page<Size4KiB>, flags: PageTableFlags) {
+    unsafe{mem_handler!().map(page, flags)}.unwrap()
 }
-
+pub fn map_frame(page: Page<Size4KiB>, frame: PhysFrame, flags: PageTableFlags) {
+    unsafe{mem_handler!().map_frame(page, frame, flags)}.unwrap()
+}
+#[derive(Debug)]
 pub enum MapFrameError {
     CantAllocateFrame
 }

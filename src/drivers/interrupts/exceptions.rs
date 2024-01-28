@@ -115,7 +115,7 @@ pub extern "x86-interrupt" fn page_fault_handler(
     use x86_64::registers::control::Cr2;
     //TODO Map a page to a frame when page fault
     let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
-    unsafe { map(Page::containing_address(Cr2::read()), flags) };
+    map(Page::containing_address(Cr2::read()), flags);
     error!(
         "EXCEPTION: PAGE FAULT
     Accessed Address: {:?}

@@ -7,7 +7,7 @@ use x86_64::{instructions::interrupts, structures::paging::{Page, PageTableFlags
 
 use bitfield::bitfield;
 
-use crate::{descriptor_tables, mem_handler};
+use crate::{descriptor_tables, mem_handler, memory::handler::map_frame};
 
 pub struct Apic {
     local_apic_ptr: *mut u8,
@@ -21,7 +21,7 @@ impl Apic {
     fn init(&mut self) {
         log::debug!("initializing APIC");
         let addr = core::ptr::addr_of!(self.local_apic_ptr) as u64;
-        unsafe { mem_handler!().map_frame(Page::containing_address(VirtAddr::new(addr)), PhysFrame::containing_address(PhysAddr::new(addr)), PageTableFlags::PRESENT | PageTableFlags::WRITABLE) };
+        unsafe { map_frame(Page::containing_address(VirtAddr::new(addr)), PhysFrame::containing_address(PhysAddr::new(addr)), PageTableFlags::PRESENT | PageTableFlags::WRITABLE) };
         self.write(Offset::TaskPriority, 0); // set task priority to 0 (accept all interrupts)
                                              // self.write(Offset::SpuriousInterruptVector, 0xFF); // set spurious interrupt vector to 0xFF
                                              // self.write(Offset::SpuriousInterruptVector, 0x100); // enable apic
@@ -178,4 +178,4 @@ pub fn init() {
     });
 }
 
-static AP_TIMER_INIT_LOCK: spin::Mutex<()> = spin::Mutex::new(());
+// static AP_TIMER_INIT_LOCK: spin::Mutex<()> = spin::Mutex::new(());

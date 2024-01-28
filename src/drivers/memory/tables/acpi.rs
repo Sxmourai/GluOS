@@ -8,7 +8,7 @@ pub enum AcpiEnablingError {
 }
 
 pub struct AcpiHandler {
-    fadt: &'static FADT,
+    pub fadt: &'static FADT,
 }
 
 impl AcpiHandler {

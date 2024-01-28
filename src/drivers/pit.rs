@@ -22,7 +22,7 @@ pub fn try_mdelay(millis: u16) -> Result<(), TimerError> {
     for i in 0..times {
         try_udelay(MAX_COUNTER_VALUE_INPUT)?
     }
-    try_udelay(rest);
+    try_udelay(rest)?;
     Ok(())
 }
 pub fn try_sdelay(seconds: u16) -> Result<(), TimerError> {
@@ -33,7 +33,7 @@ pub fn try_sdelay(seconds: u16) -> Result<(), TimerError> {
     for i in 0..times {
         try_udelay(MAX_COUNTER_VALUE_INPUT)?
     }
-    try_udelay(rest);
+    try_udelay(rest)?;
     Ok(())
 }
 pub fn udelay(micros: u16) {
@@ -84,7 +84,7 @@ pub fn set(micros: u16) -> Result<(), TimerError> {
 fn set_data(channel: u8, value: u8) {
     unsafe { PortWrite::write_to_port(0x40 + channel as u16, value) }
 }
-
+#[allow(unused)]
 fn get_data(channel: u8) -> u8 {
     unsafe { PortRead::read_from_port(0x40 + channel as u16) }
 }
@@ -113,7 +113,7 @@ bitfield::bitfield! {
 }
 
 #[repr(u8)]
-enum AccessMode {
+pub enum AccessMode {
     LatchCountValue = 0,
     LowByteOnly = 1,
     HighByteOnly = 2,
@@ -121,7 +121,7 @@ enum AccessMode {
 }
 
 #[repr(u8)]
-enum OperatingMode {
+pub enum OperatingMode {
     InterruptOnTerminalCount = 0,
     ProgrammableOneShot = 1,
     RateGenerator = 2,

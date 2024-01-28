@@ -71,7 +71,7 @@ impl NTFSDriver {
                     } else if let Some(Ok(b)) = file.data(reader, file_name.name().to_string_lossy().as_str()) {
                         let v = b.to_attribute().unwrap();
                         let mut buf = Vec::new();
-                        v.value(reader).unwrap().read(reader, &mut buf);
+                        v.value(reader).unwrap().read(reader, &mut buf).unwrap();
                         let content = String::from_utf8_lossy(&buf).to_string();
                         Entry::File(File {
                             path: FilePath::new(format!("{}/{}",prefix, file_name.name()), partition.clone()),

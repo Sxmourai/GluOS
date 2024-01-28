@@ -7,7 +7,8 @@
 #![feature(const_mut_refs)]
 #![feature(linkage)]
 #![feature(naked_functions)]
-#![cfg_attr(debug_assertions, allow(dead_code, unused))]
+#![cfg_attr(debug_assertions, allow(unused))]
+#![allow(dead_code)]
 #![deny(unsafe_op_in_unsafe_fn)]
 
 pub mod bit_manipulation;

@@ -2,7 +2,7 @@ use core::sync::atomic::AtomicU64;
 
 use x86_64::{structures::paging::{Page, PageTableFlags, PhysFrame, Size4KiB}, PhysAddr, VirtAddr};
 
-use crate::{dbg, descriptor_tables, gdt::KERNEL_STACK_SIZE, interrupts::apic::ipi::InterruptCommand, mem_handler, pit::udelay};
+use crate::{dbg, descriptor_tables, gdt::KERNEL_STACK_SIZE, interrupts::apic::ipi::InterruptCommand, mem_handler, memory::handler::{map, map_frame}, pit::udelay};
 
 const CODE: &[u8] = include_bytes!("ap.bin");
 pub const AP_STACKS_ADDR: usize = 109<<39;
@@ -17,19 +17,12 @@ pub fn init() {
         return
     }
     allocate_stacks(num_core);
-    dbg!("a");
     // SAFETY WARNING null ptr mapped: dereferencing a null ptr is now allowed
-    dbg!("a");
-    {
-        let mut mem = mem_handler!();
-        unsafe {
-            mem.map_frame(
-                Page::<Size4KiB>::from_start_address(VirtAddr::new(0)).unwrap(),
-                PhysFrame::from_start_address(PhysAddr::new(0)).unwrap(),
-                PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
-            );
-        };
-    }
+    map_frame(
+        Page::<Size4KiB>::from_start_address(VirtAddr::new(0)).unwrap(),
+        PhysFrame::from_start_address(PhysAddr::new(0)).unwrap(),
+        PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
+    );
     
     dbg!("b");
     dbg!(CODE.as_ptr());
@@ -68,7 +61,7 @@ pub fn init() {
 
     {
         let mut mem = mem_handler!();
-        unsafe { mem.unmap(Page::<Size4KiB>::from_start_address(VirtAddr::new(0)).unwrap()) };
+        unsafe { mem.unmap(Page::<Size4KiB>::from_start_address(VirtAddr::new(0)).unwrap()) }.unwrap();
     }
 
     if time_out == 0 {
@@ -171,7 +164,7 @@ fn allocate_stacks(num_core: usize) {
         for _ in 0..pages_per_core {
             dbg!(addr);
             let page = Page::<Size4KiB>::from_start_address(VirtAddr::new(addr as u64)).unwrap();
-            unsafe { mem_handler!().map(page, PageTableFlags::WRITABLE | PageTableFlags::NO_EXECUTE) };
+            map(page, PageTableFlags::WRITABLE | PageTableFlags::NO_EXECUTE);
             addr += 4096;
         }
     }
