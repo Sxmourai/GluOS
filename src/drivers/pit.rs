@@ -48,7 +48,7 @@ pub fn sdelay(seconds: u16) {
 
 pub fn wait_for_timeout() -> Result<(), TimerError> {
     loop {
-        let c = Control(unsafe { PortRead::read_from_port(0x61 as u16) });
+        let c = Control(unsafe { PortRead::read_from_port(0x61_u16) });
         if !c.enable_timer_counter2() {
             return Err(TimerError::NotActive);
         } else if c.status_timer_counter2() {
@@ -64,7 +64,7 @@ pub fn set(micros: u16) -> Result<(), TimerError> {
     if counter > MAX_COUNTER_VALUE as u64 {
         return Err(TimerError::OutOfRange);
     }
-    let mut c = Control(unsafe { PortRead::read_from_port(0x61 as u16) });
+    let mut c = Control(unsafe { PortRead::read_from_port(0x61_u16) });
     c.set_enable_speaker_data(false);
     c.set_enable_timer_counter2(true);
     unsafe { PortWrite::write_to_port(0x61, c.0) }

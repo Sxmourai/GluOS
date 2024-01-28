@@ -76,7 +76,7 @@ pub fn init() {
         let register_b = get_reg(0x0B);
 
         // Convert BCD to binary values if necessary
-        if !(register_b & 0x04 != 0) {
+        if register_b & 0x04 == 0 {
             seconds = (seconds & 0x0F) + ((seconds / 16) * 10);
             minutes = (minutes & 0x0F) + ((minutes / 16) * 10);
             hours = ((hours & 0x0F) + (((hours & 0x70) / 16) * 10)) | (hours & 0x80);
@@ -88,7 +88,7 @@ pub fn init() {
             // }
         }
         // Convert 12 hour clock to 24 hour clock if necessary
-        if !(register_b & 0x02 != 0) && (hours & 0x80 != 0) {
+        if register_b & 0x02 == 0 && (hours & 0x80 != 0) {
             hours = ((hours & 0x7F) + 12) % 24;
         }
         // let current_time = 0;
@@ -114,5 +114,5 @@ pub fn tick() {
     *ELAPSED_TICKS_SINCE_BOOT.lock() += 1;
 }
 pub fn get_ticks() -> usize {
-    ELAPSED_TICKS_SINCE_BOOT.lock().clone()
+    *ELAPSED_TICKS_SINCE_BOOT.lock()
 }

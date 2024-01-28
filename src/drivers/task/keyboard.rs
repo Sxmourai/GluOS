@@ -63,9 +63,7 @@ impl KeyboardHandler {
                         }
                     }
                     DecodedKey::Unicode(k) => {
-                        match k {
-                            _ => {}
-                        }
+                        {}
                     }
                 }
                 if !key_handled {

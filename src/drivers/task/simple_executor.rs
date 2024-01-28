@@ -22,6 +22,12 @@ pub struct SimpleExecutor {
     task_queue: VecDeque<Task>,
 }
 
+impl Default for SimpleExecutor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SimpleExecutor {
     pub fn new() -> SimpleExecutor {
         SimpleExecutor {

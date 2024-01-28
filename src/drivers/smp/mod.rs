@@ -2,11 +2,14 @@ use core::sync::atomic::AtomicU64;
 
 use x86_64::{structures::paging::{Page, PageTableFlags, PhysFrame, Size4KiB}, PhysAddr, VirtAddr};
 
-use crate::{dbg, descriptor_tables, gdt::KERNEL_STACK_SIZE, interrupts::apic::ipi::InterruptCommand, mem_handler, memory::handler::{map, map_frame}, pit::udelay};
+use crate::{boot::hlt_loop, dbg, descriptor_tables, gdt::KERNEL_STACK_SIZE, interrupts::apic::ipi::InterruptCommand, mem_handler, memory::handler::{map, map_frame}, pit::udelay};
 
 const CODE: &[u8] = include_bytes!("ap.bin");
+#[allow(clippy::declare_interior_mutable_const)]
 pub const AP_STACKS_ADDR: usize = 109<<39;
+#[allow(clippy::declare_interior_mutable_const)]
 pub const AP_CORE_COUNTER: AtomicU64 = AtomicU64::new(0);
+#[allow(clippy::declare_interior_mutable_const)]
 pub const AP_CORE_COUNTER_DONE: AtomicU64 = AtomicU64::new(0);
 
 /// Tries to init the cores
@@ -41,7 +44,7 @@ pub fn init() {
 
     let entry_function_addr = (ap_entry_fn as *const ());
     unsafe {
-        core::ptr::copy_nonoverlapping(CODE.as_ptr(), 0 as *mut u8, CODE.len());
+        core::ptr::copy_nonoverlapping(CODE.as_ptr(), core::ptr::NonNull::dangling().as_ptr(), CODE.len());
 
         *(0x0A00 as *mut usize) = lvl4table_addr;
         *(0x0B00 as *mut usize) = core_counter_addr;
@@ -153,12 +156,12 @@ unsafe extern "C" fn ap_entry_fn(ap_index: u64) -> ! {
         ap_index + 1,
     );
     //TODO Proper booting
-    loop {}
+    hlt_loop()
 }
 
 fn allocate_stacks(num_core: usize) {
     let pages_per_core = KERNEL_STACK_SIZE.div_ceil(4096);
-    let mut addr = AP_STACKS_ADDR.clone();
+    let mut addr = AP_STACKS_ADDR;
     for _ in 0..num_core {
         addr += 4096; // add guard page
         for _ in 0..pages_per_core {

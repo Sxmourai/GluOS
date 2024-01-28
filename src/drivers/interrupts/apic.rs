@@ -19,9 +19,9 @@ impl Apic {
     }
 
     fn init(&mut self) {
-        log::debug!("initializing APIC");
         let addr = core::ptr::addr_of!(self.local_apic_ptr) as u64;
-        unsafe { map_frame(Page::containing_address(VirtAddr::new(addr)), PhysFrame::containing_address(PhysAddr::new(addr)), PageTableFlags::PRESENT | PageTableFlags::WRITABLE) };
+        log::debug!("{:x}", addr);
+        unsafe { mem_handler!().map_frame(Page::containing_address(VirtAddr::new(addr)), PhysFrame::containing_address(PhysAddr::new(addr)), PageTableFlags::PRESENT | PageTableFlags::WRITABLE) };
         self.write(Offset::TaskPriority, 0); // set task priority to 0 (accept all interrupts)
                                              // self.write(Offset::SpuriousInterruptVector, 0xFF); // set spurious interrupt vector to 0xFF
                                              // self.write(Offset::SpuriousInterruptVector, 0x100); // enable apic

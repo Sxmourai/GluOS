@@ -76,7 +76,7 @@ unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut
 
 // end_page is using .containing address
 //TODO Map a page when a page fault occurs (in interrupts/exceptions.rs)
-pub unsafe fn read_phys_memory_and_map(
+pub fn read_phys_memory_and_map(
     location: u64,
     size: usize,
     end_page: u64,

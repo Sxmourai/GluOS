@@ -4,7 +4,7 @@ use alloc::{
 };
 
 
-use super::fs::FilePath;
+use super::path::FilePath;
 
 #[derive(Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
 pub struct FatPermissions(pub u8);

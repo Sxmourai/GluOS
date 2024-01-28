@@ -8,7 +8,7 @@ use log::{debug, error};
 use x86_64::registers::rflags::read;
 
 use super::{
-    fat::Fat32Driver, fs::*, partition::Partition, userland::FatAttributes
+    fat::Fat32Driver, path::*, partition::Partition, userland::FatAttributes
 };
 use crate::{
     bit_manipulation::any_as_u8_slice,

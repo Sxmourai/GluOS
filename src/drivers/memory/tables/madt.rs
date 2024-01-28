@@ -30,13 +30,14 @@ pub struct MADT {
     pub cores: Vec<Core>, // (core id, apic id)
 }
 impl MADT {
-    pub unsafe fn new(bytes: &[u8]) -> Option<Self> {
+    
+    pub fn new(bytes: &[u8]) -> Option<Self> {
         let inner = unsafe { &*(bytes.as_ptr() as *const RawMADT) };
         let mut fields = Vec::new();
         let mut cores = Vec::new();
         let mut start_idx = core::mem::size_of::<RawMADT>(); // Fields start at end of RawMADT
         while start_idx + 1 < bytes.len() {
-            let record_type = &bytes[start_idx + 0];
+            let record_type = &bytes[start_idx];
             let record_length = &bytes[start_idx + 1];
             start_idx+=2;
             let record = match record_type {

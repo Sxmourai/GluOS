@@ -20,16 +20,10 @@ use super::ACPISDTHeader;
 pub fn find_string(bytes: &[u8], search_string: &[u8]) -> Option<usize> {
     let search_len = search_string.len();
 
-    for i in 0..(bytes.len() - search_len + 1) {
-        if &bytes[i..(i + search_len)] == search_string {
-            return Some(i);
-        }
-    }
-
-    None
+    (0..(bytes.len() - search_len + 1)).find(|&i| &bytes[i..(i + search_len)] == search_string)
 }
 
-pub const RSDP_SIGNATURE: &'static [u8; 8] = b"RSD PTR ";
+pub const RSDP_SIGNATURE: &[u8; 8] = b"RSD PTR ";
 
 #[repr(C, packed)]
 pub struct RSDPDescriptor {
@@ -91,7 +85,7 @@ fn get_rsdt(rsdt_addr: u64) -> RSDT {
     let sdts = unsafe { core::slice::from_raw_parts(ptr_addr as *const u8, sdts_size) };
     let mut pointer_to_other_sdt = Vec::new();
     for i in (0..sdts.len()).step_by(4) {
-        let addr = crate::bit_manipulation::ptrlist_to_num(&mut sdts[i..i + 4].into_iter());
+        let addr = crate::bit_manipulation::ptrlist_to_num(&mut sdts[i..i + 4].iter());
         pointer_to_other_sdt.push(addr);
     }
     RSDT {

@@ -66,6 +66,8 @@ where
 
     T::from(result)
 }
+/// # Safety
+/// Ensure that the slice.len > struct size
 pub unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
     unsafe { core::slice::from_raw_parts((p as *const T) as *const u8, core::mem::size_of::<T>()) }
 }
@@ -74,7 +76,6 @@ pub fn all_zeroes(mut iter: &[u8]) -> bool {
     iter.iter().all(|x| *x==0)
 }
 
-///! DANGER ZONE DONT GO THERE 🤣
 pub fn list_to_num<T, R>(content: impl Iterator<Item = T> + DoubleEndedIterator) -> R
 where
     T: Into<R>,
@@ -85,7 +86,7 @@ where
         if i >= size_of::<R>() / size_of::<T>() {
             break;
         }
-        result = Into::<R>::into(result << size_of::<T>() * 8) | byte.into();
+        result = Into::<R>::into(result << (size_of::<T>() * 8)) | byte.into();
     }
     result
 }
@@ -101,7 +102,7 @@ where
         if i >= size_of::<R>() / size_of::<T>() {
             break;
         }
-        result = Into::<R>::into(result << size_of::<T>() * 8) | Into::<R>::into(byte.clone());
+        result = Into::<R>::into(result << (size_of::<T>() * 8)) | Into::<R>::into(byte.clone());
     }
     result
 }

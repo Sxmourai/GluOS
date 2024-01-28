@@ -1,4 +1,4 @@
-use crate::{interrupts::msr, println};
+use crate::{boot::hlt_loop, interrupts::msr, println};
 
 pub fn go_ring3() {
     // GDT setup, Barebone TSS and stack start is already done
@@ -9,7 +9,7 @@ pub fn go_ring3() {
 }
 #[allow(unused)]
 extern "C" fn test_user() {
-    loop{}
+    hlt_loop()
     // unsafe{core::arch::asm!("cli")}
 }
 

@@ -45,9 +45,8 @@ impl MemoryHandler {
         trace!("Finished initializing heap, can now begin tracing !");
         _self
     }
-    pub unsafe fn try_map(&mut self, page: Page<Size4KiB>, flags: PageTableFlags) {
-        unsafe{self.map(page, flags)}.unwrap()
-    }
+    /// # Safety
+    /// Mapping can cause all sorts of panics, set OffsetPageTable
     pub unsafe fn map(&mut self, page: Page<Size4KiB>, flags: PageTableFlags) -> Result<(), MapFrameError> {
         let frame = self.frame_allocator.allocate_frame();
         if frame.is_none() {return Err(MapFrameError::CantAllocateFrame)}
@@ -56,18 +55,21 @@ impl MemoryHandler {
             self.map_frame(page, frame, flags)
         }
     }
+    /// # Safety
+    /// Mapping can cause all sorts of panics, set OffsetPageTable
     pub unsafe fn unmap(&mut self, page: Page<Size4KiB>) -> Result<(PhysFrame, MapperFlush<Size4KiB>), UnmapError> {
         unsafe {
             self.mapper.unmap(page)
         }
     }
+    
+    /// # Safety
+    /// Mapping can cause all sorts of panics, set OffsetPageTable
     pub unsafe fn map_frame(&mut self, page: Page<Size4KiB>,frame: PhysFrame, flags: PageTableFlags) -> Result<(), MapFrameError> {
         unsafe {
             self.mapper
                 .map_to(page, frame, flags, &mut self.frame_allocator)
-                .map_err(|err| match err {
-                    _ => MapFrameError::CantAllocateFrame,
-                })
+                .map_err(|err| MapFrameError::CantAllocateFrame)
                 ?
                 .flush()
         }

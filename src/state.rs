@@ -16,28 +16,28 @@ pub static mut DESCRIPTOR_TABLES: Option<DescriptorTablesHandler> = None;
 #[macro_export]
 macro_rules! boot_info {
     () => {
-        &mut crate::state::BOOT_INFO.as_mut().unwrap()
+        &mut $crate::state::BOOT_INFO.as_mut().unwrap()
     };
 }
 
 #[macro_export]
 macro_rules! mem_handler {
     () => {
-        unsafe{crate::state::MEM_HANDLER.as_mut().unwrap()}
+        unsafe{$crate::state::MEM_HANDLER.as_mut().unwrap()}
     };
 }
 
 #[macro_export]
 macro_rules! fs_driver {
     () => {
-        unsafe{crate::state::FS_DRIVER.as_mut().unwrap()}
+        unsafe{$crate::state::FS_DRIVER.as_mut().unwrap()}
     };
 }
 
 #[macro_export]
 macro_rules! descriptor_tables {
     () => {
-        unsafe{crate::state::DESCRIPTOR_TABLES.as_mut().unwrap()}
+        unsafe{$crate::state::DESCRIPTOR_TABLES.as_mut().unwrap()}
     };
 }
 

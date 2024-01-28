@@ -198,14 +198,14 @@ impl KbInput for BlockingPrompt {
                     }
                 }),
                 KeyCode::ArrowUp => {
-                    if unsafe { COMMANDS_INDEX.read().clone() } > 0 {
+                    if unsafe { *COMMANDS_INDEX.read() } > 0 {
                         *unsafe { COMMANDS_INDEX.write() } -= 1;
-                        if unsafe { COMMANDS_INDEX.read().clone() } == unsafe { COMMANDS_HISTORY.read().len() } - 1 {
+                        if unsafe { *COMMANDS_INDEX.read() } == unsafe { COMMANDS_HISTORY.read().len() } - 1 {
                             unsafe { COMMANDS_HISTORY.write().push(self.pressed_keys.clone()) };
                         }
                         {
                             let history = unsafe { COMMANDS_HISTORY.read() };
-                            let last_command = history.get(unsafe { COMMANDS_INDEX.read().clone() }).unwrap();
+                            let last_command = history.get(unsafe { *COMMANDS_INDEX.read() }).unwrap();
                             self.pressed_keys = last_command.clone();
                         }
                         print_screenchars_atp(&self.origin, [DEFAULT_CHAR; 70]);
@@ -214,12 +214,12 @@ impl KbInput for BlockingPrompt {
                     }
                 },
                 KeyCode::ArrowDown => {
-                        if unsafe { COMMANDS_INDEX.read().clone() } + 1 < unsafe { COMMANDS_HISTORY.read().len() } {
+                        if unsafe { *COMMANDS_INDEX.read() } + 1 < unsafe { COMMANDS_HISTORY.read().len() } {
                             *unsafe { COMMANDS_INDEX.write() } += 1;
                             {
                                 let history = unsafe { COMMANDS_HISTORY.read() };
                                 let last_command =
-                                    history.get(unsafe { COMMANDS_INDEX.read().clone() }).unwrap();
+                                    history.get(unsafe { *COMMANDS_INDEX.read() }).unwrap();
                                 self.pressed_keys = last_command.clone();
                             }
                             print_screenchars_atp(&self.origin, [DEFAULT_CHAR; 70]);

@@ -36,7 +36,8 @@ impl core::fmt::Debug for HPET {
     }
 }
 
-
+/// # Safety
+/// Must ensure bytes is proper HPET
 pub unsafe fn handle_hpet(bytes: &[u8]) -> Option<&'static HPET> {
     Some(unsafe { &*(bytes.as_ptr() as *const HPET) })
 }

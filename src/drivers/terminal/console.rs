@@ -9,7 +9,7 @@ use super::{
 };
 
 
-pub const DEFAULT_CHAR: ScreenChar = ScreenChar::new('\0' as u8, ColorCode(15)); // Black on black
+pub const DEFAULT_CHAR: ScreenChar = ScreenChar::new(b'\0', ColorCode(15)); // Black on black
 
 pub struct Console {
     pub buffer: &'static mut VgaBuffer,
@@ -37,7 +37,7 @@ impl Console {
             unsafe { read_volatile(&self.buffer.chars[y as usize][x as usize]) }
         } else {
             log::error!("Tried to read {:?}", (x, y));
-            return DEFAULT_CHAR;
+            DEFAULT_CHAR
         }
     }
 

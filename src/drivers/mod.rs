@@ -38,8 +38,8 @@ impl core::fmt::Display for dyn Driver {
 pub enum DriverInitError {
 
 }
-
-pub const DRIVERS: &[(&'static str, fn() -> ())] = &[
+#[allow(clippy::type_complexity)]
+pub const DRIVERS: &[(&str, fn() -> ())] = &[
     ("log", crate::user::log::initialize_logger),
     ("heap & frame allocation", super::memory::handler::init),
     ("gdt", super::gdt::init),
@@ -52,12 +52,12 @@ pub const DRIVERS: &[(&'static str, fn() -> ())] = &[
     ("descriptor tables", super::memory::tables::DescriptorTablesHandler::init),
     ("APIC", super::interrupts::apic::init),
     // ("multiprocessing (SMP)", super::smp::init),
-    ("Userland (Ring 3)", super::userland::go_ring3),
+    // ("Userland (Ring 3)", super::userland::go_ring3),
 ];
 
 //TODO Specify a bit more what is a driver... Cuz rn it's just smth that needs to be initialised
 pub fn init_drivers() {
-    'main: for (name, init_fun) in DRIVERS.into_iter() {
+    'main: for (name, init_fun) in DRIVERS.iter() {
         log::info!("Initialising {}... ", name);
         init_fun()
     }

@@ -27,7 +27,7 @@ fn lsdisk(_args: String) -> Result<(), String> {
             #[cfg(feature="fs")]
             if let Some(partitions) = drvs.partitions.get(&disk.loc) {
                 // If the partition start is 1 we know it's MBR because on GPT the first 33 sectors are reserved !
-                let start_lba = partitions.get(0).and_then(|x| Some(x.1)).unwrap_or(0);
+                let start_lba = partitions.first().map(|x| x.1).unwrap_or(0);
                 if start_lba == 1 {
                     println!("--MBR--");
                 }
@@ -47,7 +47,7 @@ fn lsdisk(_args: String) -> Result<(), String> {
 
 #[command("read_raw", "Reads a raw sector from disk")]
 fn read_sector(raw_args: String) -> Result<(), String> {
-    let mut args = raw_args.split(" ");
+    let mut args = raw_args.split(' ');
     let channel = match args
         .next()
         .ok_or("Invalid argument: missing channel (Primary/0, Secondary/1)")?
@@ -104,10 +104,10 @@ fn read_sector(raw_args: String) -> Result<(), String> {
 
 #[command("write_sector", "Writes a raw sector to disk")]
 fn write_sector(raw_args: String) -> Result<(), String> {
-    let mut args = raw_args.split(" ");
+    let mut args = raw_args.split(' ');
     let channel = match args
         .next()
-        .ok_or_else(|| "Invalid argument: missing channel (Primary/0, Secondary/1)")?
+        .ok_or("Invalid argument: missing channel (Primary/0, Secondary/1)")?
     {
         "Primary" => Channel::Primary,
         "0" => Channel::Primary,
@@ -138,7 +138,7 @@ fn write_sector(raw_args: String) -> Result<(), String> {
             bytes.push(c as u8);
         }
     }
-    let _sectors = write_to_disk(DiskLoc(channel, drive), start, bytes)?;
+    write_to_disk(DiskLoc(channel, drive), start, bytes)?;
     println!("Done");
     Ok(())
 }
@@ -147,19 +147,20 @@ fn write_sector(raw_args: String) -> Result<(), String> {
 /// p = Partition id
 /// [n][p]/[path]
 #[cfg(feature="fs")]
-fn parse_path(path: &str) -> Option<crate::fs::fs::FilePath> {
-    let loc_idx = path.chars().nth(0)?.to_string().parse::<u8>().ok()?;
+fn parse_path(path: &str) -> Option<crate::fs::path::FilePath> {
+    let mut chars = path.chars();
+    let loc_idx = chars.next()?.to_string().parse::<u8>().ok()?;
     let loc = DiskLoc::from_idx(loc_idx)?;
-    let part_idx = path.chars().nth(1)?.to_string().parse::<u8>().ok()?;
+    let part_idx = chars.next()?.to_string().parse::<u8>().ok()?;
     let part = crate::fs::partition::Partition::from_idx(&loc, part_idx)?;
-    Some(crate::fs::fs::FilePath::new(path[2..].to_string(), part.clone()))
+    Some(crate::fs::path::FilePath::new(path[2..].to_string(), part.clone()))
 }
 
 // #[cfg(feature="fs")]
 #[command("read", "Reads a file/dir from disk")]
 fn read(raw_args: String) -> Result<(), String> {
     use crate::fs::fs_driver::Entry;
-    let mut args = raw_args.split(" ");
+    let mut args = raw_args.split(' ');
     let path = parse_path(args.next().unwrap_or("0"));
     if path.is_none() {
         println!("Invalid path");
@@ -219,7 +220,7 @@ fn read(raw_args: String) -> Result<(), String> {
 
 #[command("dump_disk", "Dumps disk to serial output (QEMU ONLY)")]
 fn dump_disk(args: String) -> Result<(), String> {
-    let mut args = args.split(" ");
+    let mut args = args.split(' ');
     let channel = match args
         .next()
         .ok_or("Invalid argument: missing channel (Primary/0, Secondary/1)")?
@@ -413,17 +414,15 @@ impl CommandRunner {
         unsafe {
             COMMANDS_HISTORY.write().push(command);
             let history_len = COMMANDS_HISTORY.read().len();
-            if history_len > 1 {
-                if COMMANDS_HISTORY.read().get(history_len - 2).unwrap().len() == 0 {
-                    COMMANDS_HISTORY
-                        .write()
-                        .swap(history_len - 2, history_len - 1);
-                }
+            if history_len > 1 && COMMANDS_HISTORY.read().get(history_len - 2).unwrap().is_empty() {
+                COMMANDS_HISTORY
+                    .write()
+                    .swap(history_len - 2, history_len - 1);
             }
         }
         unsafe { *COMMANDS_INDEX.write() += 1 };
 
-        let mut args = cmd.split(" ");
+        let mut args = cmd.split(' ');
         let program = args.next().unwrap(); //TODO Crash if user types nothing, handle error
         if let Some(Command {
             name: _,
@@ -432,7 +431,6 @@ impl CommandRunner {
         }) = self.commands.get(program)
         {
             let args = args
-                .into_iter()
                 .map(|s| alloc::string::ToString::to_string(&s))
                 .collect::<Vec<String>>()
                 .join(" ");
@@ -457,7 +455,16 @@ pub struct Command {
 }
 
 impl Shell {
-    pub fn new() -> Self {
+    pub async fn run(self) {
+        self.inner.run()
+    }
+    pub async fn run_with_command(mut self, cmd: String) {
+        self.inner.run_command(cmd);
+        self.inner.run()
+    }
+}
+impl Default for Shell {
+    fn default() -> Self {
         let commands = {
             let commands = shell_macro::command_list!();
             let mut res = HashMap::new();
@@ -469,12 +476,5 @@ impl Shell {
         Self {
             inner: CommandRunner::new("> ", commands),
         }
-    }
-    pub async fn run(self) {
-        self.inner.run()
-    }
-    pub async fn run_with_command(mut self, cmd: String) {
-        self.inner.run_command(cmd);
-        self.inner.run()
     }
 }

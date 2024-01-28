@@ -18,7 +18,8 @@ impl core::fmt::Debug for WAET {
     }
 }
 
-
+/// # Safety
+/// Must ensure that bytes is valid WAET !
 pub unsafe fn handle_waet(bytes: &[u8]) -> Option<&'static WAET> {
     Some(unsafe { &*(bytes.as_ptr() as *const WAET) })
 }

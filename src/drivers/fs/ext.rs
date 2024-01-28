@@ -6,7 +6,7 @@ use hashbrown::HashMap;
 
 use crate::{dbg, disk::ata::read_from_partition, bit_manipulation::{all_zeroes, any_as_u8_slice}};
 
-use super::{fs::FilePath, fs_driver::{Dir, Entry, File, FsDriver, FsDriverEnum, FsDriverInitialiser, FsReadError, SoftEntry}, partition::Partition};
+use super::{path::FilePath, fs_driver::{Dir, Entry, File, FsDriver, FsDriverEnum, FsDriverInitialiser, FsReadError, SoftEntry}, partition::Partition};
 
 pub struct InodeNumber(u64);
 #[derive(Debug)]
@@ -143,7 +143,7 @@ impl FsDriverInitialiser for ExtDriver {
                 superblock.as_ext_super_block()   
             }
         };
-        if check_superblock(&extsuperblock) {
+        if check_superblock(extsuperblock) {
             log::error!("Error in superblock, probably something not supported !");
             return None
         }
@@ -194,13 +194,13 @@ pub struct ExtFile {
 //Block size in sectors
 //TODO Make some parsing ?
 fn read_bgdt(partition: &Partition, block_size: u32) -> Vec<u8> {
-    let raw_bgdt = read_from_partition(partition, ((block_size)*2).into(), 1).expect("Failed reading Block Group Descriptor");
-    raw_bgdt
+    
+    read_from_partition(partition, ((block_size)*2).into(), 1).expect("Failed reading Block Group Descriptor")
 }
 //TODO Not use vec but [Inode; 4]
 /// inode_size should be u16
 fn get_inode_table(partition: &Partition, inode_table_start_sector: u64, inode_size: usize) -> Option<Vec<Inode>> {
-    let raw_inode_table = read_from_partition(&partition, inode_table_start_sector, 1).unwrap();
+    let raw_inode_table = read_from_partition(partition, inode_table_start_sector, 1).unwrap();
     let mut tables = Vec::new();
     for i in 0..raw_inode_table.len()/inode_size {
         let inode_table = unsafe { &*(raw_inode_table[i*inode_size..].as_ptr() as *const Inode) }.clone();
@@ -210,7 +210,7 @@ fn get_inode_table(partition: &Partition, inode_table_start_sector: u64, inode_s
 }
 
 fn read_superblock(partition: &Partition) -> Option<Superblock> {
-    let mut rawsuper_block = read_from_partition(&partition, 2, 2).expect("Failed reading partition on disk");
+    let mut rawsuper_block = read_from_partition(partition, 2, 2).expect("Failed reading partition on disk");
     if all_zeroes(&rawsuper_block) {return None}
     let superblock = Superblock::new(rawsuper_block);
     Some(superblock)
@@ -260,7 +260,7 @@ fn check_superblock(extsuperblock: &ExtendedExtSuperblock) -> bool {
 fn block_group_of_inode(inode_number: u64, inodes_per_group: u32) -> u64 {
     (inode_number - 1) / inodes_per_group as u64
 }
-fn get_blkgrp64<'a>(block_group: u64, bgd: &'a [u8]) -> Option<&'a BlockGroupDescriptor64> {
+fn get_blkgrp64(block_group: u64, bgd: &[u8]) -> Option<&BlockGroupDescriptor64> {
     let raw_bgd = bgd.chunks_exact(64).nth(block_group as usize)?;
     Some(unsafe { &*(raw_bgd.as_ptr() as *const BlockGroupDescriptor64) })
 }
@@ -455,7 +455,7 @@ pub struct ExtEntryDescriptor {
     name: String,// Name characters size: N
 }
 impl<'a> ExtEntryDescriptor {
-    ///! SAFETY: data.len() > sizeof::<Self>
+    /// SAFETY: data.len() > sizeof::<Self>
     /// Tuple is: (self, name)
     pub fn new(data: &'a [u8], dir_entries_contain_type: bool) -> Self {
         let _self = unsafe {&*(data.as_ptr() as *const RawExtEntryDescriptor)};

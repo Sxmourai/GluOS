@@ -1,5 +1,5 @@
 pub mod entry;
-pub mod fs;
+pub mod path;
 pub mod fs_driver;
 pub mod userland;
 pub mod partition;
@@ -14,13 +14,19 @@ use hashbrown::HashMap;
 
 use crate::{dbg, disk::ata::{DiskLoc, DISK_MANAGER}, fs_driver, state::FS_DRIVER};
 
-use self::{fs::FilePath, fs_driver::{Entry, FsDriver, FsDriverInitialiser, FsReadError}, partition::{HeaderType, Partition}};
+use self::{path::FilePath, fs_driver::{Entry, FsDriver, FsDriverInitialiser, FsReadError}, partition::{HeaderType, Partition}};
 
 /// Holds drivers for all of the partitions of all the disks
 pub struct FsDriverManager {
     pub drivers: HashMap<Partition, Box<dyn FsDriver>>,
     pub partitions: HashMap<DiskLoc, Vec<Partition>>
 }
+impl Default for FsDriverManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FsDriverManager {
     pub fn read(&self, path: &FilePath) -> Result<Entry, FsReadError> {
         if let Some(driver) = self.drivers.get(&path.partition) {
@@ -67,8 +73,9 @@ impl FsDriverManager {
     }
 }
 
+#[allow(clippy::borrowed_box)]
 pub fn get_fs_driver(loc: &Partition) -> Option<&Box<dyn FsDriver>> {
-    unsafe{fs_driver!().drivers.get(loc)}
+    fs_driver!().drivers.get(loc)
 }
 
 pub fn init() {

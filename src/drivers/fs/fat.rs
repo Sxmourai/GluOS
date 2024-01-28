@@ -1,9 +1,9 @@
 use alloc::{boxed::Box, format, string::{String, ToString}, vec::Vec};
 use hashbrown::HashMap;
 
-use crate::{bit_manipulation::any_as_u8_slice, dbg, disk::{ata::{read_from_partition, write_to_partition}, DiskError}, fs::fs::FileSystemError, serial_print, serial_println};
+use crate::{bit_manipulation::any_as_u8_slice, dbg, disk::{ata::{read_from_partition, write_to_partition}, DiskError}, fs::path::FileSystemError, serial_print, serial_println};
 
-use super::{fs::FilePath, fs_driver::{Dir, Entry, File, FsDriver, FsDriverEnum, FsDriverInitialiser, FsReadError, SoftEntry}, partition::Partition, userland::FatAttributes};
+use super::{path::FilePath, fs_driver::{Dir, Entry, File, FsDriver, FsDriverEnum, FsDriverInitialiser, FsReadError, SoftEntry}, partition::Partition, userland::FatAttributes};
 
 
 #[derive(Debug)]
@@ -15,7 +15,7 @@ pub struct Fat32Driver {
 }
 impl Fat32Driver {
     pub fn new(partition: &Partition) -> Option<Self> {
-        let fat_info = Self::get_fat_boot(&partition).unwrap();
+        let fat_info = Self::get_fat_boot(partition).unwrap();
         if fat_info.0.fs_type_label[0..5] != [70, 65, 84, 51, 50] {
             // log::error!("Error reading fat info in {:?} {}",partition, crate::bit_manipulation::as_chars(&fat_info.0.fs_type_label));
             return None
@@ -23,7 +23,7 @@ impl Fat32Driver {
         let first_fat_sector = fat_info.first_fat_sector();
         let first_data_sector = fat_info.get_first_data_sector();
         let fat_table = Self::read_fat(
-            &partition,
+            partition,
             fat_info.get_fat_size(),
             first_fat_sector,
             first_data_sector,
@@ -85,7 +85,7 @@ impl Fat32Driver {
         let entries_part = Self::parse_entries(
             &raw_entries_part,
             self.fat_info.get_first_data_sector(),
-            &path,
+            path,
             &self.partition,
         );
         Some(entries_part)
@@ -244,7 +244,7 @@ impl Fat32Driver {
         }
         files
     }
-    fn get_raw_entries(sector: &Vec<u8>) -> Vec<RawFat32Entry> {
+    fn get_raw_entries(sector: &[u8]) -> Vec<RawFat32Entry> {
         let mut entries = Vec::new();
         for i in 0..sector.len() / 32 {
             let sector_section = &sector[(i * 32)..(i * 32) + 31];
@@ -283,7 +283,7 @@ impl Fat32Driver {
         entries
     }
     fn parse_entries(
-        entries: &Vec<RawFat32Entry>,
+        entries: &[RawFat32Entry],
         first_data_sector: u64,
         prefix: &FilePath,
         partition: &Partition,
@@ -322,7 +322,7 @@ impl Fat32Driver {
                     }
                     let nentry = nentry.unwrap();
                     let next_name = nentry.name();
-                    if next_name.starts_with(".") || next_name.starts_with("..") {
+                    if next_name.starts_with('.') || next_name.starts_with("..") {
                         continue;
                     } // Pass on "." and ".." folders
                     let is_file = nentry.attributes & 0x20 == 0x20;
@@ -357,7 +357,7 @@ impl Fat32Driver {
                 RawFat32Entry::Standard(file) => {
                     // From my tests only "." and ".." folders
                     //EDIT Also CACHEDIRTAG file
-                    if !file.name().starts_with(".") && !file.name().contains("CACHEDIRTAG") {
+                    if !file.name().starts_with('.') && !file.name().contains("CACHEDIRTAG") {
                         log::debug!("What is this file ?"); // If this prints one day we need to do investigations
                         dbg!(file)
                     }
@@ -423,7 +423,7 @@ impl Fat32File {
         &self.path
     }
     pub fn name(&self) -> &str {
-        &self.path.name()
+        self.path.name()
     }
     pub fn sector(&self) -> u32 {
         self.sector
@@ -444,7 +444,7 @@ impl Fat32Dir {
         &self.path
     }
     pub fn name(&self) -> &str {
-        &self.path.name()
+        self.path.name()
     }
     pub fn sector(&self) -> u32 {
         self.sector
@@ -530,13 +530,13 @@ impl FatInfo {
         }
     }
     pub fn get_total_clusters(&self) -> u64 {
-        self.get_data_sectors() as u64 / self.0.sectors_per_cluster as u64
+        self.get_data_sectors() / self.0.sectors_per_cluster as u64
     }
     pub fn get_data_sectors(&self) -> u64 {
         self.get_total_sectors() as u64
             - (self.0.reserved_sectors as u64
                 + (self.0.fats as u64 * self.get_fat_size() as u64)
-                + self.get_root_dir_sectors()) as u64
+                + self.get_root_dir_sectors())
     }
     pub fn get_total_sectors(&self) -> u32 {
         if self.0.total_sectors_16 == 0 {
@@ -554,7 +554,7 @@ impl FatInfo {
         }
     }
     pub fn get_root_dir_sectors(&self) -> u64 {
-        ((self.0.root_entries as u64 * 32 as u64) + (self.0.bytes_per_sector as u64 - 1))
+        ((self.0.root_entries as u64 * 32_u64) + (self.0.bytes_per_sector as u64 - 1))
             / self.0.bytes_per_sector as u64
     }
     pub fn first_fat_sector(&self) -> u16 {

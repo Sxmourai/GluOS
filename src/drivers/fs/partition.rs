@@ -61,7 +61,7 @@ pub fn read_header_type(disk: &Disk) -> Option<HeaderType> {
                     if partition.part_type_guid.into_iter().all(|x| x==0) {break}
                     let start_lba = partition.start_lba;
                     let end_lba = partition.end_lba;
-                    partitions.push(Partition(disk.loc.clone(), partition.start_lba, partition.end_lba));
+                    partitions.push(Partition(disk.loc, partition.start_lba, partition.end_lba));
                 }
             }
             return Some(HeaderType::GPT(partitions))
@@ -78,7 +78,7 @@ pub fn read_header_type(disk: &Disk) -> Option<HeaderType> {
                 }
                 let lba_start = mbr_part.lba_start;
                 let sector_count = mbr_part.sector_count;
-                partitions.push(Partition(disk.loc.clone(), mbr_part.lba_start as u64, mbr_part.sector_count as u64));
+                partitions.push(Partition(disk.loc, mbr_part.lba_start as u64, mbr_part.sector_count as u64));
             }
             return Some(HeaderType::MBR(partitions))
         }

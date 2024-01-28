@@ -17,10 +17,8 @@ impl AcpiHandler {
 
         if fadt.smi_command_port==0 && fadt.acpi_disable==0 && fadt.acpi_enable==0 && fadt.pm1a_control_block&0x1==1 {
             log::info!("ACPI is already enabled")
-        } else {
-            if AcpiHandler::enable_acpi(fadt).is_err() {
-                log::error!("Error whilst enabling ACPI mode !")
-            }
+        } else if AcpiHandler::enable_acpi(fadt).is_err() {
+            log::error!("Error whilst enabling ACPI mode !")
         }
         Self {
             fadt

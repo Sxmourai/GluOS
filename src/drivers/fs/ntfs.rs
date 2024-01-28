@@ -5,7 +5,7 @@ use ntfs::{Ntfs, NtfsFile, NtfsReadSeek};
 
 use crate::{bit_manipulation::all_zeroes, dbg, disk::ata::read_from_partition, fs::fs_driver::{Dir, SoftEntry}, println, serial_println};
 
-use super::{fs::FilePath, fs_driver::{Entry, File, FsDriver, FsDriverInitialiser, FsReadError}, partition::Partition};
+use super::{path::FilePath, fs_driver::{Entry, File, FsDriver, FsDriverInitialiser, FsReadError}, partition::Partition};
 
 #[derive(Debug)]
 pub struct NTFSDriver {
@@ -25,7 +25,6 @@ impl FsDriverInitialiser for NTFSDriver {
         drv.read_upcase_table(&mut reader).ok()?;
         let root = drv.root_directory(&mut reader).ok()?;
         let files = Self::walk_dir(partition, "", &mut reader, &drv, root)?;
-        dbg!(files);
         Some(alloc::boxed::Box::new(Self {
             partition: partition.clone(),
             ntfs: drv,
@@ -44,7 +43,7 @@ impl NTFSDriver {
             let file_name = entry.key().unwrap().unwrap();
             // println!("{}", file_name.name());
             if let Ok(name) = file_name.name().to_string() {
-                if name.starts_with("$") { // Skip if starts with $
+                if name.starts_with('$') { // Skip if starts with $
                     if let Some(Ok(_entry)) = entries.next(reader) {
                         entry = _entry;
                         continue
@@ -88,7 +87,7 @@ impl NTFSDriver {
 }
 
 impl FsDriver for NTFSDriver {
-    fn read(&self, path: &super::fs::FilePath) -> Result<super::fs_driver::Entry, super::fs_driver::FsReadError> {
+    fn read(&self, path: &FilePath) -> Result<super::fs_driver::Entry, super::fs_driver::FsReadError> {
         dbg!(self.files);
         Ok(self.files.get(path).ok_or(FsReadError::EntryNotFound)?.clone())
     }

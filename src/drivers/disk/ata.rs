@@ -16,7 +16,7 @@ use crate::bit_manipulation::{bytes, ptrlist_to_num, u16_to_u8};
 
 use crate::dbg;
 #[cfg(feature="fs")]
-use crate::fs::fs::FilePath;
+use crate::fs::path::FilePath;
 #[cfg(feature="fs")]
 use crate::fs::partition::Partition;
 use crate::x86_64::instructions::port::{PortRead, PortWrite};
@@ -92,10 +92,10 @@ fn detect(addr: impl DiskAddress) -> Option<Disk> {
         //TODO Try to handle the error
         return None;
     }
-    let identify = read_identify(base + 0);
+    let identify = read_identify(base);
     let mut u8_identify = [0u8; 512];
     let mut char_identify = ['\0'; 512];
-    for i in 0..identify.len() {
+    for (i, item) in identify.iter().enumerate() {
         let j = i * 2;
         (u8_identify[j], u8_identify[j + 1]) = u16_to_u8(identify[i]);
         let (byte0, byte1) = u16_to_u8(identify[i]);
@@ -105,12 +105,12 @@ fn detect(addr: impl DiskAddress) -> Option<Disk> {
     // debug!("Serial number: {}\tFirmware revision: {}\tModel number: {}", CharSlicePtr(&char_identify[20..40]), CharSlicePtr(&char_identify[46..52]), CharSlicePtr(&char_identify[54..92]));
 
     // let rev = identify[60..61].iter().rev().collect::<Vec<u16>>();
-    let lba28 = ptrlist_to_num(&mut identify[60..61].into_iter());
-    let lba48: u64 = ptrlist_to_num(&mut identify[100..103].into_iter());
+    let lba28 = ptrlist_to_num(&mut identify[60..61].iter());
+    let lba48: u64 = ptrlist_to_num(&mut identify[100..103].iter());
     let is_hardisk = true; //TODO Parse if 'i24612s hard disk'
                            //TODO Parse ALL info returned by IDENTIFY https://wiki.osdev.org/ATA_PIO_Mode
 
-    info!(
+    trace!(
         "Found {:?} {:?} drive in {:?} channel of size: {}Ko",
         addr.drive(),
         drive_type,
@@ -130,8 +130,8 @@ fn detect(addr: impl DiskAddress) -> Option<Disk> {
 fn read_identify(command_port_addr: u16) -> [u16; SSECTOR_SIZEWORD] {
     trace!("Reading identify data");
     let mut data = [0u16; 256];
-    for i in 0..data.len() {
-        data[i] = unsafe { u16::read_from_port(command_port_addr) };
+    for ele in &mut data {
+        *ele = unsafe { u16::read_from_port(command_port_addr) };
     }
     data
 }
@@ -266,9 +266,9 @@ pub trait DiskAddress: Copy {
         self.channel_addr()
     }
 }
-impl Into<DiskLoc> for usize {
-    fn into(self) -> DiskLoc {
-        match self {
+impl From<usize> for DiskLoc {
+    fn from(val: usize) -> Self {
+        match val {
             0 => {DiskLoc(Channel::Primary,   Drive::Master)},
             1 => {DiskLoc(Channel::Primary,   Drive::Slave)},
             2 => {DiskLoc(Channel::Secondary, Drive::Master)},
@@ -282,6 +282,12 @@ pub struct DiskManager {
     pub disks: [Option<Disk>; 4],
     selected_disk: usize, // u8 but usize because used for indexation
 }
+impl Default for DiskManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DiskManager {
     pub fn new() -> Self {
         unsafe { u8::write_to_port(0x3f6, (1 << 1) | (1 << 2)) }
@@ -439,7 +445,7 @@ impl Disk {
         self.loc.base()
     }
     pub fn data_reg(&self) -> u16 {
-        self.base() + 0
+        self.base()
     }
     pub fn error_reg(&self) -> u16 {
         self.base() + 1
@@ -533,7 +539,7 @@ impl Disk {
             self.poll()?;
             for _i in 0..SSECTOR_SIZEWORD / 2 {
                 let data = unsafe { u32::read_from_port(self.data_reg()) };
-                buffer.push((data >> 0) as u8);
+                buffer.push(data as u8);
                 buffer.push((data >> 8) as u8);
                 buffer.push((data >> 16) as u8);
                 buffer.push((data >> 24) as u8);
@@ -604,7 +610,7 @@ impl Disk {
                 let mut data = 0;
                 for j in 0..4 {
                     data |=
-                        (*content.get((sector * 512) + i * 4 + j).unwrap_or(&0) as u32) << 8 * j
+                        (*content.get((sector * 512) + i * 4 + j).unwrap_or(&0) as u32) << (8 * j)
                 }
                 unsafe { u32::write_to_port(self.data_reg(), data) };
             }
@@ -683,7 +689,7 @@ impl Disk {
             let sector_address = sector_address.try_into()?;
             let sector_count = sector_count.try_into()?;
             self.read28(sector_address, sector_count)
-        } else if self.addressing_modes.chs == true {
+        } else if self.addressing_modes.chs {
             todo!("Implement CHS pio mode");
             // return self.readchs(sector_address.try_into()?, sector_count.try_into()?)
         } else {
@@ -696,7 +702,7 @@ impl Disk {
         } else if self.addressing_modes.lba28 != 0 {
             todo!("Implement lba28 mode");
             // self.write28(start_sector, content)
-        } else if self.addressing_modes.chs == true {
+        } else if self.addressing_modes.chs {
             todo!("Implement CHS pio mode");
         } else {
             Err(DiskError::NoReadModeAvailable)

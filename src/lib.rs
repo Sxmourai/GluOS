@@ -11,6 +11,9 @@
 #![allow(dead_code)]
 #![deny(unsafe_op_in_unsafe_fn)]
 
+#![allow(clippy::borrow_interior_mutable_const)]
+
+
 pub mod bit_manipulation;
 pub mod boot;
 pub mod drivers;
