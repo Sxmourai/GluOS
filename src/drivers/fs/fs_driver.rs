@@ -81,6 +81,22 @@ pub struct SoftEntry {
 pub enum FsDriverEnum {
     Fat32,
     Ext,
+    NTFS,
+    //NOT SUPPORTED
+    BTRFS,
+    TFS,
+}
+impl core::fmt::Display for FsDriverEnum {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let repr = match self {
+            Self::Fat32=>"Fat32",
+            Self::Ext=>"Ext",
+            Self::NTFS=>"Ntfs",
+            Self::BTRFS=>"Btrfs",
+            Self::TFS=>"Tfs (redox)",
+        };
+        f.write_str(repr)
+    }
 }
 #[derive(Debug)]
 pub enum FsReadError {

@@ -3,8 +3,10 @@ pub mod fs;
 pub mod fs_driver;
 pub mod userland;
 pub mod partition;
+// Specific fs's
 pub mod ext;
 pub mod fat;
+pub mod ntfs;
 
 
 use alloc::{boxed::Box, vec::Vec};

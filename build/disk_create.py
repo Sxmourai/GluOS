@@ -48,6 +48,9 @@ if __name__ == "__main__":
         print(f"\n\tMounting partition on loop device")
         cmd(fr"sudo losetup -o 18432 /dev/loop3 {args.filename}")
         print(f"\n\tCreating fs on partition")
+        if "ntfs" in format:
+            print("Ouhh NTFS, good luck =)")
+            format += " -F "
         cmd(fr"sudo {format} /dev/loop3") # Sudo because sometimes it's needed
         print(f"\n\tMounting partition")
         cmd(fr"sudo mount /dev/loop3 mounted_disk")

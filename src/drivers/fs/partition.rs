@@ -107,9 +107,9 @@ pub fn find_and_init_fs_driver_for_part(part: &Partition) -> Option<Box<dyn FsDr
     if let Some(drv) = _FsDriverWrapper(part).try_init_drv::<super::ext::ExtDriver>() {
         return Some(drv);
     }
-    // if let Some(drv) = _FsDriverWrapper(part).try_init_drv::<NTFSDriver>() {
-    //     return Some(drv);
-    // }
+    if let Some(drv) = _FsDriverWrapper(part).try_init_drv::<super::ntfs::NTFSDriver>() {
+        return Some(drv);
+    }
     None
 }
 //let fat_info = Fat32Driver::get_fat_boot(&partition).unwrap();

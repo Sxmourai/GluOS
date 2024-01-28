@@ -8,39 +8,6 @@ use crate::{disk::ata::DiskLoc, fs_driver};
 
 use super::{partition::Partition, userland::FatAttributes};
 
-#[derive(Default, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[repr(packed)]
-pub struct BiosParameterBlock {
-    pub bootjmp: [u8; 3],
-    pub oem_name: [u8; 8],
-    pub bytes_per_sector: u16,
-    pub sectors_per_cluster: u8,
-    pub reserved_sectors: u16,
-    pub fats: u8,
-    pub root_entries: u16,
-    pub total_sectors_16: u16,
-    pub media: u8,
-    pub sectors_per_fat_16: u16,
-    pub sectors_per_track: u16,
-    pub heads: u16,
-    pub hidden_sectors: u32,
-    pub total_sectors_32: u32,
-
-    // Extended BIOS Parameter Block
-    pub sectors_per_fat_32: u32,
-    pub extended_flags: u16,
-    pub fs_version: u16,
-    pub root_dir_first_cluster: u32,
-    pub fs_info_sector: u16,
-    pub backup_boot_sector: u16,
-    pub reserved_0: [u8; 12],
-    pub drive_num: u8,
-    pub reserved_1: u8,
-    pub ext_sig: u8,
-    pub volume_id: u32,
-    pub volume_label: [u8; 11],
-    pub fs_type_label: [u8; 8],
-}
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
 pub enum FileSystemError {

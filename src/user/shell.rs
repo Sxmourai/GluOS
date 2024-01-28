@@ -34,11 +34,7 @@ fn lsdisk(_args: String) -> Result<(), String> {
                 for part in partitions {
                     print!("|-> {}Kb ({} - {})",(part.2-part.1)/2, part.1, part.2);
                     if let Some(drv) = drvs.drivers.get(part) {
-                        let fs = match &drv.as_enum() {
-                            crate::fs::fs_driver::FsDriverEnum::Fat32 => "Fat32",
-                            crate::fs::fs_driver::FsDriverEnum::Ext => "Ext2",
-                        };
-                        print!(" {}", fs);
+                        print!(" {}", drv.as_enum());
                     }
                     println!();
                 }

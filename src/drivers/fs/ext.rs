@@ -135,7 +135,7 @@ impl FsDriver for ExtDriver {
 }
 impl FsDriverInitialiser for ExtDriver {
     fn try_init(partition: &Partition) -> Option<Box<Self>> where Self: Sized {
-        let superblock = read_superblock(partition).unwrap();
+        let superblock = read_superblock(partition)?;
         let extsuperblock = match superblock.as_super_block().major_portion_version {
             0 => {
                 log::error!("Superblock version is to old, don't support it {:?} {:?}", superblock.as_super_block(), partition); 
@@ -213,6 +213,7 @@ fn get_inode_table(partition: &Partition, inode_table_start_sector: u64, inode_s
 
 fn read_superblock(partition: &Partition) -> Option<Superblock> {
     let mut rawsuper_block = read_from_partition(&partition, 2, 2).expect("Failed reading partition on disk");
+    if all_zeroes(&rawsuper_block) {return None}
     let superblock = Superblock::new(rawsuper_block);
     Some(superblock)
 }
