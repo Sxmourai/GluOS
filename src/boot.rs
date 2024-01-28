@@ -17,7 +17,7 @@ pub fn boot(boot_info: &'static bootloader::BootInfo) -> Executor {
 
     let mut executor = Executor::new();
     info!("Initialising shell");
-    executor.spawn(Task::new(Shell::new().run_with_command("read 30/".to_string())));
+    executor.spawn(Task::new(Shell::new().run_with_command("".to_string())));
     // executor.spawn(Task::new());
     executor
 }

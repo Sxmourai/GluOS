@@ -2,7 +2,7 @@ use alloc::{boxed::Box, vec::Vec};
 
 use crate::{dbg, disk::ata::{Disk, DiskLoc}, fs_driver};
 
-use super::{ext::ExtDriver, fat::Fat32Driver, fs_driver::FsDriver, get_fs_driver};
+use super::{fat::Fat32Driver, fs_driver::FsDriver, get_fs_driver};
 
 #[repr(C, packed)]
 #[derive(Debug)]
@@ -104,9 +104,12 @@ pub fn find_and_init_fs_driver_for_part(part: &Partition) -> Option<Box<dyn FsDr
     if let Some(drv) = _FsDriverWrapper(part).try_init_drv::<Fat32Driver>() {
         return Some(drv);
     }
-    if let Some(drv) = _FsDriverWrapper(part).try_init_drv::<ExtDriver>() {
+    if let Some(drv) = _FsDriverWrapper(part).try_init_drv::<super::ext::ExtDriver>() {
         return Some(drv);
     }
+    // if let Some(drv) = _FsDriverWrapper(part).try_init_drv::<NTFSDriver>() {
+    //     return Some(drv);
+    // }
     None
 }
 //let fat_info = Fat32Driver::get_fat_boot(&partition).unwrap();

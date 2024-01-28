@@ -35,8 +35,8 @@ fn lsdisk(_args: String) -> Result<(), String> {
                     print!("|-> {}Kb ({} - {})",(part.2-part.1)/2, part.1, part.2);
                     if let Some(drv) = drvs.drivers.get(part) {
                         let fs = match &drv.as_enum() {
-                            FsDriverEnum::Fat32 => "Fat32",
-                            FsDriverEnum::Ext => "Ext2",
+                            crate::fs::fs_driver::FsDriverEnum::Fat32 => "Fat32",
+                            crate::fs::fs_driver::FsDriverEnum::Ext => "Ext2",
                         };
                         print!(" {}", fs);
                     }
@@ -151,16 +151,18 @@ fn write_sector(raw_args: String) -> Result<(), String> {
 /// p = Partition id
 /// [n][p]/[path]
 #[cfg(feature="fs")]
-fn parse_path(path: &str) -> Option<FilePath> {
+fn parse_path(path: &str) -> Option<crate::fs::fs::FilePath> {
     let loc_idx = path.chars().nth(0)?.to_string().parse::<u8>().ok()?;
     let loc = DiskLoc::from_idx(loc_idx)?;
     let part_idx = path.chars().nth(1)?.to_string().parse::<u8>().ok()?;
-    let part = Partition::from_idx(&loc, part_idx)?;
-    Some(FilePath::new(path[2..].to_string(), part.clone()))
+    let part = crate::fs::partition::Partition::from_idx(&loc, part_idx)?;
+    Some(crate::fs::fs::FilePath::new(path[2..].to_string(), part.clone()))
 }
-#[cfg(feature="fs")]
+
+// #[cfg(feature="fs")]
 #[command("read", "Reads a file/dir from disk")]
 fn read(raw_args: String) -> Result<(), String> {
+    use crate::fs::fs_driver::Entry;
     let mut args = raw_args.split(" ");
     let path = parse_path(args.next().unwrap_or("0"));
     if path.is_none() {
@@ -172,11 +174,11 @@ fn read(raw_args: String) -> Result<(), String> {
     if let Ok(entry) = fs_driver.read(&path) {
         match entry {
             Entry::File(mut f) => {
-                println!("{}",f.content());
+                println!("{}",f.content);
             },
             Entry::Dir(mut d) => {
-                for sub in d.entries() {
-                    println!("- {} ({}Kb)", sub.name(), sub.size());
+                for sub in d.entries {
+                    println!("- {} ({}Kb)", sub.path, sub.size);
                 }
             },
         }

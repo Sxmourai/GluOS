@@ -12,7 +12,7 @@ use hashbrown::HashMap;
 
 use crate::{dbg, disk::ata::{DiskLoc, DISK_MANAGER}, fs_driver, state::FS_DRIVER};
 
-use self::{fs::FilePath, fs_driver::{Entry, FsDriver, FsReadError}, partition::{HeaderType, Partition}};
+use self::{fs::FilePath, fs_driver::{Entry, FsDriver, FsDriverInitialiser, FsReadError}, partition::{HeaderType, Partition}};
 
 /// Holds drivers for all of the partitions of all the disks
 pub struct FsDriverManager {

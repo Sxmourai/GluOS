@@ -17,6 +17,7 @@ filesystems = {
         "ext4": "mkfs.ext4",
         "ext3": "mkfs.ext3",
         "ext2": "mkfs.ext2",
+        "ntfs": "mkfs.ntfs",
 }
 
 if __name__ == "__main__":

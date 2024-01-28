@@ -8,7 +8,7 @@ use crate::{drivers::memory::handler::MemoryHandler, memory::tables::DescriptorT
 pub static mut BOOT_INFO: Option<&'static bootloader::BootInfo> = None;
 pub static mut MEM_HANDLER: Option<MemoryHandler> = None;
 #[cfg(feature="fs")]
-pub static mut FS_DRIVER: Option<FsDriverManager> = None;
+pub static mut FS_DRIVER: Option<crate::fs::FsDriverManager> = None;
 pub static mut DESCRIPTOR_TABLES: Option<DescriptorTablesHandler> = None;
 
 
