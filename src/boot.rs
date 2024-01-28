@@ -7,16 +7,14 @@ use crate::{
         self,
         disk::ata::{Channel, DiskLoc, Drive},
         memory::handler::MemoryHandler,
-    },
-    task::{executor::Executor, Task},
-    user::{self, shell::Shell}, memory::tables::DescriptorTablesHandler, state::{self, MEM_HANDLER},
+    }, memory::tables::DescriptorTablesHandler, pit::{sdelay, udelay}, state::{self, MEM_HANDLER}, task::{executor::Executor, Task}, user::{self, shell::Shell}
 };
 
 pub fn boot(boot_info: &'static bootloader::BootInfo) -> Executor {
     //TODO Can't use vecs, Strings before heap init (in memoryHandler init), which means we can't do trace... Use a constant-size list ?
     unsafe { state::BOOT_INFO.replace(boot_info) };
     drivers::init_drivers();
-    
+
     let mut executor = Executor::new();
     info!("Initialising shell");
     executor.spawn(Task::new(Shell::new().run_with_command("read 30/".to_string())));

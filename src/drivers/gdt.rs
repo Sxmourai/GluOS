@@ -18,16 +18,16 @@ pub fn init() {
     }
 }
 
+pub const KERNEL_STACK_SIZE: usize = 4096 * 1024;
 lazy_static! {
     pub static ref TSS: TaskStateSegment = {
         let mut tss = TaskStateSegment::new();
         tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX as usize] = {
-            const STACK_SIZE: usize = 4096 * 5;
-            static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
+            static mut STACK: [u8; KERNEL_STACK_SIZE] = [0; KERNEL_STACK_SIZE];
 
             let stack_start = VirtAddr::from_ptr(unsafe { core::ptr::addr_of!(STACK) });
 
-            stack_start + STACK_SIZE
+            stack_start + KERNEL_STACK_SIZE
         };
         //TODO tss.privilege_stack_table
         tss

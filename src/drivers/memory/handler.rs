@@ -1,6 +1,6 @@
 use bootloader::bootinfo::MemoryMap;
 use x86_64::{
-    structures::paging::{Mapper, OffsetPageTable, Page, PageTableFlags, PhysFrame, Size4KiB, FrameAllocator},
+    structures::paging::{mapper::{MapperFlush, UnmapError}, FrameAllocator, Mapper, OffsetPageTable, Page, PageTableFlags, PhysFrame, Size4KiB},
     VirtAddr,
 };
 
@@ -53,11 +53,19 @@ impl MemoryHandler {
             self.map_frame(page, frame, flags)
         }
     }
+    pub unsafe fn unmap(&mut self, page: Page<Size4KiB>) -> Result<(PhysFrame, MapperFlush<Size4KiB>), UnmapError> {
+        unsafe {
+            self.mapper.unmap(page)
+        }
+    }
     pub unsafe fn map_frame(&mut self, page: Page<Size4KiB>,frame: PhysFrame, flags: PageTableFlags) -> Result<(), MapFrameError> {
         unsafe {
             self.mapper
                 .map_to(page, frame, flags, &mut self.frame_allocator)
-                .unwrap()
+                .map_err(|err| match err {
+                    _ => MapFrameError::CantAllocateFrame,
+                })
+                ?
                 .flush()
         }
         Ok(())

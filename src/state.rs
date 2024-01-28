@@ -23,7 +23,7 @@ macro_rules! boot_info {
 #[macro_export]
 macro_rules! mem_handler {
     () => {
-        &mut crate::state::MEM_HANDLER.as_mut().unwrap()
+        unsafe{crate::state::MEM_HANDLER.as_mut().unwrap()}
     };
 }
 
@@ -37,7 +37,7 @@ macro_rules! fs_driver {
 #[macro_export]
 macro_rules! descriptor_tables {
     () => {
-        crate::state::DESCRIPTOR_TABLES.as_mut().unwrap()
+        unsafe{crate::state::DESCRIPTOR_TABLES.as_mut().unwrap()}
     };
 }
 

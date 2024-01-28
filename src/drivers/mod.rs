@@ -14,6 +14,8 @@ pub mod terminal;
 pub mod time;
 pub mod video; 
 pub mod userland;
+pub mod smp;
+pub mod pit;
 
 pub trait Driver: Sync + Send {
     fn new() -> Self
@@ -48,7 +50,8 @@ pub const DRIVERS: &[(&'static str, fn() -> ())] = &[
     #[cfg(feature="fs")]
     ("filesystem (indexing disk)", fs::init),
     ("descriptor tables", super::memory::tables::DescriptorTablesHandler::init),
-    // ("APIC", || unsafe { super::interrupts::apic::init().expect("Failed to init apic"); }),
+    ("APIC", super::interrupts::apic::init),
+    // ("multiprocessing (SMP)", super::smp::init),
     ("Userland (Ring 3)", super::userland::go_ring3),
 ];
 

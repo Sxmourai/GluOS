@@ -39,3 +39,4 @@ extern crate spin; // Mutex and lock
 extern crate uart_16550; // Helps us to talk to QEMU (serial print and shutdown)
 extern crate x86_64; // A lot of asm macros, and useful for paging... Everything far and near CPU related // Reimplementation of HashMap and HashSet from stdlib
                      //TODO Make vga cursor move (os dev vga terminal doc) so we don't need to do our blinking, which means we don't need hashmaps anymore
+extern crate bitfield;
