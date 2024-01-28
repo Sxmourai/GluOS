@@ -1,5 +1,4 @@
-use super::{GenericAddressStructure, ACPISDTHeader};
-
+use super::{ACPISDTHeader, GenericAddressStructure};
 
 #[derive(Debug)]
 #[repr(C)]
