@@ -112,10 +112,8 @@ impl ExtDriver {
 
 impl FsDriver for ExtDriver {
     fn read(&self, path: &FilePath) -> Result<super::fs_driver::Entry, super::fs_driver::FsReadError> {
-        dbg!(path, self.files);
         let entry = self.files.get(path).ok_or(FsReadError::EntryNotFound)?;
         let inode = self.get_inode(entry.inner.inode).ok_or(FsReadError::EntryNotFound)?;
-        dbg!(entry);
         match self.read_inode_block(inode, entry)? {
             ExtEntry::Dir(d) => {
                 let mut entries = Vec::with_capacity(d.entries.len());

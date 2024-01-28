@@ -10,31 +10,40 @@ pub enum TimerError {
 }
 // Inline it because we call it a million times to wait for 1 second
 #[inline(always)]
-pub fn udelay(micros: u16) -> Result<(), TimerError> {
+pub fn try_udelay(micros: u16) -> Result<(), TimerError> {
     set(micros)?;
     wait_for_timeout()
 }
-pub fn mdelay(millis: u16) -> Result<(), TimerError> {
+pub fn try_mdelay(millis: u16) -> Result<(), TimerError> {
     let micros = millis as u64*1_000;
     let times = micros/MAX_COUNTER_VALUE_INPUT as u64;
     let rest = (micros%MAX_COUNTER_VALUE_INPUT as u64) as u16;
     dbg!(times, rest);
     for i in 0..times {
-        udelay(MAX_COUNTER_VALUE_INPUT)?
+        try_udelay(MAX_COUNTER_VALUE_INPUT)?
     }
-    udelay(rest);
+    try_udelay(rest);
     Ok(())
 }
-pub fn sdelay(seconds: u16) -> Result<(), TimerError> {
+pub fn try_sdelay(seconds: u16) -> Result<(), TimerError> {
     let micros = seconds as u64*1_000_000;
     let times = micros/MAX_COUNTER_VALUE_INPUT as u64;
     let rest = (micros%MAX_COUNTER_VALUE_INPUT as u64) as u16;
     dbg!(times, rest);
     for i in 0..times {
-        udelay(MAX_COUNTER_VALUE_INPUT)?
+        try_udelay(MAX_COUNTER_VALUE_INPUT)?
     }
-    udelay(rest);
+    try_udelay(rest);
     Ok(())
+}
+pub fn udelay(micros: u16) {
+    try_sdelay(micros).unwrap()
+}
+pub fn mdelay(millis: u16) {
+    try_sdelay(millis).unwrap()
+}
+pub fn sdelay(seconds: u16) {
+    try_sdelay(seconds).unwrap()
 }
 
 pub fn wait_for_timeout() -> Result<(), TimerError> {

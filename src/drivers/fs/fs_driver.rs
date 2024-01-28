@@ -70,7 +70,7 @@ pub trait FsDriverInitialiser {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SoftEntry {
     pub path: FilePath,
     pub size: usize,
@@ -105,19 +105,19 @@ pub enum FsReadError {
     ParsingError
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Entry {
     File(File),
     Dir(Dir),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct File {
     pub path: FilePath,
     pub content: String,
     pub size: usize,
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Dir {
     pub path: FilePath,
     pub entries: Vec<SoftEntry>,

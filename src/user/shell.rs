@@ -7,12 +7,12 @@ use alloc::{
 };
 use hashbrown::HashMap;
 
-use raw_cpuid::{CpuId, VendorInfo};
+use raw_cpuid::CpuId;
 use shell_macro::command;
 
 
 use crate::{
-    dbg, descriptor_tables, drivers::disk::ata::{self, read_from_disk, write_to_disk, Channel, DiskLoc, Drive}, fs_driver, print, println, serial_print, serial_println, terminal::console::{ScreenChar, DEFAULT_CHAR}
+    dbg, descriptor_tables, drivers::disk::ata::{self, read_from_disk, write_to_disk, Channel, DiskLoc, Drive}, fs_driver, print, println, serial_println, terminal::console::{ScreenChar, DEFAULT_CHAR}
 };
 
 use super::prompt::{input, COMMANDS_HISTORY, COMMANDS_INDEX};

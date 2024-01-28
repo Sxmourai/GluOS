@@ -128,9 +128,9 @@ fn startup_aps() {
     
     let mut apic = crate::interrupts::apic::get_apic();
     apic.write_interrupt_command(init_cmd);
-    crate::pit::udelay(10_000).unwrap();
+    crate::pit::udelay(10_000);
     apic.write_interrupt_command(startup_cmd);
-    crate::pit::udelay(200).unwrap();
+    crate::pit::udelay(200);
     apic.write_interrupt_command(startup_cmd);
     // crate::interrupts::apic::write_interrupt_command(unsafe { &mut lapic }, init_cmd);
     // crate::pit::udelay(10_000).unwrap();

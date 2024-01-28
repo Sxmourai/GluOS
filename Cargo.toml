@@ -22,6 +22,8 @@ pic8259 = "0.10.1" # A PIC implementation, we might not need it when we will hav
 uart_16550 = "0.3.0" # Talks to qemu
 linked_list_allocator = "0.10.5" # A linked list allocator lib & also Heap
 raw-cpuid = "11.0.1" # Gets some cpuid infos
+ntfs = {version="0.4.0", default-features = false} # A filesystem implementation of ntfs
+binrw = {version="0.11.2", default-features = false} # Needed by ntfs
 
 # Simple features
 log = {version="0.4.20", default-features = false} # Logging facility (not that useful)
