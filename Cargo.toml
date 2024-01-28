@@ -12,7 +12,6 @@ bootloader = { version = "0.9.23", features = ["map_physical_memory", ]} #"map_p
 spin = "0.9.8" # We have our allocator, so we can use std::spin
 hashbrown = "0.14.0" # A hashmap/hashset & all implementation
 crossbeam-queue = { version = "0.3.10", default-features = false, features = ["alloc"]}
-conquer-once = "0.4.0"
 futures-util = { version = "0.3.4", default-features = false, features = ["alloc"]}
 lazy_static = { version = "1.4.0", features=["spin_no_std"]} # Helps us with static mut's & all
 

@@ -10,7 +10,6 @@ pub mod port;
 use alloc::string::String;
 use alloc::vec::Vec;
 use bit_field::BitField;
-use conquer_once::spin::OnceCell;
 use hashbrown::HashMap;
 use core::fmt;
 use core::ops::{Deref, DerefMut};

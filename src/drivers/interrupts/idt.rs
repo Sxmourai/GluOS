@@ -3,7 +3,6 @@ use x86_64::structures::idt::InterruptDescriptorTable;
 use crate::drivers::gdt::DOUBLE_FAULT_IST_INDEX;
 use crate::drivers::interrupts::hardware::InterruptIndex;
 
-
 use super::exceptions::*;
 use super::hardware::{keyboard, timer};
 

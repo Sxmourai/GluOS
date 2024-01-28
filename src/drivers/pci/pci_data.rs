@@ -1,12 +1,3 @@
-
-
-
-
-
-
-
-
-
 // pub fn print_all_pci_classes_and_subclasses() {
 //     for class in pci_ids::Classes::iter() {
 //         serial_println!("Class: {} (id: {})", class.name(), class.id());
