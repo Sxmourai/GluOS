@@ -1,3 +1,5 @@
+use crate::dbg;
+
 use super::{Task, TaskId};
 use alloc::task::Wake;
 use alloc::{collections::BTreeMap, sync::Arc};
@@ -34,6 +36,7 @@ impl Executor {
     }
     pub fn run(&mut self) -> ! {
         loop {
+            dbg!(self.task_queue);
             self.run_ready_tasks();
             self.sleep_if_idle();
         }
@@ -50,27 +53,20 @@ impl Executor {
         }
     }
     fn run_ready_tasks(&mut self) {
-        // destructure `self` to avoid borrow checker errors
-        let Self {
-            tasks,
-            task_queue,
-            waker_cache,
-        } = self;
-
-        while let Some(task_id) = task_queue.pop() {
-            let task = match tasks.get_mut(&task_id) {
+        while let Some(task_id) = self.task_queue.pop() {
+            let task = match self.tasks.get_mut(&task_id) {
                 Some(task) => task,
                 None => continue, // task no longer exists
             };
-            let waker = waker_cache
+            let waker = self.waker_cache
                 .entry(task_id)
-                .or_insert_with(|| TaskWaker::get_waker(task_id, task_queue.clone()));
+                .or_insert_with(|| TaskWaker::get_waker(task_id, self.task_queue.clone()));
             let mut context = Context::from_waker(waker);
             match task.poll(&mut context) {
                 Poll::Ready(()) => {
                     // task done -> remove it and its cached waker
-                    tasks.remove(&task_id);
-                    waker_cache.remove(&task_id);
+                    self.tasks.remove(&task_id);
+                    self.waker_cache.remove(&task_id);
                 }
                 Poll::Pending => {}
             }

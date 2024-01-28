@@ -45,6 +45,9 @@ pub fn mdelay(millis: u16) {
 pub fn sdelay(seconds: u16) {
     try_sdelay(seconds).unwrap()
 }
+pub async fn async_sdelay(seconds: u16) {
+    sdelay(seconds)
+}
 
 pub fn wait_for_timeout() -> Result<(), TimerError> {
     loop {
