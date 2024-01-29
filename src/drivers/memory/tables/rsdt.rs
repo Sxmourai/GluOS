@@ -20,16 +20,10 @@ use super::ACPISDTHeader;
 pub fn find_string(bytes: &[u8], search_string: &[u8]) -> Option<usize> {
     let search_len = search_string.len();
 
-    for i in 0..(bytes.len() - search_len + 1) {
-        if &bytes[i..(i + search_len)] == search_string {
-            return Some(i);
-        }
-    }
-
-    None
+    (0..(bytes.len() - search_len + 1)).find(|&i| &bytes[i..(i + search_len)] == search_string)
 }
 
-pub const RSDP_SIGNATURE: &'static [u8; 8] = b"RSD PTR ";
+pub const RSDP_SIGNATURE: &[u8; 8] = b"RSD PTR ";
 
 #[repr(C, packed)]
 pub struct RSDPDescriptor {
@@ -38,6 +32,11 @@ pub struct RSDPDescriptor {
     oemid: [u8; 6],
     revision: u8,
     rsdt_addr: u32,
+    // ! XSDT
+    len:u32,
+    xsdt_addr:u64,
+    ext_chcksum: u8,
+    reserved: [u8; 3],
 }
 
 fn search_rsdp_in_page(page: u64, physical_memory_offset: u64) -> Option<&'static RSDPDescriptor> {
@@ -61,15 +60,9 @@ fn search_rsdp_in_page(page: u64, physical_memory_offset: u64) -> Option<&'stati
 
 //TODO Support ACPI version 2 https://wiki.osdev.org/RSDP
 pub fn search_rsdp(physical_memory_offset: u64) -> &'static RSDPDescriptor {
-    trace!("Searching RSDP in first memory region");
-    for i in (0x80000..0x9ffff).step_by(4096) {
+    trace!("Searching RSDP in first&second memory region");
+    for i in (0x80000..0x9ffff).chain(0xe0000..0xfffff).step_by(4096) {
         if let Some(rsdp) = search_rsdp_in_page(i, physical_memory_offset) {
-            return rsdp;
-        }
-    }
-    trace!("Searching RSDP in second memory region");
-    for j in (0xe0000..0xfffff).step_by(4096) {
-        if let Some(rsdp) = search_rsdp_in_page(j, physical_memory_offset) {
             return rsdp;
         }
     }
@@ -92,7 +85,7 @@ fn get_rsdt(rsdt_addr: u64) -> RSDT {
     let sdts = unsafe { core::slice::from_raw_parts(ptr_addr as *const u8, sdts_size) };
     let mut pointer_to_other_sdt = Vec::new();
     for i in (0..sdts.len()).step_by(4) {
-        let addr = crate::bit_manipulation::ptrlist_to_num(&mut sdts[i..i + 4].into_iter());
+        let addr = crate::bit_manipulation::ptrlist_to_num(&mut sdts[i..i + 4].iter());
         pointer_to_other_sdt.push(addr);
     }
     RSDT {
@@ -101,5 +94,10 @@ fn get_rsdt(rsdt_addr: u64) -> RSDT {
     }
 }
 pub fn search_rsdt(physical_memory_offset: u64) -> RSDT {
-    get_rsdt(search_rsdp(physical_memory_offset).rsdt_addr.into())
+    let rsdp = search_rsdp(physical_memory_offset);
+    if rsdp.xsdt_addr != 0{
+        let xsdt_addr = rsdp.xsdt_addr;
+        log::debug!("Xsdt address is set, we should maybe use it ?!");
+    }
+    get_rsdt(rsdp.rsdt_addr.into())
 }

@@ -17,7 +17,7 @@ use super::handler::MemoryHandler;
 #[global_allocator]
 static ALLOCATOR: Locked<FixedSizeBlockAllocator> = Locked::new(FixedSizeBlockAllocator::new());
 pub const HEAP_START: usize = 0x_4444_4444_0000;
-pub const HEAP_SIZE: usize = 100 * 1024; // 100 KiB
+pub const HEAP_SIZE: usize = 100 * 1024* 5;
 
 pub struct Dummy;
 
@@ -40,11 +40,8 @@ pub fn init_heap(mem_handler: &mut MemoryHandler) -> Result<(), MapToError<Size4
         Page::range_inclusive(heap_start_page, heap_end_page)
     };
     for page in page_range {
-        let frame = mem_handler.frame_allocator
-            .allocate_frame()
-            .ok_or(MapToError::FrameAllocationFailed)?;
         let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
-        unsafe { mem_handler.map_to(page, frame, flags) };
+        unsafe { mem_handler.map(page, flags) }.unwrap();
     }
 
     unsafe {

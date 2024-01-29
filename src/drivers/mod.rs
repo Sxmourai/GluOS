@@ -1,16 +1,21 @@
 use self::memory::handler::MemoryHandler;
 
 pub mod disk;
+#[cfg(feature="fs")]
 pub mod fs;
 pub mod gdt;
 pub mod graphics;
 pub mod interrupts;
 pub mod memory;
+#[cfg(feature="pci")]
 pub mod pci;// pci id's Adds 2MB to kernel size !
 pub mod task;
 pub mod terminal;
 pub mod time;
 pub mod video; 
+pub mod userland;
+pub mod smp;
+pub mod pit;
 
 pub trait Driver: Sync + Send {
     fn new() -> Self
@@ -33,8 +38,8 @@ impl core::fmt::Display for dyn Driver {
 pub enum DriverInitError {
 
 }
-
-pub const DRIVERS: &[(&'static str, fn() -> ())] = &[
+#[allow(clippy::type_complexity)]
+pub const DRIVERS: &[(&str, fn() -> ())] = &[
     ("log", crate::user::log::initialize_logger),
     ("heap & frame allocation", super::memory::handler::init),
     ("gdt", super::gdt::init),
@@ -42,14 +47,17 @@ pub const DRIVERS: &[(&'static str, fn() -> ())] = &[
     ("disks", super::disk::ata::init),
     ("timer", super::time::init),
     ("graphics", super::video::init_graphics),
-    // ("filesystem (indexing disk)", fs::fs_driver::FsDriver::init),
+    #[cfg(feature="fs")]
+    ("filesystem (indexing disk)", fs::init),
     ("descriptor tables", super::memory::tables::DescriptorTablesHandler::init),
-    ("APIC", || unsafe { super::interrupts::apic::init().expect("Failed to init apic"); }),
+    ("APIC", super::interrupts::apic::init),
+    // ("multiprocessing (SMP)", super::smp::init),
+    // ("Userland (Ring 3)", super::userland::go_ring3),
 ];
 
 //TODO Specify a bit more what is a driver... Cuz rn it's just smth that needs to be initialised
 pub fn init_drivers() {
-    'main: for (name, init_fun) in DRIVERS.into_iter() {
+    'main: for (name, init_fun) in DRIVERS.iter() {
         log::info!("Initialising {}... ", name);
         init_fun()
     }

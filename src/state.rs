@@ -3,14 +3,12 @@ use core::cell::Cell;
 use bootloader::BootInfo;
 use spin::{Mutex, RwLock, RwLockWriteGuard};
 
-use crate::{drivers::{
-    fs::fs_driver::FsDriver,
-    memory::handler::MemoryHandler,
-}, memory::tables::DescriptorTablesHandler};
+use crate::{drivers::memory::handler::MemoryHandler, memory::tables::DescriptorTablesHandler};
 
 pub static mut BOOT_INFO: Option<&'static bootloader::BootInfo> = None;
 pub static mut MEM_HANDLER: Option<MemoryHandler> = None;
-pub static mut FS_DRIVER: Option<FsDriver> = None;
+#[cfg(feature="fs")]
+pub static mut FS_DRIVER: Option<crate::fs::FsDriverManager> = None;
 pub static mut DESCRIPTOR_TABLES: Option<DescriptorTablesHandler> = None;
 
 
@@ -18,28 +16,28 @@ pub static mut DESCRIPTOR_TABLES: Option<DescriptorTablesHandler> = None;
 #[macro_export]
 macro_rules! boot_info {
     () => {
-        &mut crate::state::BOOT_INFO.as_mut().unwrap()
+        &mut $crate::state::BOOT_INFO.as_mut().unwrap()
     };
 }
 
 #[macro_export]
 macro_rules! mem_handler {
     () => {
-        &mut crate::state::MEM_HANDLER.as_mut().unwrap()
+        unsafe{$crate::state::MEM_HANDLER.as_mut().unwrap()}
     };
 }
 
 #[macro_export]
 macro_rules! fs_driver {
     () => {
-        crate::state::FS_DRIVER.as_mut().unwrap()
+        unsafe{$crate::state::FS_DRIVER.as_mut().unwrap()}
     };
 }
 
 #[macro_export]
 macro_rules! descriptor_tables {
     () => {
-        crate::state::DESCRIPTOR_TABLES.as_mut().unwrap()
+        unsafe{$crate::state::DESCRIPTOR_TABLES.as_mut().unwrap()}
     };
 }
 

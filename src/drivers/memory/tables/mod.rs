@@ -8,12 +8,12 @@ use self::acpi::AcpiHandler;
 
 use super::{handler::MemoryHandler, read_phys_memory_and_map};
 
-mod rsdt; // pub ?
-mod madt;
-mod hpet;
-mod waet;
-mod acpi;
-mod fadt;
+pub mod rsdt; // pub ?
+pub mod madt;
+pub mod hpet;
+pub mod waet;
+pub mod acpi;
+pub mod fadt;
 
 static ACPI_HEAD_SIZE: usize = core::mem::size_of::<ACPISDTHeader>();
 
@@ -98,7 +98,7 @@ fn read_sdt(
 
 #[repr(C)]
 #[derive(Debug)]
-struct GenericAddressStructure {
+pub struct GenericAddressStructure {
     address_space: u8,
     bit_width: u8,
     bit_offset: u8,

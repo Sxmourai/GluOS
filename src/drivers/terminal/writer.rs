@@ -43,7 +43,7 @@ impl ColorCode {
         ColorCode((background as u8) << 4 | (foreground as u8))
     }
     pub const fn newb(foreground: u8, background: u8) -> ColorCode {
-        ColorCode((background as u8) << 4 | (foreground as u8))
+        ColorCode(background << 4 | foreground)
     }
 }
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Hash)]
@@ -70,14 +70,14 @@ impl Writer {
         {
             self.write_char_at(
                 self.pos.clone(),
-                ScreenChar::new('\0' as u8, ColorCode::new(Color::White, Color::Black)),
+                ScreenChar::new(b'\0', ColorCode::new(Color::White, Color::Black)),
             );
         }
         unsafe {
             PortWrite::write_to_port(0x3D4, 0x0Fu8);
-            PortWrite::write_to_port(0x3D5, pos as u16);
+            PortWrite::write_to_port(0x3D5, pos);
             PortWrite::write_to_port(0x3D4, 0x0Eu8);
-            PortWrite::write_to_port(0x3D5, (pos >> 8) as u16);
+            PortWrite::write_to_port(0x3D5, (pos >> 8));
         }
     }
     pub fn write_char_at(&mut self, pos: ScreenPos, chr: ScreenChar) {
@@ -185,7 +185,7 @@ impl Writer {
         s: impl IntoIterator<Item = ScreenChar>,
     ) -> (u8, u8) {
         for c in s.into_iter() {
-            if (x + 1 >= BUFFER_WIDTH) || (c.ascii_character == '\n' as u8) {
+            if (x + 1 >= BUFFER_WIDTH) || (c.ascii_character == b'\n') {
                 if y + 1 >= BUFFER_HEIGHT {
                     self.move_up()
                 } else {
@@ -193,7 +193,7 @@ impl Writer {
                 }
                 x = 0;
             }
-            if c.ascii_character == '\n' as u8 {
+            if c.ascii_character == b'\n' {
                 continue;
             }
             self.write_char_at(ScreenPos(x, y), c);

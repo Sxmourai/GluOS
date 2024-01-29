@@ -17,6 +17,7 @@ filesystems = {
         "ext4": "mkfs.ext4",
         "ext3": "mkfs.ext3",
         "ext2": "mkfs.ext2",
+        "ntfs": "mkfs.ntfs",
 }
 
 if __name__ == "__main__":
@@ -25,12 +26,9 @@ if __name__ == "__main__":
     parser.add_argument("size",)
     parser.add_argument("-format")
     parser.add_argument('-partition', action='store_true')
-<<<<<<< HEAD
     parser.add_argument('-header_type', default="gpt")
-=======
-    parser.add_argument('--header_type')
->>>>>>> bfb22e7b59b990cf578dcbadfa4ab6d92673f899
     args = parser.parse_args(sys.argv[1:])
+    if not args.filename.endswith(".img"):args.filename+=".img"
     if args.format.lower() in filesystems.keys():
         format = filesystems[args.format.lower()]
     else:
@@ -45,8 +43,27 @@ if __name__ == "__main__":
     else:
         print(f"\n\tCreating label on disk ({args.header_type})")
         cmd(f"parted {args.filename} mklabel {args.header_type} --script")
-        print(f"\n\tFormating disk")
-        cmd(fr"parted {args.filename} mkpart primary {args.format} 0% 100% --script")
+        print(f"\n\tCreating partition")
+        cmd(fr"parted {args.filename} mkpart primary {args.format} 18432B 100% --script")
+        print(f"\n\tMounting partition on loop device")
+        cmd(fr"sudo losetup -o 18432 /dev/loop3 {args.filename}")
+        print(f"\n\tCreating fs on partition")
+        if "ntfs" in format:
+            print("Ouhh NTFS, good luck =)")
+            format += " -F "
+        cmd(fr"sudo {format} /dev/loop3") # Sudo because sometimes it's needed
+        print(f"\n\tMounting partition")
+        cmd(fr"sudo mount /dev/loop3 mounted_disk")
+        print(f"\n\tCreating a test file")
+        cmd(fr"echo hi | sudo tee -a mounted_disk/hello.txt")
+        print(f"\n\tCreating a test dir")
+        cmd(fr"sudo mkdir mounted_disk/hello_dirs")
+        cmd(fr"echo hello | sudo tee -a mounted_disk/hello_dirs/second_hello_wewe.txt")
+        print(f"\n\tUnmounting partition")
+        cmd(fr"sudo umount mounted_disk")
+        print(f"\n\tUnmounting partition from loop device")
+        cmd(fr"sudo losetup -d /dev/loop3")
+        
 
     drives = []
 

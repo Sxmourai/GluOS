@@ -16,7 +16,6 @@ use x86_64::{
 
 pub mod acpi;
 pub mod allocator;
-pub mod apic;
 pub mod frame_allocator;
 pub mod handler;
 pub mod tables;
@@ -77,7 +76,7 @@ unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut
 
 // end_page is using .containing address
 //TODO Map a page when a page fault occurs (in interrupts/exceptions.rs)
-pub unsafe fn read_phys_memory_and_map(
+pub fn read_phys_memory_and_map(
     location: u64,
     size: usize,
     end_page: u64,
@@ -100,7 +99,7 @@ pub unsafe fn read_phys_memory_and_map(
         // Currently mapping: Physical({:X}-{:X})\t-\tVirtual({:X}-{:X})
         // ", phys_frame.start_address().as_u64(), location, end_page, page.start_address().as_u64(),end_page, i,i+4096, end_page+offset, end_page+offset+4096);
         
-        unsafe{mem_handler.map_to(page, phys_frame, flags)};
+        unsafe{mem_handler.map_frame(page, phys_frame, flags)}.unwrap();
         offset += 4096;
     }
     // Reads the content from memory, should be safe

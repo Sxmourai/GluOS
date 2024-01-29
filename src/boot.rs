@@ -1,3 +1,4 @@
+use alloc::string::ToString;
 use log::info;
 use spin::Mutex;
 
@@ -5,31 +6,23 @@ use crate::{
     drivers::{
         self,
         disk::ata::{Channel, DiskLoc, Drive},
-        fs::fs_driver::FsDriver,
         memory::handler::MemoryHandler,
-    },
-    task::{executor::Executor, Task},
-    user::{self, shell::Shell}, memory::tables::DescriptorTablesHandler, state::{self, MEM_HANDLER},
+    }, memory::tables::DescriptorTablesHandler, pit::{sdelay, udelay}, state::{self, MEM_HANDLER}, task::{executor::Executor, Task}, user::{self, shell::Shell}
 };
 
-pub fn boot(boot_info: &'static bootloader::BootInfo) {
+pub fn boot(boot_info: &'static bootloader::BootInfo) -> Executor {
     //TODO Can't use vecs, Strings before heap init (in memoryHandler init), which means we can't do trace... Use a constant-size list ?
     unsafe { state::BOOT_INFO.replace(boot_info) };
     drivers::init_drivers();
-    
+
     let mut executor = Executor::new();
     info!("Initialising shell");
-    executor.spawn(Task::new(Shell::new()));
+    executor.spawn(Task::new(Shell::default().run_with_command("".to_string())));
     // executor.spawn(Task::new());
-    info!("Done booting !");
-    executor.run();
+    executor
 }
 
-pub fn end() -> ! {
-    //TODO Implement async stuff & all in Executor
-    // hlt_loop()
-    let mut executor = Executor::new();
-    // // executor.spawn(Task::new(keyboard::print_keypresses()));
+pub fn end(mut executor: Executor) -> ! {
     executor.run() // Replaces halt loop
 }
 

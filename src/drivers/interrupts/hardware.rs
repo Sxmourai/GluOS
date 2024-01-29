@@ -55,6 +55,7 @@ pub extern "x86-interrupt" fn keyboard(_stack_frame: InterruptStackFrame) {
 }
 
 pub extern "x86-interrupt" fn second_interrupt_controller(_stack_frame: InterruptStackFrame) {
-    // unsafe{log::debug!("{:?} | {:?}", _stack_frame, (inb(0x20),inb(0x21),inb(0xa0),inb(0xa1)))};
+    use crate::x86_64::instructions::port::PortRead;
+    unsafe{log::debug!("{:?} | {:?}", _stack_frame, (u8::read_from_port(0x20),u8::read_from_port(0x21),u8::read_from_port(0xa0),u8::read_from_port(0xa1)))};
     notify_end_of_interrupt(InterruptIndex::SecondInterruptController)
 }

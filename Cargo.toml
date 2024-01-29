@@ -7,39 +7,44 @@ autotests = true
 
 [dependencies]
 x86_64 = "0.14.10" # Usefull asm functions (inb outb, enable interrupts & all)
-pc-keyboard = "0.7.0" # Easy transform from key code to char
-pic8259 = "0.10.1"
 bootloader = { version = "0.9.23", features = ["map_physical_memory", ]} #"map_physical_memory"
-linked_list_allocator = "0.10.5" # A linked list allocator lib & also Heap
+# Some utils data types (std::collections, asyncs, hashmaps...)
 spin = "0.9.8" # We have our allocator, so we can use std::spin
-uart_16550 = "0.3.0" # Talks to qemu
 hashbrown = "0.14.0" # A hashmap/hashset & all implementation
-lazy_static = { version = "1.4.0", features=["spin_no_std"]} # Helps us with static mut's & all
-log = {version="0.4.20", default-features = false} # Logging facility (not that useful)
 crossbeam-queue = { version = "0.3.10", default-features = false, features = ["alloc"]}
 conquer-once = { version = "0.4.0", default-features = false }
 futures-util = { version = "0.3.4", default-features = false, features = ["alloc"]}
-bit_field = "0.10.2"
+lazy_static = { version = "1.4.0", features=["spin_no_std"]} # Helps us with static mut's & all
+
+# Usefull for parsing hardware infos
+pc-keyboard = "0.7.0" # Easy transform from key code to char
+pic8259 = "0.10.1" # A PIC implementation, we might not need it when we will have APIC
+uart_16550 = "0.3.0" # Talks to qemu
+linked_list_allocator = "0.10.5" # A linked list allocator lib & also Heap
+raw-cpuid = "11.0.1" # Gets some cpuid infos
+ntfs = {version="0.4.0", default-features = false} # A filesystem implementation of ntfs
+binrw = {version="0.11.2", default-features = false} # Needed by ntfs
+
+# Simple features
+log = {version="0.4.20", default-features = false} # Logging facility (not that useful)
+bitfield = "0.14.0" # Usefull to read specific flags in u8...
+bytemuck = {version="1.14.1", features = ["derive"]} # Very usefull for converting between types (Vec<u8> -> ExtSuperblock)
 
 # Our libs
-pci-ids = { git = "https://github.com/Sxmourai/auto-pci-ids.rs.git" } # Pci ids to discover what is connected via pci
+pci-ids = { git = "https://github.com/Sxmourai/auto-pci-ids.rs.git", optional = true} # Pci ids to discover what is connected via pci
 shell_macro = { path = "src/user/shell_macro" }
-raw-cpuid = "11.0.1"
 
 [package.metadata.bootimage]
 run-args = [
     "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04", "-serial", "stdio",
     # DISKFLAG for build script (see /build/disk_create.py)
-<<<<<<< HEAD
-"-drive", "file=build/mbr-disk.img,format=raw",
-"-drive", "file=build/gpt-disk.img,format=raw",
-"-drive", "file=build/fat-disk.img,format=raw",
-=======
-"-drive", "file=build/fat-mbr-disk.img,format=raw",
-"-drive", "file=build/fat-gpt-disk.img,format=raw",
-"-drive", "file=build/ext4-mbr-disk.img,format=raw",
->>>>>>> bfb22e7b59b990cf578dcbadfa4ab6d92673f899
+"-drive", "file=build/fatgpt.img,format=raw",
+"-drive", "file=build/ntfsgpt.img,format=raw",
+"-drive", "file=build/ext2gpt.img,format=raw",
     # ENDDISKFLAG
+    # If working on APIC and IPI/SMP: (sets amount of cores to 4)
+    #TODO When APIC feature automatically set -smp 4
+    "-smp","4"
 ]
 test-args = [
     "-display", "none"
@@ -48,12 +53,23 @@ test-success-exit-code = 33
 test-timeout = 300
 
 [features]
-default = []
-print_trace = []
+default = ["fs"]
+pci-ids = ["dep:pci-ids"]
+ata = []
+fs = ["ata"]
 
+[profile.dev.package."*"]
+opt-level = "z"
 
-# [profile.dev]
-# panic = "abort" # disable stack unwinding on panic
+[profile.dev]
+opt-level = 0 # Optimize for size
+strip = true
+# lto = true
+panic = "abort" # disable stack unwinding on panic
 
+# https://github.com/johnthagen/min-sized-rust
 [profile.release]
+opt-level = "z" # Optimize for size
+strip = true
+lto = true
 panic = "abort" # disable stack unwinding on panic

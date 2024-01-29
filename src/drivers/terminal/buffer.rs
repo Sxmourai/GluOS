@@ -29,6 +29,12 @@ pub struct VgaBuffer {
 pub struct ConsoleBuffer {
     inner: Vec<[ScreenChar; SBUFFER_WIDTH]>,
 }
+impl Default for ConsoleBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ConsoleBuffer {
     pub fn new() -> Self {
         Self { inner: Vec::new() }
@@ -45,13 +51,13 @@ impl ConsoleBuffer {
         self.inner = inner;
     }
     pub fn get_youngest_line(&self) -> Option<[ScreenChar; BUFFER_WIDTH as usize]> {
-        self.inner.get(self.inner.len() - 1).copied()
+        self.inner.last().copied()
     }
     pub fn remove_youngest_line(&mut self) -> [ScreenChar; BUFFER_WIDTH as usize] {
         self.inner.remove(self.inner.len() - 1)
     }
     pub fn get_oldest_line(&self) -> Option<[ScreenChar; BUFFER_WIDTH as usize]> {
-        self.inner.get(0).copied()
+        self.inner.first().copied()
     }
 
     pub fn size(&self) -> (u8, u8) {
