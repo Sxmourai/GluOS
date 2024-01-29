@@ -1,25 +1,25 @@
 use self::memory::handler::MemoryHandler;
 
 pub mod disk;
-#[cfg(feature="fs")]
+#[cfg(feature = "fs")]
 pub mod fs;
 pub mod gdt;
 pub mod graphics;
 pub mod interrupts;
 pub mod memory;
-#[cfg(feature="pci-ids")]
-pub mod pci;// pci id's Adds 2MB to kernel size !
+pub mod network;
+#[cfg(feature = "pci-ids")]
+pub mod pci; // pci id's Adds 2MB to kernel size !
+pub mod qemu_in;
+pub mod rand;
+#[cfg(feature = "smp")]
+pub mod smp;
 pub mod task;
 pub mod terminal;
 pub mod time;
-pub mod video; 
 pub mod userland;
-#[cfg(feature="smp")]
-pub mod smp;
-#[cfg(feature="pit")]
-pub mod pit;
-pub mod qemu_in;
-pub mod rand;
+pub mod video;
+pub mod mouse;
 
 pub trait Driver: Sync + Send {
     fn new() -> Self
@@ -39,9 +39,7 @@ impl core::fmt::Display for dyn Driver {
         ))
     }
 }
-pub enum DriverInitError {
-
-}
+pub enum DriverInitError {}
 #[allow(clippy::type_complexity)]
 pub const DRIVERS: &[(&str, fn() -> ())] = &[
     ("log", crate::user::log::initialize_logger),
@@ -52,12 +50,15 @@ pub const DRIVERS: &[(&str, fn() -> ())] = &[
     ("timer", super::time::init),
     ("graphics", super::video::init_graphics),
     ("Pci devices", super::pci::init),
-    #[cfg(feature="fs")]
+    #[cfg(feature = "fs")]
     ("filesystem (indexing disk)", fs::init),
-    ("descriptor tables", super::memory::tables::DescriptorTablesHandler::init),
-    #[cfg(feature="apic")]
+    (
+        "descriptor tables",
+        super::memory::tables::DescriptorTablesHandler::init,
+    ),
+    #[cfg(feature = "apic")]
     ("APIC", super::interrupts::apic::init),
-    #[cfg(feature="smp")]
+    #[cfg(feature = "smp")]
     ("multiprocessing (SMP)", super::smp::init),
     // ("Userland (Ring 3)", super::userland::go_ring3),
     ("Random numbers", super::rand::init),

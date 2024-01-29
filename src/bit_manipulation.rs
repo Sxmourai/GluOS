@@ -5,6 +5,7 @@ use core::{
 };
 
 use alloc::string::String;
+use x86_64::structures::port::{PortRead, PortWrite};
 
 use crate::serial_print;
 
@@ -150,6 +151,16 @@ pub fn as_chars(list: &[u8]) -> String {
         r.push(*byte as char);
     }
     r
+}
+/// # Safety
+/// Ensure that writing to this port doesn't crash anything
+pub fn outb(port: u16, val: u8) {
+    unsafe{PortWrite::write_to_port(port, val)}
+}
+/// # Safety
+/// Ensure that reading to this port doesn't crash anything
+pub fn inb(port: u16) -> u8 {
+    unsafe{PortRead::read_from_port(port)}
 }
 
 // pub fn is_set<T: core::ops::BitAnd<usize>>(value: T,n: usize) -> bool {

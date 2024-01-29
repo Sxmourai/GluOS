@@ -38,7 +38,7 @@ shell_macro = { path = "src/user/shell_macro" }
 run-args = [
     "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04", "-serial", "stdio",
     # DISKFLAG for build script (see /build/disk_create.py)
-"-drive", "file=build/ntfs.img,format=raw",
+"-drive", "file=build/ntfsgpt.img,format=raw",
 "-drive", "file=build/ext2gpt.img,format=raw",
 "-drive", "file=build/fatgpt.img,format=raw",
     # ENDDISKFLAG
