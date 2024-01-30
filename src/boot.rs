@@ -7,7 +7,7 @@ use crate::{
         self,
         disk::ata::{Channel, DiskLoc, Drive},
         memory::handler::MemoryHandler,
-    }, memory::tables::DescriptorTablesHandler, pit::{sdelay, udelay}, state::{self, MEM_HANDLER}, task::{executor::Executor, Task}, user::{self, shell::Shell}
+    }, memory::tables::DescriptorTablesHandler, state::{self, MEM_HANDLER}, task::{executor::Executor, Task}, user::{self, shell::Shell}
 };
 
 pub fn boot(boot_info: &'static bootloader::BootInfo) -> Executor {

@@ -7,12 +7,13 @@ use alloc::{
 };
 use hashbrown::HashMap;
 
+use pci_ids::{SubSystem, Subclass};
 use raw_cpuid::CpuId;
 use shell_macro::command;
 
 
 use crate::{
-    dbg, descriptor_tables, drivers::disk::ata::{self, read_from_disk, write_to_disk, Channel, DiskLoc, Drive}, fs_driver, print, println, serial_println, terminal::console::{ScreenChar, DEFAULT_CHAR}
+    dbg, descriptor_tables, drivers::disk::ata::{self, read_from_disk, write_to_disk, Channel, DiskLoc, Drive}, fs_driver, pci::PciLocation, pci_manager, print, println, serial_println, terminal::console::{ScreenChar, DEFAULT_CHAR}
 };
 
 use super::prompt::{input, COMMANDS_HISTORY, COMMANDS_INDEX};
@@ -294,49 +295,29 @@ fn dump_disk(args: String) -> Result<(), String> {
 //     }
 //     Ok(())
 // }
-
-#[cfg(feature="pci")]
-#[command("lspci", "Lists pci devices connected to computer")]
-fn lspci(args: String) -> Result<(), String> {
-    let mut verbose = 0;
-    if args.contains("-v") {
-        verbose += 1;
+// Comment it if enabled for now because it breaks the proc macro :c
+// #[cfg(feature="pci-ids")]
+#[command("lspci", "Lists pci devices connected to computer (--class to get class infos or put bus location to get more info on specific devices)")]
+fn lspci(rargs: String) -> Result<(), String> {
+    let manager = pci_manager!();
+    if !rargs.is_empty() {
+        let mut args = rargs.split(" ");
+        let bus = args.next().and_then(|s| s.parse().ok()).ok_or("Please specify bus location")?;
+        let slot = args.next().and_then(|s| s.parse().ok()).ok_or("Please specify slot location")?;
+        let func = args.next().and_then(|s| s.parse().ok()).ok_or("Please specify func location")?;
+        let user_loc = PciLocation { bus, slot, func };
+        let device = manager.get(&user_loc).ok_or("No device on this bus !")?;
+        
+        println!("{}",device);
+        println!("{}", device.display_classes());
+        return Ok(())
     }
-    for device in crate::pci::pci_device_iter() {
-        if let Some(d) = pci_ids::Device::from_vid_pid(device.vendor_id, device.device_id) {
-            let mut class = "Not found";
-            let mut subclass = "Not found";
-            for iter_class in pci_ids::Classes::iter() {
-                if iter_class.id() == device.class {
-                    for iter_subclass in iter_class.subclasses() {
-                        if iter_subclass.id() == device.subclass {
-                            //TODO Don't be afraid of nesting
-                            class = iter_class.name();
-                            subclass = iter_subclass.name();
-                        }
-                    }
-                }
-            }
-
-            println!(
-                "{}.{}.{} - {} {:?}",
-                device.location.bus(),
-                device.location.slot(),
-                device.location.function(),
-                d.name(),
-                d.vendor().name(),
-            );
-            if verbose > 1 {
-                println!(
-                    "Class: {} - Subclass: {}\nSubsystems {:?}",
-                    class, subclass, d,
-                );
-            }
-        } else {
-            crate::dbg!(device);
+    for (loc, device) in manager.iter() {
+        println!("{}",device);
+        if rargs.contains("--class") {
+            println!("{}", device.display_classes());
         }
     }
-
     Ok(())
 }
 

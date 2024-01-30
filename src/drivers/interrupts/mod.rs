@@ -1,6 +1,7 @@
 pub mod exceptions;
 pub mod hardware;
 pub mod idt;
+#[cfg(feature="apic")]
 pub mod apic;
 pub mod msr;
 pub mod multiprocessor;

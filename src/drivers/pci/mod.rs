@@ -7,16 +7,19 @@ pub mod pci_data;
 pub mod port;
 
 
+use alloc::string::String;
 use alloc::vec::Vec;
 use bit_field::BitField;
+use conquer_once::spin::OnceCell;
+use hashbrown::HashMap;
 use core::fmt;
 use core::ops::{Deref, DerefMut};
-use pci_ids::{Class, FromId};
-use spin::{Mutex, Once};
+use pci_ids::{Class, Classes, FromId, SubSystem, Subclass};
+use spin::{Mutex, Once, RwLock};
 use x86_64::instructions::port::Port;
 use x86_64::PhysAddr;
 
-use crate::serial_println;
+use crate::{dbg, serial_println};
 
 // The below constants define the PCI configuration space.
 // More info here: <http://wiki.osdev.org/PCI#PCI_Device_Structure>
@@ -48,6 +51,98 @@ pub const PCI_INTERRUPT_LINE: u8 = 0x3C;
 pub const PCI_INTERRUPT_PIN: u8 = 0x3D;
 pub const PCI_MIN_GRANT: u8 = 0x3E;
 pub const PCI_MAX_LATENCY: u8 = 0x3F;
+
+pub type PciManager = HashMap<PciLocation, PciDevice>;
+pub static mut MANAGER: Option<PciManager> = None;
+#[macro_export]
+macro_rules! pci_manager {
+    () => {
+        unsafe{&crate::drivers::pci::MANAGER.as_ref().unwrap()}
+    };
+}
+
+
+pub struct PciDevice {
+    raw: &'static RawPciDevice,
+    identified: &'static pci_ids::Device,
+    class: &'static pci_ids::Class
+}
+impl PciDevice {
+    pub fn location(&self) -> PciLocation {
+        self.raw.location
+    }
+    pub fn subclass(&self) -> u8 {
+        self.raw.subclass
+    }
+    pub fn vendor_id(&self) -> u16 {
+        self.raw.vendor_id
+    }
+    pub fn device_id(&self) -> u16 {
+        self.raw.device_id
+    }
+    pub fn command(&self) -> u16 {
+        self.raw.command
+    }
+    pub fn status(&self) -> u16 {
+        self.raw.status
+    }
+    pub fn vendor(&self) -> &pci_ids::Vendor {
+        self.identified.vendor()
+    }
+    pub fn name(&self) -> &'static str {
+        self.identified.name()
+    }
+    pub fn subsystems(&self) -> impl Iterator<Item = &'static pci_ids::SubSystem> {
+        self.identified.subsystems()
+    }
+    pub fn class(&self) -> &'static pci_ids::Class {
+        self.class
+    }
+    pub fn display_classes(&self) -> String {
+        alloc::format!(
+            "Class: {:?} - Subclass: {:?}\nSubsystems {:?}",
+            self.class(), self.class().subclasses().collect::<Vec<&'static Subclass>>(), self.subsystems().collect::<Vec<&'static SubSystem>>(),
+        )
+    }
+}
+impl core::fmt::Display for PciDevice {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_fmt(format_args!(
+            "{}.{}.{} ({:#x}) - {} {:?}",
+            self.location().bus(),
+            self.location().slot(),
+            self.location().function(),
+            self.device_id(),
+            self.name(),
+            self.vendor().name(),
+        ))
+    }
+}
+
+pub fn init() {
+    //TODO With_capacity
+    let mut devices = HashMap::new();
+    for pci_device in get_pci_buses().iter().flat_map(|b| b.devices.iter()) {
+        if let Some(device) = pci_ids::Device::from_vid_pid(pci_device.vendor_id, pci_device.device_id) {
+            let class = Classes::iter().find(|class| pci_device.class==class.id());
+            if class.is_none() {continue}
+            let class = class.unwrap();
+            devices.insert(pci_device.location, PciDevice {
+                raw: pci_device,
+                identified: device,
+                class
+            });
+        } else {
+            log::error!("Failed parsing device: {:?}", pci_device);
+        }
+    }
+
+    unsafe { MANAGER.replace(
+        devices
+    ) };
+}
+
+
 
 #[repr(u8)]
 pub enum PciCapability {
@@ -89,14 +184,14 @@ pub enum InterruptPin {
 
 /// Returns a list of all PCI buses in this system.
 /// If the PCI bus hasn't been initialized, this initializes the PCI bus & scans it to enumerates devices.
-pub fn get_pci_buses() -> &'static Vec<PciBus> {
+fn get_pci_buses() -> &'static Vec<PciBus> {
     static PCI_BUSES: Once<Vec<PciBus>> = Once::new();
     PCI_BUSES.call_once(scan_pci)
 }
 
-/// Returns a reference to the `PciDevice` with the given bus, slot, func identifier.
+/// Returns a reference to the `RawPciDevice` with the given bus, slot, func identifier.
 /// If the PCI bus hasn't been initialized, this initializes the PCI bus & scans it to enumerates devices.
-pub fn get_pci_device_bsf(bus: u8, slot: u8, func: u8) -> Option<&'static PciDevice> {
+fn get_pci_device_bsf(bus: u8, slot: u8, func: u8) -> Option<&'static RawPciDevice> {
     for b in get_pci_buses() {
         if b.bus_number == bus {
             for d in &b.devices {
@@ -109,19 +204,13 @@ pub fn get_pci_device_bsf(bus: u8, slot: u8, func: u8) -> Option<&'static PciDev
     None
 }
 
-/// Returns an iterator that iterates over all `PciDevice`s, in no particular guaranteed order.
-/// If the PCI bus hasn't been initialized, this initializes the PCI bus & scans it to enumerates devices.
-pub fn pci_device_iter() -> impl Iterator<Item = &'static PciDevice> {
-    get_pci_buses().iter().flat_map(|b| b.devices.iter())
-}
-
 /// A PCI bus, which contains a list of PCI devices on that bus.
 #[derive(Debug)]
 pub struct PciBus {
     /// The number identifier of this PCI bus.
     pub bus_number: u8,
     /// The list of devices attached to this PCI bus.
-    pub devices: Vec<PciDevice>,
+    pub devices: Vec<RawPciDevice>,
 }
 
 /// Scans all PCI Buses (brute force iteration) to enumerate PCI Devices on each bus.
@@ -131,7 +220,7 @@ fn scan_pci() -> Vec<PciBus> {
 
     for bus in 0..MAX_PCI_BUSES {
         let bus = bus as u8;
-        let mut device_list: Vec<PciDevice> = Vec::new();
+        let mut device_list: Vec<RawPciDevice> = Vec::new();
 
         for slot in 0..MAX_SLOTS_PER_BUS {
             let loc_zero = PciLocation { bus, slot, func: 0 };
@@ -157,7 +246,7 @@ fn scan_pci() -> Vec<PciBus> {
                     continue;
                 }
 
-                let device = PciDevice {
+                let device = RawPciDevice {
                     vendor_id,
                     device_id: location.pci_read_16(PCI_DEVICE_ID),
                     command: location.pci_read_16(PCI_COMMAND),
@@ -202,9 +291,9 @@ fn scan_pci() -> Vec<PciBus> {
 /// This offers methods for reading and writing the PCI config space.
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct PciLocation {
-    bus: u8,
-    slot: u8,
-    func: u8,
+    pub bus: u8,
+    pub slot: u8,
+    pub func: u8,
 }
 
 impl PciLocation {
@@ -278,13 +367,13 @@ impl PciLocation {
         }
         let inval = Self::read_data_port();
         serial_println!(
-            "pci_set_command_bus_master_bit: PciDevice: {}, read value: {:#x}",
+            "pci_set_command_bus_master_bit: RawPciDevice: {}, read value: {:#x}",
             self,
             inval
         );
         Self::write_data_port(inval | (1 << 2));
         serial_println!(
-            "pci_set_command_bus_master_bit: PciDevice: {}, read value AFTER WRITE CMD: {:#x}",
+            "pci_set_command_bus_master_bit: RawPciDevice: {}, read value AFTER WRITE CMD: {:#x}",
             self,
             Self::read_data_port()
         );
@@ -299,14 +388,14 @@ impl PciLocation {
         }
         let command = Self::read_data_port();
         serial_println!(
-            "pci_set_interrupt_disable_bit: PciDevice: {}, read value: {:#x}",
+            "pci_set_interrupt_disable_bit: RawPciDevice: {}, read value: {:#x}",
             self,
             command
         );
         const INTERRUPT_DISABLE: u32 = 1 << 10;
         Self::write_data_port(command | INTERRUPT_DISABLE);
         serial_println!(
-            "pci_set_interrupt_disable_bit: PciDevice: {} read value AFTER WRITE CMD: {:#x}",
+            "pci_set_interrupt_disable_bit: RawPciDevice: {} read value AFTER WRITE CMD: {:#x}",
             self,
             Self::read_data_port()
         );
@@ -373,7 +462,7 @@ impl fmt::Debug for PciLocation {
 /// For more, see [this partial table](http://wiki.osdev.org/PCI#Class_Codes)
 /// of `class`, `subclass`, and `prog_if` codes,
 #[derive(Debug)]
-pub struct PciDevice {
+pub struct RawPciDevice {
     /// the bus, slot, and function number that locates this PCI device in the bus tree.
     pub location: PciLocation,
 
@@ -398,7 +487,7 @@ pub struct PciDevice {
     pub int_line: u8,
 }
 
-impl PciDevice {
+impl RawPciDevice {
     /// Returns the base address of the memory region specified by the given `BAR`
     /// (Base Address Register) for this PCI device.
     ///
@@ -606,13 +695,13 @@ impl PciDevice {
     }
 }
 
-impl Deref for PciDevice {
+impl Deref for RawPciDevice {
     type Target = PciLocation;
     fn deref(&self) -> &PciLocation {
         &self.location
     }
 }
-impl DerefMut for PciDevice {
+impl DerefMut for RawPciDevice {
     fn deref_mut(&mut self) -> &mut PciLocation {
         &mut self.location
     }
@@ -703,7 +792,7 @@ pub enum PciConfigSpaceAccessMechanism {
 pub struct Device {
     class: &'static Class,
     device: &'static pci_ids::Device,
-    pub bus_device: PciDevice,
+    pub bus_device: RawPciDevice,
 }
 
 impl Device {
@@ -714,7 +803,7 @@ impl Device {
     //     Self {
     //         class: Class::from_id(class_id).unwrap(),
     //         device: pci_ids::Device::from_vid_pid(vendor_id, product_id).unwrap(),
-    //         bus_device: PciDevice { location: (), class: (), subclass: (), prog_if: (), bars: (), vendor_id: (), device_id: (), command: (), status: (), revision_id: (), cache_line_size: (), latency_timer: (), header_type: (), bist: (), int_pin: (), int_line: () }
+    //         bus_device: RawPciDevice { location: (), class: (), subclass: (), prog_if: (), bars: (), vendor_id: (), device_id: (), command: (), status: (), revision_id: (), cache_line_size: (), latency_timer: (), header_type: (), bist: (), int_pin: (), int_line: () }
     //     }
     // }
     pub fn at_bus(bus: u8) -> Vec<Self> {
@@ -743,7 +832,7 @@ impl Device {
                     continue;
                 }
 
-                let device = PciDevice {
+                let device = RawPciDevice {
                     vendor_id,
                     device_id: location.pci_read_16(PCI_DEVICE_ID),
                     command: location.pci_read_16(PCI_COMMAND),

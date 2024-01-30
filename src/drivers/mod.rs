@@ -7,14 +7,16 @@ pub mod gdt;
 pub mod graphics;
 pub mod interrupts;
 pub mod memory;
-#[cfg(feature="pci")]
+#[cfg(feature="pci-ids")]
 pub mod pci;// pci id's Adds 2MB to kernel size !
 pub mod task;
 pub mod terminal;
 pub mod time;
 pub mod video; 
 pub mod userland;
+#[cfg(feature="smp")]
 pub mod smp;
+#[cfg(feature="pit")]
 pub mod pit;
 
 pub trait Driver: Sync + Send {
@@ -47,11 +49,14 @@ pub const DRIVERS: &[(&str, fn() -> ())] = &[
     ("disks", super::disk::ata::init),
     ("timer", super::time::init),
     ("graphics", super::video::init_graphics),
+    ("Pci devices", super::pci::init),
     #[cfg(feature="fs")]
     ("filesystem (indexing disk)", fs::init),
     ("descriptor tables", super::memory::tables::DescriptorTablesHandler::init),
+    #[cfg(feature="apic")]
     ("APIC", super::interrupts::apic::init),
-    // ("multiprocessing (SMP)", super::smp::init),
+    #[cfg(feature="smp")]
+    ("multiprocessing (SMP)", super::smp::init),
     // ("Userland (Ring 3)", super::userland::go_ring3),
 ];
 
