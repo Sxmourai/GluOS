@@ -32,17 +32,16 @@ fn expect_specific_punct(lex: &mut impl Iterator<Item=TokenTree>, ch: char) -> P
     }
 }
 
-fn expect_specific_ident(lex: &mut impl Iterator<Item=TokenTree>, name: &str) -> Ident {
-    match lex.next() {
-        Some(TokenTree::Ident(ident)) => {
+fn expect_specific_ident<'a>(lex: &'a mut TokenTree, name: &str) -> &'a mut Ident {
+    match lex {
+        TokenTree::Ident(ident) => {
             if ident.to_string() == name {
                 ident
             } else {
                 panic!("Expected indent `{expected}` but got `{actual}`", expected = ident, actual = name)
             }
         },
-        Some(_token) => panic!("Expected ident but got something else"),
-        None => panic!("Expected ident but got nothing"),
+        _token => panic!("Expected ident but got something else"),
     }
 }
 
@@ -62,8 +61,15 @@ pub fn command(args: TokenStream, input: TokenStream) -> TokenStream {
     let description = expect_literal(&mut args_iter).to_string();
 
     let mut input_iter = input.clone().into_iter();
-    let _ = expect_specific_ident(&mut input_iter, "fn");
+    let ident = &mut input_iter.next().unwrap();
+    let _ = expect_specific_ident(ident, "fn");
     let run = expect_ident(&mut input_iter).to_string();
+    // match ident {
+    //     TokenTree::Ident(i) => {
+    //         dbg!(i.to_string());
+    //     },
+    //     _ => todo!(),
+    // }
 
     unsafe {
         COMMANDS.push(Command {name, description, run})

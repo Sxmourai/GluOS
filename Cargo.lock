@@ -248,6 +248,7 @@ name = "kernel"
 version = "0.1.0"
 dependencies = [
  "binrw",
+ "bit_field",
  "bitfield",
  "bootloader",
  "bytemuck",
