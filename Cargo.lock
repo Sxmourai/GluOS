@@ -247,6 +247,7 @@ dependencies = [
  "pc-keyboard",
  "pci-ids",
  "pic8259",
+ "rand",
  "raw-cpuid 11.0.1",
  "shell_macro",
  "spin 0.9.8",

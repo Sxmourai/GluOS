@@ -36,7 +36,6 @@ impl Executor {
     }
     pub fn run(&mut self) -> ! {
         loop {
-            dbg!(self.task_queue);
             self.run_ready_tasks();
             self.sleep_if_idle();
         }

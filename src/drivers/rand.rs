@@ -1,23 +1,23 @@
-use core::ops::Mul;
+use rand::{rngs::SmallRng, RngCore};
+use spin::{Lazy, Mutex};
 
-use raw_cpuid::{cpuid, native_cpuid::cpuid_count, CpuId};
-use spin::{Mutex, Once};
+pub static GENERATOR: Lazy<Mutex<SmallRng>> = Lazy::new(|| {
+    Mutex::new(rand::SeedableRng::seed_from_u64(get_pseudo_rand()))
+});
 
-use crate::dbg;
-
-const SEED: Mutex<u128> = Mutex::new(0);
-static mut RAND_SUPPORTED: bool = false;
+/// Don't do anything for now... We could try initialising the Lazy GENERATOR
+pub fn init() {
+}
 
 pub fn rand() -> u64 {
-    if unsafe{RAND_SUPPORTED} {
-        let rand = 0;
-        // unsafe{core::arch::asm!("rdseed {rand:e}", rand=in(reg) rand)};
-        rand
-    } else {
-        panic!("Tried random generation but it's not supported")
-    }
+    unsafe{GENERATOR.lock().next_u64()}
 }
-/// Checks if random generator is supported
-pub fn init() {
-    unsafe{RAND_SUPPORTED = cpuid_count(0, 7).ebx>>18&0x1==1};
+
+/// Reads stuff in memory to get some random numbers 🤣
+pub fn get_pseudo_rand() -> u64 {
+    let mut r = 0;
+    for i in 0..10 {
+        r += unsafe {*((0xF0+i) as *const u32)} as u64;
+    }
+    r
 }

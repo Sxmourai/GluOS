@@ -155,3 +155,16 @@ pub fn as_chars(list: &[u8]) -> String {
 // pub fn is_set<T: core::ops::BitAnd<usize>>(value: T,n: usize) -> bool {
 //     Into::<<T as core::ops::BitAnd<usize>>::Output>::into(value & n) != 0
 // }
+
+/// # Safety
+/// Breaks memory safety from rust
+pub unsafe fn read_at<T: Clone>(addr: usize) -> T {
+    unsafe {(&*(addr as *const T)).clone()}
+    // todo!()
+}
+
+/// # Safety
+/// Breaks memory safety from rust
+pub unsafe fn write_at<T: Clone>(addr: usize, val: T) {
+    unsafe {*(addr as *mut T) = val}
+}

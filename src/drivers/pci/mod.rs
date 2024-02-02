@@ -62,9 +62,9 @@ macro_rules! pci_manager {
 
 
 pub struct PciDevice {
-    raw: &'static RawPciDevice,
-    identified: &'static pci_ids::Device,
-    class: &'static pci_ids::Class
+    pub raw: &'static RawPciDevice,
+    pub identified: &'static pci_ids::Device,
+    pub class: &'static pci_ids::Class
 }
 impl PciDevice {
     pub fn location(&self) -> PciLocation {

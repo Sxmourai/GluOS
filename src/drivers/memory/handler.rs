@@ -1,7 +1,6 @@
 use bootloader::bootinfo::MemoryMap;
 use x86_64::{
-    structures::paging::{mapper::{MapperFlush, UnmapError}, FrameAllocator, Mapper, OffsetPageTable, Page, PageTableFlags, PhysFrame, Size4KiB},
-    VirtAddr,
+    structures::paging::{mapper::{MapperFlush, UnmapError}, FrameAllocator, Mapper, OffsetPageTable, Page, PageTableFlags, PhysFrame, Size4KiB}, PhysAddr, VirtAddr
 };
 
 use log::trace;
@@ -47,13 +46,14 @@ impl MemoryHandler {
     }
     /// # Safety
     /// Mapping can cause all sorts of panics, set OffsetPageTable
-    pub unsafe fn map(&mut self, page: Page<Size4KiB>, flags: PageTableFlags) -> Result<(), MapFrameError> {
+    pub unsafe fn map(&mut self, page: Page<Size4KiB>, flags: PageTableFlags) -> Result<PhysAddr, MapFrameError> {
         let frame = self.frame_allocator.allocate_frame();
         if frame.is_none() {return Err(MapFrameError::CantAllocateFrame)}
         let frame = frame.unwrap();
         unsafe {
-            self.map_frame(page, frame, flags)
+            self.map_frame(page, frame, flags)?
         }
+        Ok(frame.start_address())
     }
     /// # Safety
     /// Mapping can cause all sorts of panics, set OffsetPageTable
@@ -77,7 +77,7 @@ impl MemoryHandler {
     }
 }
 ///TODO Is it unsafe ?
-pub fn map(page: Page<Size4KiB>, flags: PageTableFlags) {
+pub fn map(page: Page<Size4KiB>, flags: PageTableFlags) -> PhysAddr {
     unsafe{mem_handler!().map(page, flags)}.unwrap()
 }
 pub fn map_frame(page: Page<Size4KiB>, frame: PhysFrame, flags: PageTableFlags) {

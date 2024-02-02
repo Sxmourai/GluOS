@@ -20,6 +20,7 @@ pub mod smp;
 pub mod pit;
 pub mod qemu_in;
 pub mod rand;
+pub mod network;
 
 pub trait Driver: Sync + Send {
     fn new() -> Self
@@ -61,6 +62,7 @@ pub const DRIVERS: &[(&str, fn() -> ())] = &[
     ("multiprocessing (SMP)", super::smp::init),
     // ("Userland (Ring 3)", super::userland::go_ring3),
     ("Random numbers", super::rand::init),
+    // ("Network", super::network::init)
 ];
 
 //TODO Specify a bit more what is a driver... Cuz rn it's just smth that needs to be initialised
