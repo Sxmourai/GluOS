@@ -12,6 +12,7 @@ pub mod pci;// pci id's Adds 2MB to kernel size !
 pub mod task;
 pub mod terminal;
 pub mod time;
+pub mod video;
 pub mod userland;
 #[cfg(feature="smp")]
 pub mod video;
