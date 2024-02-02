@@ -12,11 +12,11 @@ pub fn init() {
                     match drv.start() {
                         Ok(_) => {
                             log::info!("Initialised a ethernet driver !");
-                        },
+                        }
                         Err(e) => match e {
                             E1000NetworkDriverInitError::CantReadMac => {
                                 log::error!("Failed to initialise ethernet driver !");
-                            },
+                            }
                         },
                     }
                 }

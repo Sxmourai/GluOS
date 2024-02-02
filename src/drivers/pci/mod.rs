@@ -8,8 +8,10 @@ pub mod port;
 
 
 use alloc::string::String;
+use alloc::string::String;
 use alloc::vec::Vec;
 use bit_field::BitField;
+use hashbrown::HashMap;
 use hashbrown::HashMap;
 use core::fmt;
 use core::ops::{Deref, DerefMut};
@@ -18,6 +20,7 @@ use spin::{Mutex, Once, RwLock};
 use x86_64::instructions::port::Port;
 use x86_64::PhysAddr;
 
+use crate::{dbg, serial_println};
 use crate::{dbg, serial_println};
 
 // The below constants define the PCI configuration space.

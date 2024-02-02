@@ -1,7 +1,7 @@
 use self::memory::handler::MemoryHandler;
 
 pub mod disk;
-#[cfg(feature="fs")]
+#[cfg(feature = "fs")]
 pub mod fs;
 pub mod gdt;
 pub mod graphics;
@@ -12,12 +12,11 @@ pub mod pci;// pci id's Adds 2MB to kernel size !
 pub mod task;
 pub mod terminal;
 pub mod time;
-pub mod video; 
 pub mod userland;
 #[cfg(feature="smp")]
-pub mod smp;
+pub mod video;
 #[cfg(feature="pit")]
-pub mod pit;
+pub mod mouse;
 pub mod qemu_in;
 pub mod rand;
 pub mod network;
@@ -40,9 +39,7 @@ impl core::fmt::Display for dyn Driver {
         ))
     }
 }
-pub enum DriverInitError {
-
-}
+pub enum DriverInitError {}
 #[allow(clippy::type_complexity)]
 pub const DRIVERS: &[(&str, fn() -> ())] = &[
     ("log", crate::user::log::initialize_logger),
