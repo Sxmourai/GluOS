@@ -1,5 +1,6 @@
 pub mod exceptions;
 pub mod hardware;
+pub mod irq;
 pub mod idt;
 #[cfg(feature="apic")]
 pub mod apic;

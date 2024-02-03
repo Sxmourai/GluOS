@@ -1,4 +1,3 @@
-
 pub fn check_msr() -> bool {
     raw_cpuid::CpuId::new().get_feature_info().unwrap().has_msr()
 }

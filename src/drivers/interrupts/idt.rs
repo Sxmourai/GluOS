@@ -1,10 +1,8 @@
 use x86_64::structures::idt::InterruptDescriptorTable;
 
 use crate::drivers::gdt::DOUBLE_FAULT_IST_INDEX;
-use crate::drivers::interrupts::hardware::InterruptIndex;
 
 use super::exceptions::*;
-use super::hardware::{keyboard, timer};
 
 lazy_static::lazy_static! {
     pub static ref IDT: InterruptDescriptorTable = {
@@ -14,7 +12,8 @@ lazy_static::lazy_static! {
         idt.breakpoint.set_handler_fn(breakpoint_handler);
         idt.device_not_available.set_handler_fn(device_not_available);
         idt.divide_error.set_handler_fn(divide_error);
-        unsafe { // Double fault occurs when an exception occurs while an exception function is being called...
+        unsafe { 
+            // Double fault occurs when an exception occurs while an exception function is being called...
             // If double fault fails, a triple fault is invoked which, on most hardware, cause a system reboot
             idt.double_fault.set_handler_fn(double_fault_handler)
                 .set_stack_index(DOUBLE_FAULT_IST_INDEX);
@@ -39,13 +38,7 @@ lazy_static::lazy_static! {
 
         // HARDWARE INTERRUPTS
         //TODO: SUPPORT ALL HI: https://os.phil-opp.com/hardware-interrupts/
-        idt[InterruptIndex::Timer.as_usize()]
-            .set_handler_fn(timer);
-        idt[InterruptIndex::Keyboard.as_usize()]
-            .set_handler_fn(keyboard);
-        // for i in 34..255 {
-        //     idt[i].set_handler_fn(second_interrupt_controller);
-        // }
+        crate::interrupts::hardware::setup_hardware_interrupts(&mut idt);
         idt
     };
 }
