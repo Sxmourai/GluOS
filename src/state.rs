@@ -26,7 +26,7 @@ macro_rules! mem_handler {
         unsafe{$crate::state::MEM_HANDLER.as_mut().unwrap()}
     };
 }
-
+#[cfg(feature = "fs")]
 #[macro_export]
 macro_rules! fs_driver {
     () => {

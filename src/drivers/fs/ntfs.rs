@@ -3,7 +3,7 @@ use alloc::{format, string::{String, ToString}, vec::Vec};
 use hashbrown::HashMap;
 use ntfs::{Ntfs, NtfsFile, NtfsReadSeek};
 
-use crate::{bit_manipulation::all_zeroes, dbg, disk::ata::read_from_partition, fs::fs_driver::{Dir, SoftEntry}, println, serial_println};
+use crate::{bit_manipulation::all_zeroes, dbg, disk::driver::read_from_partition, fs::fs_driver::{Dir, SoftEntry}, println, serial_println};
 
 use super::{path::FilePath, fs_driver::{Entry, File, FsDriver, FsDriverInitialiser, FsReadError}, partition::Partition};
 

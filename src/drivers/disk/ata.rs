@@ -14,35 +14,30 @@ use spin::{Mutex, MutexGuard};
 use crate::bit_manipulation::{bytes, ptrlist_to_num, u16_to_u8};
 
 
-use crate::dbg;
+use crate::{dbg, disk_manager};
 #[cfg(feature="fs")]
 use crate::fs::path::FilePath;
 #[cfg(feature="fs")]
 use crate::fs::partition::Partition;
 use crate::x86_64::instructions::port::{PortRead, PortWrite};
 
-use super::DiskError;
+use super::driver::{DiskDriver, SECTOR_SIZE};
+use super::{DiskError, DiskLoc};
 
-pub const SECTOR_SIZE: u16 = 512;
-//TODO Is it really needed to store constants like this ?!
-pub const SSECTOR_SIZE: usize = SECTOR_SIZE as usize;
-pub const SECTOR_SIZEWORD: u16 = SECTOR_SIZE / 2;
-pub const SSECTOR_SIZEWORD: usize = SECTOR_SIZEWORD as usize;
-pub type Sectors = Vec<u8>;
-pub type DResult<T> = Result<T, DiskError>;
 
-pub static mut DISK_MANAGER: Mutex<Option<DiskManager>> = Mutex::new(None); // Uninitialised
-                                                                        // Don't call before disk_manager is initialised
-pub fn disk_manager() -> MutexGuard<'static, Option<DiskManager>> {
-    unsafe { DISK_MANAGER.lock() }
-}
-
-pub fn init() {
-    unsafe { DISK_MANAGER = Mutex::new(Some(DiskManager::new())) }
+pub fn init() -> [Option<AtaDisk>; 4] {
+    unsafe { u8::write_to_port(0x3f6, (1 << 1) | (1 << 2)) }
+    unsafe { u8::write_to_port(0x376, (1 << 1) | (1 << 2)) }
+    [
+        detect(&DiskLoc(Channel::Primary, Drive::Master)), 
+        detect(&DiskLoc(Channel::Primary, Drive::Slave)),
+        detect(&DiskLoc(Channel::Secondary, Drive::Master)), 
+        detect(&DiskLoc(Channel::Secondary, Drive::Slave)),
+    ]
 }
 
 //Detects a disk at specified channel and drive
-fn detect(addr: impl DiskAddress) -> Option<Disk> {
+fn detect(addr: &DiskLoc) -> Option<AtaDisk> {
     let drive_addr = addr.drive_select_addr();
     let channel = addr.channel();
     let base = addr.base();
@@ -117,7 +112,7 @@ fn detect(addr: impl DiskAddress) -> Option<Disk> {
         channel,
         ((lba48.max(lba28 as u64) * 512) / 1024)
     );
-    let disk = Disk::new(
+    let disk = AtaDisk::new(
         addr,
         lba28,
         lba48,
@@ -127,7 +122,7 @@ fn detect(addr: impl DiskAddress) -> Option<Disk> {
     Some(disk)
 }
 
-fn read_identify(command_port_addr: u16) -> [u16; SSECTOR_SIZEWORD] {
+fn read_identify(command_port_addr: u16) -> [u16; SECTOR_SIZE as usize/2] {
     trace!("Reading identify data");
     let mut data = [0u16; 256];
     for ele in &mut data {
@@ -160,204 +155,38 @@ fn get_selected_drive_type(channel: Channel) -> DriveType {
         }
     }
 }
-pub fn read_from_disk(
-    addr: &impl DiskAddress,
-    start_sector: u64,
-    sector_count: u16,
-) -> DResult<Sectors> {
-    disk_manager()
-        .as_mut()
-        .unwrap()
-        .read_disk(addr, start_sector, sector_count)
-}
-#[cfg(feature="fs")]
-pub fn read_from_partition(
-    partition: &Partition,
-    start_sector: u64,
-    sector_count: u16,
-) -> DResult<Sectors> {
-    let start_sector = start_sector+partition.1;
-    assert!((start_sector+sector_count as u64)<partition.1+partition.2, "Trying to read outside of partition");
-    read_from_disk(&partition.0, start_sector, sector_count)
-}
-pub fn write_to_disk(addr: impl DiskAddress, start_sector: u64, content: Sectors) -> DResult<()> {
-    disk_manager()
-        .as_ref()
-        .unwrap()
-        .write_disk(addr, start_sector, content)
-}
-#[cfg(feature="fs")]
-pub fn write_to_partition(partition: &Partition, start_sector: u64, content: Sectors) -> DResult<()> {
-    let start_sector = start_sector+partition.1;
-    assert!((start_sector+content.len() as u64)<partition.1+partition.2, "Trying to write outside of partition");
-    disk_manager()
-        .as_ref()
-        .unwrap()
-        .write_disk(partition.0, start_sector, content)
-}
-// Read disk sectors by iterating on it. Usefull when you want to read a lot and can't store everything in memory
-// pub struct ReadDiskIterator {
-//     step: u16,
-//     current_sector: u64,
-//     end_sector: u64,
-//     addr: DiskLoc
-// }
-// impl Iterator for ReadDiskIterator {
-//     type Item = DResult<Sectors>;
-
-//     fn next(&mut self) -> Option<Self::Item> {
-//         if self.current_sector - self.end_sector <= 0 {return None;}
-//         let content = read_from_disk(self.addr, self.current_sector, self.step);
-//         self.current_sector += self.step as u64;
-//         Some(content)
-//     }
-// }
-// pub fn iter_from_disk(addr: impl DiskAddress, start_sector: u64, end_sector:u64, step: u16) -> ReadDiskIterator {
-//     ReadDiskIterator { step,end_sector, current_sector: start_sector, addr: addr.as_diskloc() }
-// }
-
-pub trait DiskAddress: Copy {
-    fn as_index(&self) -> usize;
-    #[cfg(feature="fs")]
-    fn as_path(&self, partition: Partition) -> Option<FilePath>;
-    fn as_diskloc(&self) -> DiskLoc {
-        DiskLoc(self.channel(), self.drive())
-    }
-    fn channel(&self) -> Channel {
-        match self.as_index() {
-            0 => Channel::Primary,
-            1 => Channel::Primary,
-            2 => Channel::Secondary,
-            3 => Channel::Secondary,
-            _ => panic!("Invalid channel address"),
-        }
-    }
-    fn drive(&self) -> Drive {
-        match self.as_index() {
-            0 => Drive::Master,
-            1 => Drive::Slave,
-            2 => Drive::Master,
-            3 => Drive::Slave,
-            _ => panic!("Invalid drive address"),
-        }
-    }
-    fn channel_addr(&self) -> u16 {
-        self.channel() as u16
-    }
-    fn drive_select_addr(&self) -> u8 {
-        match self.drive() {
-            Drive::Master => 0xA0,
-            Drive::Slave => 0xB0,
-        }
-    }
-    fn drive_lba28_addr(&self) -> u8 {
-        match self.drive() {
-            Drive::Master => 0xE0,
-            Drive::Slave => 0xF0,
-        }
-    }
-    fn drive_lba48_addr(&self) -> u8 {
-        match self.drive() {
-            Drive::Master => 0x40,
-            Drive::Slave => 0x50,
-        }
-    }
-    fn base(&self) -> u16 {
-        self.channel_addr()
-    }
-}
-impl From<usize> for DiskLoc {
-    fn from(val: usize) -> Self {
-        match val {
-            0 => {DiskLoc(Channel::Primary,   Drive::Master)},
-            1 => {DiskLoc(Channel::Primary,   Drive::Slave)},
-            2 => {DiskLoc(Channel::Secondary, Drive::Master)},
-            3 => {DiskLoc(Channel::Secondary, Drive::Slave)},
-            _ => {panic!("Disk address is to big !")}
-        }
-    }
-}
 #[derive(Debug)]
-pub struct DiskManager {
-    pub disks: [Option<Disk>; 4],
-    selected_disk: usize, // u8 but usize because used for indexation
+pub struct AtaDriver {
+    selected_disk: u8,
+    disks: [AtaDisk; 4],
 }
-impl Default for DiskManager {
-    fn default() -> Self {
-        Self::new()
+impl DiskDriver for AtaDriver {
+    fn read(&mut self, loc: &DiskLoc, start_sector: u64, sector_count: u64) -> Result<Vec<u8>, DiskError> {
+        todo!()
     }
-}
 
-impl DiskManager {
-    pub fn new() -> Self {
-        unsafe { u8::write_to_port(0x3f6, (1 << 1) | (1 << 2)) }
-        unsafe { u8::write_to_port(0x376, (1 << 1) | (1 << 2)) }
-        Self {
-            disks: [
-                detect(DiskLoc(Channel::Primary, Drive::Master)), 
-                detect(DiskLoc(Channel::Primary, Drive::Slave)),
-                detect(DiskLoc(Channel::Secondary, Drive::Master)), 
-                detect(DiskLoc(Channel::Secondary, Drive::Slave)),
-            ],
-            selected_disk: 0,
-        }
+    fn write(&mut self, loc: &DiskLoc, start_sector: u64, content: &[u8]) -> Result<(), DiskError> {
+        todo!()
     }
-    fn select_disk(&mut self, disk_address: usize) -> Result<&mut Disk, DiskError> {
-        let disk = self.disks[disk_address].as_mut();
-        if disk_address==self.selected_disk {
-            return Ok(disk.unwrap())
-        }
-        if disk_address >= 4 || disk.is_none() {
-            return Err(DiskError::DiskNotFound);
-        }
-        
-        self.selected_disk = disk_address;
 
-        let disk_address = Into::<DiskLoc>::into(disk_address);
-        let base = disk_address.channel_addr();
-        let drive = disk_address.drive_select_addr();
+    fn select_disk(&mut self, loc: &DiskLoc) {
+        if loc.as_index()==self.selected_disk as usize {
+            return
+        }
+        let disk = &self.disks[loc.as_index()];
+        self.selected_disk = loc.as_index().try_into().unwrap();
+        let base = loc.channel_addr();
+        let drive = loc.drive_select_addr();
         unsafe { bsy(base) };
         unsafe { u8::write_to_port(base + 6, drive) }; // Select drive of channel
         for _i in 0..14 {
-            unsafe { u8::read_from_port(disk_address.base()+7) };
+            unsafe { u8::read_from_port(loc.base()+7) };
         }
-        unsafe { bsy(disk_address.base()) };
-        Ok(disk.unwrap())
+        unsafe { bsy(loc.base()) };
     }
-    pub fn read_disk(
-        &mut self,
-        disk_address: &impl DiskAddress,
-        start_sector: u64,
-        sector_count: u16,
-    ) -> Result<Sectors, DiskError> {
-        let selected_disk = self.select_disk(disk_address.as_index())?;
-        let sectors = selected_disk.read_sectors(start_sector, sector_count);
-        if sectors.is_err() {
-            let err = sectors.unwrap_err();
-            if err == DiskError::DRQRead {
-                // Read twice if error cuz sometimes crashes
-                return self.disks[disk_address.as_index()]
-                    .as_ref()
-                    .unwrap()
-                    .read_sectors(start_sector, sector_count);
-            } else {
-                return Err(err);
-            }
-        }
-        sectors
-    }
-    pub fn write_disk(
-        &self,
-        disk_address: impl DiskAddress,
-        start_sector: u64,
-        content: Sectors,
-    ) -> DResult<()> {
-        self.disks[disk_address.as_index()]
-            .as_ref()
-            .unwrap()
-            .write_sectors(start_sector, content)
-    }
+    
 }
+
 
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub enum Channel {
@@ -386,45 +215,16 @@ pub struct AddressingModes {
     lba48: u64,
 }
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct DiskLoc(pub Channel, pub Drive);
-impl DiskAddress for DiskLoc {
-    fn as_index(&self) -> usize {
-        let mut i = 0;
-        if self.0 == Channel::Secondary {
-            i += 2
-        }
-        if self.1 == Drive::Slave {
-            i += 1
-        }
-        i
-    }
-    #[cfg(feature="fs")]
-    fn as_path(&self, partition: Partition) -> Option<FilePath> {
-        Some(FilePath::new("/".to_string(), partition))
-    }
-}
-impl DiskLoc {
-    pub fn from_idx(idx: u8) -> Option<Self> {
-        Some(match idx {
-                0 => Self(Channel::Primary,  Drive::Master),
-                1 => Self(Channel::Primary,  Drive::Slave),
-                2 => Self(Channel::Secondary,Drive::Master),
-                3 => Self(Channel::Secondary,Drive::Slave),
-                _ => return None,
-        })
-    }
-}
 #[derive(Debug)]
-pub struct Disk {
+pub struct AtaDisk {
     pub addressing_modes: AddressingModes,
     pub size: u64,
     pub is_hardisk: bool,
     pub loc: DiskLoc, //TODO UDMA modes and store other infos...
 }
-impl Disk {
+impl AtaDisk {
     pub fn new(
-        addr: impl DiskAddress,
+        addr: &DiskLoc,
         lba28: u32,
         lba48: u64,
         size: u64,
@@ -473,7 +273,7 @@ impl Disk {
     }
 
     //28Bit Lba PIO mode
-    pub fn read28(&self, _lba: u32, sector_count: u8) -> DResult<Sectors> {
+    pub fn read28(&self, _lba: u32, sector_count: u8) -> Result<Vec<u8>, DiskError> {
         log::debug!("Reading 28, will it work ?");
         let drive_addr = self.loc.drive_lba28_addr() as u32;
         let base = self.loc.channel_addr();
@@ -512,7 +312,7 @@ impl Disk {
     // }
     //48Bit Lba PIO mode
     // 0 for sector_count is equals to u16::MAX
-    pub fn read48(&self, lba: u64, sector_count: u16) -> DResult<Sectors> {
+    pub fn read48(&self, lba: u64, sector_count: u16) -> Result<Vec<u8>, DiskError> {
         unsafe {
             u8::write_to_port(self.device_select_reg(), self.loc.drive_lba48_addr()); // Select drive
             u8::write_to_port(self.base(), u8::read_from_port(self.base()) | 0x80);
@@ -532,24 +332,24 @@ impl Disk {
         }
         self.retrieve_read(sector_count)
     }
-    fn retrieve_read(&self, sector_count: u16) -> DResult<Sectors> {
+    fn retrieve_read(&self, sector_count: u16) -> Result<Vec<u8>, DiskError> {
         trace!("Retrieving read !");
-        let mut buffer = alloc::vec![];
+        let mut buffer = Vec::with_capacity(sector_count as usize*512);
         for _sector in 0..sector_count {
             self.poll()?;
-            for _i in 0..SSECTOR_SIZEWORD / 2 {
+            for i in 0..SECTOR_SIZE / 4 { // Divide by 4 because we take 4 by 4 bytes
                 let data = unsafe { u32::read_from_port(self.data_reg()) };
-                buffer.push(data as u8);
-                buffer.push((data >> 8) as u8);
-                buffer.push((data >> 16) as u8);
-                buffer.push((data >> 24) as u8);
+                // Do we make a for loop ?
+                buffer.push(data as u8); // Try push_within_capacity
+                buffer.push((data>>8) as u8);
+                buffer.push((data>>16) as u8);
+                buffer.push((data>>24) as u8);
             }
-
         }
         Ok(buffer)
     }
 
-    pub fn write48(&self, start_sector: u64, content: Sectors) -> DResult<()> {
+    pub fn write48(&self, start_sector: u64, content: &[u8]) -> Result<(), DiskError> {
         let mut sector_count = content.len() / 512;
         if sector_count == 0 {
             sector_count += 1
@@ -598,7 +398,7 @@ impl Disk {
         }
         self.send_write(content)
     }
-    fn send_write(&self, content: Sectors) -> DResult<()> {
+    fn send_write(&self, content: &[u8]) -> Result<(), DiskError> {
         let mut len = content.len() / 512;
         if len == 0 {
             len += 1
@@ -676,7 +476,7 @@ impl Disk {
         Ok(status)
     }
 
-    pub fn read_sectors(&self, sector_address: u64, sector_count: u16) -> DResult<Sectors> {
+    pub fn read_sectors(&self, sector_address: u64, sector_count: u16) -> Result<Vec<u8>, DiskError> {
         //TODO Move from vecs to slices
         if self.addressing_modes.lba48 != 0 {
             if sector_address + (sector_count as u64) > self.addressing_modes.lba48 {
@@ -686,8 +486,8 @@ impl Disk {
             }
             self.read48(sector_address, sector_count)
         } else if self.addressing_modes.lba28 != 0 {
-            let sector_address = sector_address.try_into()?;
-            let sector_count = sector_count.try_into()?;
+            let sector_address = sector_address.try_into().or(Err(DiskError::SectorTooBig))?;
+            let sector_count = sector_count.try_into().or(Err(DiskError::SectorTooBig))?;
             self.read28(sector_address, sector_count)
         } else if self.addressing_modes.chs {
             todo!("Implement CHS pio mode");
@@ -696,7 +496,7 @@ impl Disk {
             Err(DiskError::NoReadModeAvailable)
         }
     }
-    pub fn write_sectors(&self, start_sector: u64, content: Sectors) -> DResult<()> {
+    pub fn write_sectors(&self, start_sector: u64, content: &[u8]) -> Result<(), DiskError> {
         if self.addressing_modes.lba48 != 0 {
             self.write48(start_sector, content)
         } else if self.addressing_modes.lba28 != 0 {
@@ -709,7 +509,7 @@ impl Disk {
         }
     }
 }
-impl Display for Disk {
+impl Display for AtaDisk {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str(&format!("Disk: {}Ko on {:?}", self.size / 1024, self.loc))?;
         Ok(())
@@ -1555,7 +1355,7 @@ unsafe fn check_drq_or_err(base: u16) -> Result<(), DiskError> {
 //       if (stu & ATA_ER_IDNF != 0)   {serial_println!("- ID mark not Found\n     ");      err = 21;}
 //       if (stu & ATA_ER_MC != 0)   {serial_println!("- No Media or Media Error\n     ");   err = 3;}
 //       if (stu & ATA_ER_UNC != 0)   {serial_println!("- Uncorrectable Data Error\n     ");   err = 22;}
-//       if (stu & ATA_ER_BBK != 0)   {serial_println!("- Bad Sectors\n     ");       err = 13;}
+//       if (stu & ATA_ER_BBK != 0)   {serial_println!("- Bad &[u8]\n     ");       err = 13;}
 //    } else  if (err == 3)           {serial_println!("- Reads Nothing\n     "); err = 23;}
 //      else  if (err == 4)  {serial_println!("- Write Protected\n     "); err = 8;}
 //    let drive = drive as usize;

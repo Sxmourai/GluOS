@@ -47,10 +47,10 @@ pub const DRIVERS: &[(&str, fn() -> ())] = &[
     ("heap & frame allocation", super::memory::handler::init),
     ("gdt", super::gdt::init),
     ("interrupts", super::interrupts::init),
-    ("disks", super::disk::ata::init),
+    ("Pci devices", super::pci::init),
+    ("disks", super::disk::init),
     ("timer", super::time::init),
     ("graphics", super::video::init_graphics),
-    ("Pci devices", super::pci::init),
     #[cfg(feature="fs")]
     ("filesystem (indexing disk)", fs::init),
     ("descriptor tables", super::memory::tables::DescriptorTablesHandler::init),

@@ -13,7 +13,7 @@ use shell_macro::command;
 
 
 use crate::{
-    dbg, descriptor_tables, drivers::disk::ata::{self, read_from_disk, write_to_disk, Channel, DiskLoc, Drive}, fs_driver, pci::PciLocation, pci_manager, print, println, serial_println, terminal::console::{ScreenChar, DEFAULT_CHAR}
+    dbg, descriptor_tables, disk::{driver::{read_from_disk, write_to_disk}, DiskLoc}, disk_manager, drivers::disk::ata::{self, Channel, Drive}, pci::PciLocation, pci_manager, print, println, serial_println, terminal::console::{ScreenChar, DEFAULT_CHAR}
 };
 
 use super::prompt::{input, COMMANDS_HISTORY, COMMANDS_INDEX};
@@ -22,25 +22,23 @@ use super::prompt::{input, COMMANDS_HISTORY, COMMANDS_INDEX};
 fn lsdisk(_args: String) -> Result<(), String> {
     #[cfg(feature="fs")]
     let drvs = fs_driver!();
-    for (i, disk) in ata::disk_manager().as_ref().unwrap().disks.iter().enumerate() {
-        if let Some(disk) = disk.as_ref() {
-            println!("- {}", disk);
-            #[cfg(feature="fs")]
-            if let Some(partitions) = drvs.partitions.get(&disk.loc) {
-                // If the partition start is 1 we know it's MBR because on GPT the first 33 sectors are reserved !
-                let start_lba = partitions.first().map(|x| x.1).unwrap_or(0);
-                if start_lba == 1 {
-                    println!("--MBR--");
-                }
-                for part in partitions {
-                    print!("|-> {}Kb ({} - {})",(part.2-part.1)/2, part.1, part.2);
-                    if let Some(drv) = drvs.drivers.get(part) {
-                        print!(" {}", drv.as_enum());
-                    }
-                    println!();
+    #[cfg(feature="fs")]
+    for (loc, (disk, drv)) in disk_manager!().disks.iter() {
+        println!("- {} {:?}", disk, drv);
+        if let Some(partitions) = drvs.partitions.get(loc) {
+            // If the partition start is 1 we know it's MBR because on GPT the first 33 sectors are reserved !
+            let start_lba = partitions.first().map(|x| x.1).unwrap_or(0);
+            if start_lba == 1 {
+                println!("--MBR--");
+            }
+            for part in partitions {
+                print!("|-> {}Kb ({} - {})",(part.2-part.1)/2, part.1, part.2);
+                if let Some(drv) = drvs.drivers.get(part) {
+                    print!(" {}", drv.as_enum());
                 }
                 println!();
             }
+            println!();
         }
     }
     Ok(())
@@ -82,7 +80,7 @@ fn read_sector(raw_args: String) -> Result<(), String> {
         .parse()
         .map_err(|e| format!("Failed to parse end: {}", e))?;
 
-    let sectors = read_from_disk(&DiskLoc(channel, drive), start, end)?;
+    let sectors = read_from_disk(&DiskLoc(channel, drive), start, end).or(Err("The sector migth be too big !".to_string()))?;
     let sectors = if raw_args.contains("num") {
         let mut nums = String::new();
         for n in sectors {
@@ -139,7 +137,7 @@ fn write_sector(raw_args: String) -> Result<(), String> {
             bytes.push(c as u8);
         }
     }
-    write_to_disk(DiskLoc(channel, drive), start, bytes)?;
+    write_to_disk(&DiskLoc(channel, drive), start, &bytes);
     println!("Done");
     Ok(())
 }
@@ -160,16 +158,23 @@ fn parse_path(path: &str) -> Option<crate::fs::path::FilePath> {
 // #[cfg(feature="fs")]
 #[command("read", "Reads a file/dir from disk")]
 fn read(raw_args: String) -> Result<(), String> {
+    #[cfg(feature="fs")]
     use crate::fs::fs_driver::Entry;
-    let mut args = raw_args.split(' ');
+#[cfg(feature="fs")]
+let mut args = raw_args.split(' ');
+#[cfg(feature="fs")]
     let path = parse_path(args.next().unwrap_or("0"));
+    #[cfg(feature="fs")]
     if path.is_none() {
         println!("Invalid path");
         return Ok(())
     }
-    let path = path.unwrap();
-    let fs_driver = fs_driver!();
-    if let Ok(entry) = fs_driver.read(&path) {
+#[cfg(feature="fs")]
+let path = path.unwrap();
+#[cfg(feature="fs")]
+let fs_driver = fs_driver!();
+#[cfg(feature="fs")]
+if let Ok(entry) = fs_driver.read(&path) {
         match entry {
             Entry::File(mut f) => {
                 println!("{}",f.content);

@@ -4,7 +4,7 @@ use alloc::{
     vec::Vec,
 };
 
-use crate::{disk::ata::DiskLoc, fs_driver};
+use crate::{disk::DiskLoc, fs_driver};
 
 use super::{partition::Partition, userland::FatAttributes};
 

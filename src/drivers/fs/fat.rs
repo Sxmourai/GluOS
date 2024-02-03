@@ -1,7 +1,7 @@
 use alloc::{boxed::Box, format, string::{String, ToString}, vec::Vec};
 use hashbrown::HashMap;
 
-use crate::{bit_manipulation::any_as_u8_slice, dbg, disk::{ata::{read_from_partition, write_to_partition}, DiskError}, fs::path::FileSystemError, serial_print, serial_println};
+use crate::{bit_manipulation::any_as_u8_slice, dbg, disk::{driver::{read_from_partition, write_to_partition}, DiskError}, fs::path::FileSystemError, serial_print, serial_println};
 
 use super::{path::FilePath, fs_driver::{Dir, Entry, File, FsDriver, FsDriverEnum, FsDriverInitialiser, FsReadError, SoftEntry}, partition::Partition, userland::FatAttributes};
 
@@ -61,7 +61,7 @@ impl Fat32Driver {
         let mut reading = true;
         while reading {
             for byte in
-                read_from_partition(&self.partition, sector + i, 1).unwrap_or(alloc::vec![0])
+                read_from_partition(&self.partition, sector + i, 1).unwrap().into_iter()
             {
                 if byte == 0 {
                     reading = false;
@@ -71,7 +71,7 @@ impl Fat32Driver {
             }
             i += 1;
         }
-        Some(String::from_utf8_lossy(chars.as_slice()).to_string())
+        Some(String::from_utf8_lossy(&chars).to_string())
     }
     pub fn read_dir(&self, path: &FilePath) -> Option<Vec<Fat32SoftEntry>> {
         let sector = self.get_sector(path)?;
@@ -101,7 +101,7 @@ impl Fat32Driver {
         let mut reading = true;
         let mut next_sector = start_sector;
         while reading {
-            let mut sector = read_from_partition(partition, next_sector, 1).unwrap_or(alloc::vec![0]);
+            let mut sector = read_from_partition(partition, next_sector, 1).unwrap();
             // if *sector.last().unwrap()==0 {
             if let Some(cluster) =
                 Self::read_fat_cluster(partition, next_sector, first_fat_sector, first_data_sector)
@@ -124,7 +124,7 @@ impl Fat32Driver {
                 ))
             }
 
-            res.append(&mut sector);
+            res.extend(sector);
             // next_sector+=1;
         }
         Some(res)

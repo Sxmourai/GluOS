@@ -83,6 +83,28 @@ pub fn map(page: Page<Size4KiB>, flags: PageTableFlags) -> PhysAddr {
 pub fn map_frame(page: Page<Size4KiB>, frame: PhysFrame, flags: PageTableFlags) {
     unsafe{mem_handler!().map_frame(page, frame, flags)}.unwrap()
 }
+#[macro_export]
+macro_rules! mem_map {
+    (frame_addr=$addr: expr, $($arg: tt)*) => {
+        let page = x86_64::structures::paging::Page::containing_address(VirtAddr::new($addr));
+        let frame = x86_64::structures::paging::PhysFrame::containing_address(PhysAddr::new($addr));
+        crate::mem_map!(page, frame=frame, $($arg)*);
+    };
+    ($page: expr, frame=$frame: expr, WRITABLE) => {
+        let flags = x86_64::structures::paging::PageTableFlags::PRESENT | x86_64::structures::paging::PageTableFlags::WRITABLE;
+        crate::mem_map!($page,frame=$frame, flags);
+    };
+    ($page: expr, frame=$frame: expr, $flags: expr) => {
+        if unsafe{crate::mem_handler!().map_frame($page,$frame,$flags)}.is_err() {
+            log::error!("Failed mapping {:?} -> {:?} with flags: {:#b}", $page, $frame, $flags);
+        }
+    };
+    ($page: expr, $flags: expr) => {
+        if unsafe{crate::mem_handler!().map($page,$flags)}.is_err() {
+            log::error!("Failed mapping {:?} with flags: {:#b}", $page, $flags);
+        }
+    };
+}
 #[derive(Debug)]
 pub enum MapFrameError {
     CantAllocateFrame

@@ -60,7 +60,6 @@ macro_rules! pci_manager {
     };
 }
 
-
 pub struct PciDevice {
     pub raw: &'static RawPciDevice,
     pub identified: &'static pci_ids::Device,

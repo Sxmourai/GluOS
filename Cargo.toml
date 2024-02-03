@@ -43,8 +43,9 @@ run-args = [
     # DISKFLAG for build script (see /build/disk_create.py)
 "-drive", "file=build/ntfsgpt.img,format=raw",
 "-drive", "file=build/ext2gpt.img,format=raw",
-"-drive", "file=build/fatgpt.img,format=raw",
     # ENDDISKFLAG
+"-drive", "file=build/fatgpt.img,format=raw,if=none,id=nvm",
+"-device", "nvme,serial=deadbeef,drive=nvm",
     # If working on APIC and IPI/SMP: (sets amount of cores to 4)
     #TODO When APIC feature automatically set -smp 4
     "-smp","4"
@@ -56,7 +57,7 @@ test-success-exit-code = 33
 test-timeout = 300
 
 [features]
-default = ["fs", "pci-ids"]
+default = ["pci-ids"]
 pci-ids = ["dep:pci-ids"]
 ata = []
 fs = ["ata", "dep:ntfs", "dep:binrw"]

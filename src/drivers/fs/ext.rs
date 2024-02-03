@@ -4,7 +4,7 @@ use alloc::{boxed::Box, string::{String, ToString}, vec::Vec};
 use bytemuck::Zeroable;
 use hashbrown::HashMap;
 
-use crate::{dbg, disk::ata::read_from_partition, bit_manipulation::{all_zeroes, any_as_u8_slice}};
+use crate::{bit_manipulation::{all_zeroes, any_as_u8_slice}, dbg, disk::driver::read_from_partition};
 
 use super::{path::FilePath, fs_driver::{Dir, Entry, File, FsDriver, FsDriverEnum, FsDriverInitialiser, FsReadError, SoftEntry}, partition::Partition};
 
@@ -72,7 +72,7 @@ impl ExtDriver {
         Some(inode.clone())
     }
     fn read_inode_block(&self, inode: Inode, entry: &ExtEntryDescriptor) -> Result<ExtEntry, super::fs_driver::FsReadError> {
-        let data_blk = read_from_partition(self.partition(), (inode.direct_blk_ptr_0*self.block_size()) as u64, self.block_size() as u16).or(Err(FsReadError::ReadingDiskError))?;
+        let data_blk = read_from_partition(self.partition(), (inode.direct_blk_ptr_0*self.block_size()).try_into().unwrap(), self.block_size().try_into().unwrap()).or(Err(FsReadError::ReadingDiskError))?;
         if inode.type_n_perms&0x4000==0x4000 { //DIR
             let mut idx = 0; // usize cuz slice indexing
             let mut entries = Vec::new();
@@ -153,7 +153,7 @@ impl FsDriverInitialiser for ExtDriver {
             return None
         }
         let block_size = extsuperblock.super_block.block_size()/256;
-        let raw_bgdt = read_bgdt(partition, block_size/2);
+        let raw_bgdt = read_from_partition(partition, ((block_size)*2).into(), 1).expect("Failed reading Block Group Descriptor");
         let mut bgds = Vec::new();
         for raw_bgd in raw_bgdt.chunks_exact(32) { //TODO Support 64 bit mode for ext4 i.e.
             if raw_bgd.iter().all(|x|*x==0) {break}
@@ -189,14 +189,6 @@ pub struct ExtFile {
     type_indicator: ExtInodeType,
     content: String,
 }
-
-
-//Block size in sectors
-//TODO Make some parsing ?
-fn read_bgdt(partition: &Partition, block_size: u32) -> Vec<u8> {
-    
-    read_from_partition(partition, ((block_size)*2).into(), 1).expect("Failed reading Block Group Descriptor")
-}
 //TODO Not use vec but [Inode; 4]
 /// inode_size should be u16
 fn get_inode_table(partition: &Partition, inode_table_start_sector: u64, inode_size: usize) -> Option<Vec<Inode>> {
@@ -212,7 +204,7 @@ fn get_inode_table(partition: &Partition, inode_table_start_sector: u64, inode_s
 fn read_superblock(partition: &Partition) -> Option<Superblock> {
     let mut rawsuper_block = read_from_partition(partition, 2, 2).expect("Failed reading partition on disk");
     if all_zeroes(&rawsuper_block) {return None}
-    let superblock = Superblock::new(rawsuper_block);
+    let superblock = Superblock::new(rawsuper_block.to_vec());
     Some(superblock)
 }
 

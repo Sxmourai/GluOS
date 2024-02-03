@@ -1,6 +1,6 @@
 use alloc::{boxed::Box, vec::Vec};
 
-use crate::{dbg, disk::ata::{Disk, DiskLoc}, fs_driver};
+use crate::{dbg, disk::{driver::read_from_disk, DiskLoc}, fs_driver};
 
 use super::{fat::Fat32Driver, fs_driver::FsDriver, get_fs_driver};
 
@@ -45,14 +45,14 @@ pub enum HeaderType {
 pub const MBR_SIGNATURE: [u8; 2] = [0x55, 0xAA];
 pub const GPT_SIGNATURE: [u8; 8] = [69, 70, 73, 32, 80, 65, 82, 84];
 
-pub fn read_header_type(disk: &Disk) -> Option<HeaderType> {
+pub fn read_header_type(disk: &DiskLoc) -> Option<HeaderType> {
     // Check GPT
     //TODO Remove all of this nesting
-    if let Ok(sec_sector) = disk.read_sectors(1, 1) {
+    if let Ok(sec_sector) = read_from_disk(disk, 1, 1) {
         if sec_sector[0..GPT_SIGNATURE.len()] == GPT_SIGNATURE {
             let mut partitions = Vec::new();
             for sector in 2..33 {
-                let raw_partitions = disk.read_sectors(sector, 1);
+                let raw_partitions = read_from_disk(disk, sector, 1);
                 if raw_partitions.is_err() {break}
                 let raw_partitions = raw_partitions.unwrap();
                 for part_num in 0..4 { // 128 bytes per partition, and 1 sector = 512 bytes
@@ -61,14 +61,14 @@ pub fn read_header_type(disk: &Disk) -> Option<HeaderType> {
                     if partition.part_type_guid.into_iter().all(|x| x==0) {break}
                     let start_lba = partition.start_lba;
                     let end_lba = partition.end_lba;
-                    partitions.push(Partition(disk.loc, partition.start_lba, partition.end_lba));
+                    partitions.push(Partition(disk.clone(), partition.start_lba, partition.end_lba));
                 }
             }
             return Some(HeaderType::GPT(partitions))
         }
     }
     // Check MBR
-    if let Ok(first_sector) = disk.read_sectors(0, 1) {
+    if let Ok(first_sector) = read_from_disk(disk, 0, 1) {
         if first_sector[first_sector.len()-MBR_SIGNATURE.len()..] == MBR_SIGNATURE {// https://wiki.osdev.org/MBR_(x86)#MBR_Format
             let mut partitions = Vec::new();
             for part_num in 0..4 {
@@ -78,7 +78,7 @@ pub fn read_header_type(disk: &Disk) -> Option<HeaderType> {
                 }
                 let lba_start = mbr_part.lba_start;
                 let sector_count = mbr_part.sector_count;
-                partitions.push(Partition(disk.loc, mbr_part.lba_start as u64, mbr_part.sector_count as u64));
+                partitions.push(Partition(disk.clone(), mbr_part.lba_start as u64, mbr_part.sector_count as u64));
             }
             return Some(HeaderType::MBR(partitions))
         }

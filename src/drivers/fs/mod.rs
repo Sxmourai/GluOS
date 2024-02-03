@@ -12,7 +12,7 @@ pub mod ntfs;
 use alloc::{boxed::Box, vec::Vec};
 use hashbrown::HashMap;
 
-use crate::{dbg, disk::ata::{DiskLoc, DISK_MANAGER}, fs_driver, state::FS_DRIVER};
+use crate::{dbg, disk::{driver::DISK_MANAGER, DiskLoc}, fs_driver, state::FS_DRIVER};
 
 use self::{path::FilePath, fs_driver::{Entry, FsDriver, FsDriverInitialiser, FsReadError}, partition::{HeaderType, Partition}};
 
@@ -42,17 +42,15 @@ impl FsDriverManager {
     pub fn new() -> Self {
         let mut self_drivers = HashMap::new();
         let mut self_partitions = HashMap::new();
-        for (i,disk) in unsafe{&DISK_MANAGER.lock().as_mut().unwrap().disks}.iter().enumerate() {
-            if let Some(disk) = disk {
-                let header_type = partition::read_header_type(disk);
-                if header_type.is_none() {continue}
-                let header_type = header_type.unwrap();
-                let partitions = match header_type {
-                    HeaderType::GPT(gpt) => gpt,
-                    HeaderType::MBR(mbr) => mbr,
-                };
-                self_partitions.insert(disk.loc, partitions);
-            }
+        for (i,(loc, (disk, drv))) in unsafe{&DISK_MANAGER.lock().as_mut().unwrap().disks}.iter().enumerate() {
+            let header_type = partition::read_header_type(loc);
+            if header_type.is_none() {continue}
+            let header_type = header_type.unwrap();
+            let partitions = match header_type {
+                HeaderType::GPT(gpt) => gpt,
+                HeaderType::MBR(mbr) => mbr,
+            };
+            self_partitions.insert(loc.clone(), partitions);
         }
         for (disk, parts) in &self_partitions {
             for part in parts {

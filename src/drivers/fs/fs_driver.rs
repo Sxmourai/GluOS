@@ -14,7 +14,7 @@ use crate::{
     bit_manipulation::any_as_u8_slice,
     dbg,
     disk::{
-        ata::{read_from_disk, write_to_disk, DiskLoc, DISK_MANAGER, DiskAddress, read_from_partition, write_to_partition},
+        driver::{read_from_disk, write_to_disk, DISK_MANAGER, read_from_partition, write_to_partition},
         DiskError,
     },
     serial_print, serial_println,
