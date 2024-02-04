@@ -6,13 +6,12 @@
 pub mod pci_data;
 pub mod port;
 
-
 use alloc::string::String;
 use alloc::vec::Vec;
 use bit_field::BitField;
-use hashbrown::HashMap;
 use core::fmt;
 use core::ops::{Deref, DerefMut};
+use hashbrown::HashMap;
 use pci_ids::{Class, Classes, FromId, SubSystem, Subclass};
 use spin::{Mutex, Once, RwLock};
 use x86_64::instructions::port::Port;
@@ -56,14 +55,14 @@ pub static mut MANAGER: Option<PciManager> = None;
 #[macro_export]
 macro_rules! pci_manager {
     () => {
-        unsafe{&crate::drivers::pci::MANAGER.as_ref().unwrap()}
+        unsafe { &crate::drivers::pci::MANAGER.as_ref().unwrap() }
     };
 }
 
 pub struct PciDevice {
     pub raw: &'static RawPciDevice,
     pub identified: &'static pci_ids::Device,
-    pub class: &'static pci_ids::Class
+    pub class: &'static pci_ids::Class,
 }
 impl PciDevice {
     pub fn location(&self) -> PciLocation {
@@ -98,7 +97,11 @@ impl PciDevice {
     }
     pub fn display_classes(&self) -> String {
         let mut classes = alloc::format!("Class: {}", self.class().name());
-        if let Some(subclass) = self.class().subclasses().find(|sub| sub.id()==self.raw.subclass) {
+        if let Some(subclass) = self
+            .class()
+            .subclasses()
+            .find(|sub| sub.id() == self.raw.subclass)
+        {
             classes.push_str(alloc::format!(" - Subclass: {}", subclass.name()).as_str());
         }
         classes
@@ -122,26 +125,29 @@ pub fn init() {
     //TODO With_capacity
     let mut devices = HashMap::new();
     for pci_device in get_pci_buses().iter().flat_map(|b| b.devices.iter()) {
-        if let Some(device) = pci_ids::Device::from_vid_pid(pci_device.vendor_id, pci_device.device_id) {
-            let class = Classes::iter().find(|class| pci_device.class==class.id());
-            if class.is_none() {continue}
+        if let Some(device) =
+            pci_ids::Device::from_vid_pid(pci_device.vendor_id, pci_device.device_id)
+        {
+            let class = Classes::iter().find(|class| pci_device.class == class.id());
+            if class.is_none() {
+                continue;
+            }
             let class = class.unwrap();
-            devices.insert(pci_device.location, PciDevice {
-                raw: pci_device,
-                identified: device,
-                class
-            });
+            devices.insert(
+                pci_device.location,
+                PciDevice {
+                    raw: pci_device,
+                    identified: device,
+                    class,
+                },
+            );
         } else {
             log::error!("Failed parsing device: {:?}", pci_device);
         }
     }
 
-    unsafe { MANAGER.replace(
-        devices
-    ) };
+    unsafe { MANAGER.replace(devices) };
 }
-
-
 
 #[repr(u8)]
 pub enum PciCapability {
@@ -507,7 +513,7 @@ impl RawPciDevice {
         } else {
             return Err("BAR index must be between 0 and 5 inclusive");
         };
-        if bar.get_bit(0)==true {
+        if bar.get_bit(0) == true {
             let base = bar.get_bits(2..);
             Ok(PciMemoryBase::IOSpace(base))
         } else {
@@ -520,7 +526,7 @@ impl RawPciDevice {
                     .get(bar_index + 1)
                     .ok_or("next highest BAR index is out of range")?;
                 // Clear the bottom 4 bits because it's a 16-byte aligned address
-                
+
                 (*bar.set_bits(0..4, 0) as usize | ((next_bar as usize) << 32))
                 // .ok_or("determine_mem_base(): [64-bit] BAR physical address was invalid")?
             } else {
@@ -529,7 +535,9 @@ impl RawPciDevice {
                 // Also, clear the bottom 4 bits because it's a 16-byte aligned address.
                 (*bar.set_bits(0..4, 0) as usize)
                 // .ok_or("determine_mem_base(): [32-bit] BAR physical address was invalid")?
-            }.try_into().unwrap();
+            }
+            .try_into()
+            .unwrap();
             Ok(PciMemoryBase::MemorySpace(PhysAddr::new(base)))
         }
     }

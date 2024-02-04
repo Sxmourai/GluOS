@@ -3,7 +3,11 @@ use core::{
     ptr::{self},
 };
 
-use x86_64::{instructions::interrupts, structures::paging::{Page, PageTableFlags, PhysFrame}, PhysAddr, VirtAddr};
+use x86_64::{
+    instructions::interrupts,
+    structures::paging::{Page, PageTableFlags, PhysFrame},
+    PhysAddr, VirtAddr,
+};
 
 use bitfield::bitfield;
 
@@ -21,7 +25,13 @@ impl Apic {
     fn init(&mut self) {
         let addr = core::ptr::addr_of!(self.local_apic_ptr) as u64;
         // log::debug!("{:x}", addr);
-        unsafe { mem_handler!().map_frame(Page::containing_address(VirtAddr::new(addr)), PhysFrame::containing_address(PhysAddr::new(addr)), PageTableFlags::PRESENT | PageTableFlags::WRITABLE) };
+        unsafe {
+            mem_handler!().map_frame(
+                Page::containing_address(VirtAddr::new(addr)),
+                PhysFrame::containing_address(PhysAddr::new(addr)),
+                PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
+            )
+        };
         self.write(Offset::TaskPriority, 0); // set task priority to 0 (accept all interrupts)
                                              // self.write(Offset::SpuriousInterruptVector, 0xFF); // set spurious interrupt vector to 0xFF
                                              // self.write(Offset::SpuriousInterruptVector, 0x100); // enable apic
@@ -63,7 +73,6 @@ impl Apic {
             .wrapping_add(offset as usize)
             .cast::<T>()
     }
-
 }
 
 pub mod ipi {
@@ -164,9 +173,7 @@ pub fn try_get_apic() -> Option<Apic> {
 // needs to be called be called once (only bsp) prior to first initialization (requires heap)
 pub fn create() {
     interrupts::without_interrupts(|| {
-        LOCAL_APIC_PTR.call_once(|| {
-            descriptor_tables!().madt.inner.local_apic_addr as u64
-        });
+        LOCAL_APIC_PTR.call_once(|| descriptor_tables!().madt.inner.local_apic_addr as u64);
     });
 }
 

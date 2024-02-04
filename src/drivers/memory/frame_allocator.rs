@@ -7,7 +7,6 @@ use x86_64::{
 
 use crate::mem_handler;
 
-
 /// A FrameAllocator that returns usable frames from the bootloader's memory map.
 #[derive(Debug, Clone)]
 pub struct BootInfoFrameAllocator {

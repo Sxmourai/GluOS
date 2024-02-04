@@ -2,9 +2,6 @@
 //TODO: Make a "simple" function to map ANY frame to a new page. Need this to access rsdp pointer
 // https://os.phil-opp.com/paging-implementation/#using-offsetpagetable
 
-
-
-
 use x86_64::structures::paging::PageTableFlags as Flags;
 use x86_64::structures::paging::PageTableFlags;
 use x86_64::{
@@ -60,11 +57,7 @@ unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut
 
 // end_page is using .containing address
 //TODO Map a page when a page fault occurs (in interrupts/exceptions.rs)
-pub fn read_phys_memory_and_map(
-    location: u64,
-    size: usize,
-    end_page: u64,
-) -> &'static [u8] {
+pub fn read_phys_memory_and_map(location: u64, size: usize, end_page: u64) -> &'static [u8] {
     let flags: PageTableFlags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE; // TODO Change this to a constant
 
     let _size_64 = size as u64;
@@ -72,7 +65,7 @@ pub fn read_phys_memory_and_map(
         .start_address()
         .as_u64();
     let mut offset = 0;
-    let mut mem_handler = unsafe{mem_handler!()};
+    let mut mem_handler = unsafe { mem_handler!() };
     for i in (start_frame_addr..start_frame_addr + size as u64).step_by(4096) {
         // Map all frames that might be used
         let page: Page<Size4KiB> = Page::containing_address(VirtAddr::new(end_page + offset));
@@ -82,8 +75,8 @@ pub fn read_phys_memory_and_map(
         // Computed location {:X}\t-\tFrame to page: {:X} (Provided (unaligned): {:X})
         // Currently mapping: Physical({:X}-{:X})\t-\tVirtual({:X}-{:X})
         // ", phys_frame.start_address().as_u64(), location, end_page, page.start_address().as_u64(),end_page, i,i+4096, end_page+offset, end_page+offset+4096);
-        
-        unsafe{mem_handler.map_frame(page, phys_frame, flags)}.unwrap();
+
+        unsafe { mem_handler.map_frame(page, phys_frame, flags) }.unwrap();
         offset += 4096;
     }
     // Reads the content from memory, should be safe

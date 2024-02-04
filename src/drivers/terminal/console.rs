@@ -2,12 +2,10 @@ use core::ptr::{read_volatile, write_volatile};
 
 use alloc::vec::Vec;
 
-
 use super::{
     buffer::{ConsoleBuffer, VgaBuffer},
     writer::{print_screenchars_atp, Color, ColorCode, ScreenPos},
 };
-
 
 pub const DEFAULT_CHAR: ScreenChar = ScreenChar::new(b'\0', ColorCode(15)); // Black on black
 

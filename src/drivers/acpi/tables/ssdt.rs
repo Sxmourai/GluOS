@@ -1,4 +1,2 @@
 #[repr(C, packed)]
-pub struct SSDT {
-
-}
+pub struct SSDT {}

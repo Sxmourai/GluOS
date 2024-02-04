@@ -1,20 +1,23 @@
 use core::fmt::Debug;
 
 use alloc::{
-    boxed::Box, format, string::{String, ToString}, vec::Vec
+    boxed::Box,
+    format,
+    string::{String, ToString},
+    vec::Vec,
 };
 use hashbrown::HashMap;
 use log::{debug, error};
 use x86_64::registers::rflags::read;
 
-use super::{
-    fat::Fat32Driver, path::*, partition::Partition, userland::FatAttributes
-};
+use super::{fat::Fat32Driver, partition::Partition, path::*, userland::FatAttributes};
 use crate::{
     bit_manipulation::any_as_u8_slice,
     dbg,
     disk::{
-        driver::{read_from_disk, write_to_disk, DISK_MANAGER, read_from_partition, write_to_partition},
+        driver::{
+            read_from_disk, read_from_partition, write_to_disk, write_to_partition, DISK_MANAGER,
+        },
         DiskError,
     },
     serial_print, serial_println,
@@ -22,7 +25,7 @@ use crate::{
 
 pub trait FsDriver: core::fmt::Debug + FsDriverInitialiser {
     fn read(&self, path: &FilePath) -> Result<Entry, FsReadError>;
-    fn read_file(&self,filepath: &FilePath) -> Result<File, FsReadError> {
+    fn read_file(&self, filepath: &FilePath) -> Result<File, FsReadError> {
         match self.read(filepath)? {
             Entry::File(f) => Ok(f),
             Entry::Dir(d) => Err(FsReadError::EntryNotFound),
@@ -43,7 +46,9 @@ pub trait FsDriver: core::fmt::Debug + FsDriverInitialiser {
 
 pub trait FsDriverInitialiser {
     //TODO Return result
-    fn try_init(partition: &Partition) -> Option<Box<Self>> where Self: Sized;
+    fn try_init(partition: &Partition) -> Option<Box<Self>>
+    where
+        Self: Sized;
     // fn index_disk(&mut self) {
     //     self.mut_files().extend(self.walk_dir("/"))
     // }
@@ -69,13 +74,11 @@ pub trait FsDriverInitialiser {
     // fn mut_files(&mut self) -> &mut HashMap<FilePath, SoftEntry>;
 }
 
-
 #[derive(Debug, Clone)]
 pub struct SoftEntry {
     pub path: FilePath,
     pub size: usize,
 }
-
 
 //TODO Hold a driver Fat32(Fat32Driver)
 pub enum FsDriverEnum {
@@ -89,11 +92,11 @@ pub enum FsDriverEnum {
 impl core::fmt::Display for FsDriverEnum {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let repr = match self {
-            Self::Fat32=>"Fat32",
-            Self::Ext=>"Ext",
-            Self::NTFS=>"Ntfs",
-            Self::BTRFS=>"Btrfs",
-            Self::TFS=>"Tfs (redox)",
+            Self::Fat32 => "Fat32",
+            Self::Ext => "Ext",
+            Self::NTFS => "Ntfs",
+            Self::BTRFS => "Btrfs",
+            Self::TFS => "Tfs (redox)",
         };
         f.write_str(repr)
     }
@@ -102,7 +105,7 @@ impl core::fmt::Display for FsDriverEnum {
 pub enum FsReadError {
     EntryNotFound,
     ReadingDiskError, //TODO This error should come from the ATA errors (see issue better error handling)
-    ParsingError
+    ParsingError,
 }
 
 #[derive(Debug, Clone)]

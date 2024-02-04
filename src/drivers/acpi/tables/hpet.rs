@@ -1,6 +1,5 @@
 use super::{ACPISDTHeader, AddressStructure};
 
-
 #[repr(C, packed)]
 pub struct HPET {
     header: ACPISDTHeader,

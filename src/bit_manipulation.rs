@@ -72,7 +72,7 @@ pub fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
 }
 // mut iter: impl Iterator<Item=impl PartialEq<u8>>
 pub fn all_zeroes(mut iter: &[u8]) -> bool {
-    iter.iter().all(|x| *x==0)
+    iter.iter().all(|x| *x == 0)
 }
 
 pub fn list_to_num<T, R>(content: impl Iterator<Item = T> + DoubleEndedIterator) -> R
@@ -153,12 +153,12 @@ pub fn as_chars(list: &[u8]) -> String {
 /// # Safety
 /// Ensure that writing to this port doesn't crash anything
 pub fn outb(port: u16, val: u8) {
-    unsafe{PortWrite::write_to_port(port, val)}
+    unsafe { PortWrite::write_to_port(port, val) }
 }
 /// # Safety
 /// Ensure that reading to this port doesn't crash anything
 pub fn inb(port: u16) -> u8 {
-    unsafe{PortRead::read_from_port(port)}
+    unsafe { PortRead::read_from_port(port) }
 }
 
 // pub fn is_set<T: core::ops::BitAnd<usize>>(value: T,n: usize) -> bool {
@@ -168,12 +168,12 @@ pub fn inb(port: u16) -> u8 {
 /// # Safety
 /// Breaks memory safety from rust
 pub unsafe fn read_at<T: Clone>(addr: usize) -> T {
-    unsafe {(&*(addr as *const T)).clone()}
+    unsafe { (&*(addr as *const T)).clone() }
     // todo!()
 }
 
 /// # Safety
 /// Breaks memory safety from rust
 pub unsafe fn write_at<T: Clone>(addr: usize, val: T) {
-    unsafe {*(addr as *mut T) = val}
+    unsafe { *(addr as *mut T) = val }
 }

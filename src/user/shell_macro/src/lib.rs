@@ -12,7 +12,7 @@ struct Command {
 
 static mut COMMANDS: Vec<Command> = Vec::new();
 
-fn expect_literal(lex: &mut impl Iterator<Item=TokenTree>) -> Literal {
+fn expect_literal(lex: &mut impl Iterator<Item = TokenTree>) -> Literal {
     match lex.next() {
         Some(TokenTree::Literal(literal)) => literal,
         Some(_token) => panic!("Expected literal but got something else"),
@@ -20,13 +20,19 @@ fn expect_literal(lex: &mut impl Iterator<Item=TokenTree>) -> Literal {
     }
 }
 
-fn expect_specific_punct(lex: &mut impl Iterator<Item=TokenTree>, ch: char) -> Punct {
+fn expect_specific_punct(lex: &mut impl Iterator<Item = TokenTree>, ch: char) -> Punct {
     match lex.next() {
-        Some(TokenTree::Punct(punct)) => if punct.as_char() == ch {
-            punct
-        } else {
-            panic!("Expected punct `{expected}`, but got `{actual}`", expected = ch, actual = punct.as_char())
-        },
+        Some(TokenTree::Punct(punct)) => {
+            if punct.as_char() == ch {
+                punct
+            } else {
+                panic!(
+                    "Expected punct `{expected}`, but got `{actual}`",
+                    expected = ch,
+                    actual = punct.as_char()
+                )
+            }
+        }
         Some(_token) => panic!("Expected punct but got something else"),
         None => panic!("Expected punct but got nothing"),
     }
@@ -38,14 +44,18 @@ fn expect_specific_ident<'a>(lex: &'a mut TokenTree, name: &str) -> &'a mut Iden
             if ident.to_string() == name {
                 ident
             } else {
-                panic!("Expected indent `{expected}` but got `{actual}`", expected = ident, actual = name)
+                panic!(
+                    "Expected indent `{expected}` but got `{actual}`",
+                    expected = ident,
+                    actual = name
+                )
             }
-        },
+        }
         _token => panic!("Expected ident but got something else"),
     }
 }
 
-fn expect_ident(lex: &mut impl Iterator<Item=TokenTree>) -> Ident {
+fn expect_ident(lex: &mut impl Iterator<Item = TokenTree>) -> Ident {
     match lex.next() {
         Some(TokenTree::Ident(ident)) => ident,
         Some(_token) => panic!("Expected ident but got something else"),
@@ -72,7 +82,11 @@ pub fn command(args: TokenStream, input: TokenStream) -> TokenStream {
     // }
 
     unsafe {
-        COMMANDS.push(Command {name, description, run})
+        COMMANDS.push(Command {
+            name,
+            description,
+            run,
+        })
     }
     input
 }

@@ -1,6 +1,10 @@
 use bootloader::bootinfo::MemoryMap;
 use x86_64::{
-    structures::paging::{mapper::{MapperFlush, UnmapError}, FrameAllocator, Mapper, OffsetPageTable, Page, PageTableFlags, PhysFrame, Size4KiB}, PhysAddr, VirtAddr
+    structures::paging::{
+        mapper::{MapperFlush, UnmapError},
+        FrameAllocator, Mapper, OffsetPageTable, Page, PageTableFlags, PhysFrame, Size4KiB,
+    },
+    PhysAddr, VirtAddr,
 };
 
 use log::trace;
@@ -9,10 +13,9 @@ use crate::{boot_info, mem_handler};
 
 use super::{active_level_4_table, frame_allocator::BootInfoFrameAllocator};
 
-
 pub fn init() {
-    let off = unsafe{boot_info!()}.physical_memory_offset;
-    let mem_handler = MemoryHandler::new(off, &unsafe{boot_info!()}.memory_map);
+    let off = unsafe { boot_info!() }.physical_memory_offset;
+    let mem_handler = MemoryHandler::new(off, &unsafe { boot_info!() }.memory_map);
     unsafe { crate::state::MEM_HANDLER.replace(mem_handler) };
 }
 
@@ -23,18 +26,13 @@ pub struct MemoryHandler {
 }
 impl MemoryHandler {
     /// Inits heap & frame allocator
-    pub fn new(
-        physical_memory_offset: u64,
-        memory_map: &'static MemoryMap,
-    ) -> Self {
+    pub fn new(physical_memory_offset: u64, memory_map: &'static MemoryMap) -> Self {
         let physical_memory_offset = VirtAddr::new(physical_memory_offset);
         // trace!("Getting active level 4 table");
         let level_4_table = unsafe { active_level_4_table(physical_memory_offset) };
 
         let mapper = unsafe { OffsetPageTable::new(level_4_table, physical_memory_offset) };
-        let frame_allocator = unsafe {
-            BootInfoFrameAllocator::init(memory_map)
-        };
+        let frame_allocator = unsafe { BootInfoFrameAllocator::init(memory_map) };
         let mut _self = Self {
             mapper,
             frame_allocator,
@@ -46,31 +44,40 @@ impl MemoryHandler {
     }
     /// # Safety
     /// Mapping can cause all sorts of panics, set OffsetPageTable
-    pub unsafe fn map(&mut self, page: Page<Size4KiB>, flags: PageTableFlags) -> Result<PhysAddr, MapFrameError> {
+    pub unsafe fn map(
+        &mut self,
+        page: Page<Size4KiB>,
+        flags: PageTableFlags,
+    ) -> Result<PhysAddr, MapFrameError> {
         let frame = self.frame_allocator.allocate_frame();
-        if frame.is_none() {return Err(MapFrameError::CantAllocateFrame)}
-        let frame = frame.unwrap();
-        unsafe {
-            self.map_frame(page, frame, flags)?
+        if frame.is_none() {
+            return Err(MapFrameError::CantAllocateFrame);
         }
+        let frame = frame.unwrap();
+        unsafe { self.map_frame(page, frame, flags)? }
         Ok(frame.start_address())
     }
     /// # Safety
     /// Mapping can cause all sorts of panics, set OffsetPageTable
-    pub unsafe fn unmap(&mut self, page: Page<Size4KiB>) -> Result<(PhysFrame, MapperFlush<Size4KiB>), UnmapError> {
-        unsafe {
-            self.mapper.unmap(page)
-        }
+    pub unsafe fn unmap(
+        &mut self,
+        page: Page<Size4KiB>,
+    ) -> Result<(PhysFrame, MapperFlush<Size4KiB>), UnmapError> {
+        unsafe { self.mapper.unmap(page) }
     }
-    
+
     /// # Safety
     /// Mapping can cause all sorts of panics, set OffsetPageTable
-    pub unsafe fn map_frame(&mut self, page: Page<Size4KiB>,frame: PhysFrame, flags: PageTableFlags) -> Result<(), MapFrameError> {
+    pub unsafe fn map_frame(
+        &mut self,
+        page: Page<Size4KiB>,
+        frame: PhysFrame,
+        flags: PageTableFlags,
+    ) -> Result<(), MapFrameError> {
         unsafe {
             self.mapper
                 .map_to(page, frame, flags, &mut self.frame_allocator)
-                .map_err(|err| MapFrameError::CantAllocateFrame)
-                ?
+                .map_err(|err| MapFrameError::CantAllocateFrame)?
                 .flush()
         }
         Ok(())
@@ -78,10 +85,10 @@ impl MemoryHandler {
 }
 ///TODO Is it unsafe ?
 pub fn map(page: Page<Size4KiB>, flags: PageTableFlags) -> PhysAddr {
-    unsafe{mem_handler!().map(page, flags)}.unwrap()
+    unsafe { mem_handler!().map(page, flags) }.unwrap()
 }
 pub fn map_frame(page: Page<Size4KiB>, frame: PhysFrame, flags: PageTableFlags) {
-    unsafe{mem_handler!().map_frame(page, frame, flags)}.unwrap()
+    unsafe { mem_handler!().map_frame(page, frame, flags) }.unwrap()
 }
 #[macro_export]
 macro_rules! mem_map {
@@ -107,5 +114,5 @@ macro_rules! mem_map {
 }
 #[derive(Debug)]
 pub enum MapFrameError {
-    CantAllocateFrame
+    CantAllocateFrame,
 }

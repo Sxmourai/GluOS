@@ -1,6 +1,10 @@
 use alloc::{boxed::Box, vec::Vec};
 
-use crate::{dbg, disk::{driver::read_from_disk, DiskLoc}, fs_driver};
+use crate::{
+    dbg,
+    disk::{driver::read_from_disk, DiskLoc},
+    fs_driver,
+};
 
 use super::{fat::Fat32Driver, fs_driver::FsDriver, get_fs_driver};
 
@@ -8,11 +12,11 @@ use super::{fat::Fat32Driver, fs_driver::FsDriver, get_fs_driver};
 #[derive(Debug)]
 pub struct MBRPartition {
     pub drive_attribute: u8, // Drive attributes (bit 7 set = active or bootable)
-    pub chs_addr: [u8; 3], // CHS Address of partition start
+    pub chs_addr: [u8; 3],   // CHS Address of partition start
     pub partition_type: u8,
     pub chs_end_addr: [u8; 3], // CHS address of last partition sector
-    pub lba_start: u32, // LBA of partition start
-    pub sector_count: u32, // Number of sectors in partition
+    pub lba_start: u32,        // LBA of partition start
+    pub sector_count: u32,     // Number of sectors in partition
 }
 #[repr(C, packed)]
 #[derive(Debug)]
@@ -29,7 +33,7 @@ pub struct GPTPartition {
 pub struct Partition(pub DiskLoc, pub u64, pub u64);
 impl Partition {
     pub fn from_idx(loc: &DiskLoc, part_id: u8) -> Option<&Self> {
-        unsafe{fs_driver!().get_partition_from_id(loc, part_id)}
+        unsafe { fs_driver!().get_partition_from_id(loc, part_id) }
     }
 }
 
@@ -40,7 +44,6 @@ pub enum HeaderType {
     GPT(Vec<Partition>),
     MBR(Vec<Partition>),
 }
-
 
 pub const MBR_SIGNATURE: [u8; 2] = [0x55, 0xAA];
 pub const GPT_SIGNATURE: [u8; 8] = [69, 70, 73, 32, 80, 65, 82, 84];
@@ -53,34 +56,55 @@ pub fn read_header_type(disk: &DiskLoc) -> Option<HeaderType> {
             let mut partitions = Vec::new();
             for sector in 2..33 {
                 let raw_partitions = read_from_disk(disk, sector, 1);
-                if raw_partitions.is_err() {break}
+                if raw_partitions.is_err() {
+                    break;
+                }
                 let raw_partitions = raw_partitions.unwrap();
-                for part_num in 0..4 { // 128 bytes per partition, and 1 sector = 512 bytes
-                    let partition = unsafe{ &*(raw_partitions[128*part_num..].as_ptr() as *const GPTPartition) };
+                for part_num in 0..4 {
+                    // 128 bytes per partition, and 1 sector = 512 bytes
+                    let partition = unsafe {
+                        &*(raw_partitions[128 * part_num..].as_ptr() as *const GPTPartition)
+                    };
                     // Check if only zeroes, if so done reading ?
-                    if partition.part_type_guid.into_iter().all(|x| x==0) {break}
+                    if partition.part_type_guid.into_iter().all(|x| x == 0) {
+                        break;
+                    }
                     let start_lba = partition.start_lba;
                     let end_lba = partition.end_lba;
-                    partitions.push(Partition(disk.clone(), partition.start_lba, partition.end_lba));
+                    partitions.push(Partition(
+                        disk.clone(),
+                        partition.start_lba,
+                        partition.end_lba,
+                    ));
                 }
             }
-            return Some(HeaderType::GPT(partitions))
+            return Some(HeaderType::GPT(partitions));
         }
     }
     // Check MBR
     if let Ok(first_sector) = read_from_disk(disk, 0, 1) {
-        if first_sector[first_sector.len()-MBR_SIGNATURE.len()..] == MBR_SIGNATURE {// https://wiki.osdev.org/MBR_(x86)#MBR_Format
+        if first_sector[first_sector.len() - MBR_SIGNATURE.len()..] == MBR_SIGNATURE {
+            // https://wiki.osdev.org/MBR_(x86)#MBR_Format
             let mut partitions = Vec::new();
             for part_num in 0..4 {
-                let mbr_part = unsafe{ &*(first_sector[446+(16*part_num)..].as_ptr() as *const MBRPartition) };
-                if first_sector[446+(16*part_num)..446+(16*part_num)+16].iter().all(|x| *x==0) {
-                    continue
+                let mbr_part = unsafe {
+                    &*(first_sector[446 + (16 * part_num)..].as_ptr() as *const MBRPartition)
+                };
+                if first_sector[446 + (16 * part_num)..446 + (16 * part_num) + 16]
+                    .iter()
+                    .all(|x| *x == 0)
+                {
+                    continue;
                 }
                 let lba_start = mbr_part.lba_start;
                 let sector_count = mbr_part.sector_count;
-                partitions.push(Partition(disk.clone(), mbr_part.lba_start as u64, mbr_part.sector_count as u64));
+                partitions.push(Partition(
+                    disk.clone(),
+                    mbr_part.lba_start as u64,
+                    mbr_part.sector_count as u64,
+                ));
             }
-            return Some(HeaderType::MBR(partitions))
+            return Some(HeaderType::MBR(partitions));
         }
     }
     // No MBR / GPT On disk (raw contents then or maybe not even a disk ?!)

@@ -10,9 +10,7 @@
 #![cfg_attr(debug_assertions, allow(unused))]
 #![allow(dead_code)]
 #![deny(unsafe_op_in_unsafe_fn)]
-
 #![allow(clippy::borrow_interior_mutable_const)]
-
 
 pub mod bit_manipulation;
 pub mod boot;
@@ -21,16 +19,13 @@ pub mod state;
 pub mod test;
 pub mod user;
 
-
 pub use drivers::*;
-
 
 #[cfg(test)]
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
     test::panic_handler(info)
 }
-
 
 //TODO: Remove the need for these
 extern crate alloc; // Lib which stores some useful structs on the heap / smart pointers from stdlib like Vec, String, Box...

@@ -1,6 +1,6 @@
 pub mod ata;
-pub mod nvme;
 pub mod driver;
+pub mod nvme;
 
 pub fn init() {
     let mut disks = hashbrown::HashMap::new();
@@ -32,7 +32,6 @@ pub fn init() {
     // })};
 }
 
-
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub enum DiskError {
     NotFound,
@@ -44,7 +43,7 @@ pub enum DiskError {
     TimeOut,
     DRQRead, //TODO Handle all errors from the register
 }
-use crate::disk::ata::{Channel,Drive};
+use crate::disk::ata::{Channel, Drive};
 
 use self::driver::{DiskManager, DISK_MANAGER};
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -60,8 +59,11 @@ impl DiskLoc {
         }
         i
     }
-    #[cfg(feature="fs")]
-    fn as_path(&self, partition: crate::fs::partition::Partition) -> Option<crate::fs::path::FilePath> {
+    #[cfg(feature = "fs")]
+    fn as_path(
+        &self,
+        partition: crate::fs::partition::Partition,
+    ) -> Option<crate::fs::path::FilePath> {
         use alloc::string::ToString;
 
         Some(crate::fs::path::FilePath::new("/".to_string(), partition))
@@ -114,11 +116,11 @@ impl DiskLoc {
 
     pub fn from_idx(idx: u8) -> Option<Self> {
         Some(match idx {
-                0 => Self(Channel::Primary,  Drive::Master),
-                1 => Self(Channel::Primary,  Drive::Slave),
-                2 => Self(Channel::Secondary,Drive::Master),
-                3 => Self(Channel::Secondary,Drive::Slave),
-                _ => return None,
+            0 => Self(Channel::Primary, Drive::Master),
+            1 => Self(Channel::Primary, Drive::Slave),
+            2 => Self(Channel::Secondary, Drive::Master),
+            3 => Self(Channel::Secondary, Drive::Slave),
+            _ => return None,
         })
     }
 }

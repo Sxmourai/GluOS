@@ -15,9 +15,9 @@ pub fn try_udelay(micros: u16) -> Result<(), TimerError> {
     wait_for_timeout()
 }
 pub fn try_mdelay(millis: u16) -> Result<(), TimerError> {
-    let micros = millis as u64*1_000;
-    let times = micros/MAX_COUNTER_VALUE_INPUT as u64;
-    let rest = (micros%MAX_COUNTER_VALUE_INPUT as u64) as u16;
+    let micros = millis as u64 * 1_000;
+    let times = micros / MAX_COUNTER_VALUE_INPUT as u64;
+    let rest = (micros % MAX_COUNTER_VALUE_INPUT as u64) as u16;
     dbg!(times, rest);
     for i in 0..times {
         try_udelay(MAX_COUNTER_VALUE_INPUT)?
@@ -26,9 +26,9 @@ pub fn try_mdelay(millis: u16) -> Result<(), TimerError> {
     Ok(())
 }
 pub fn try_sdelay(seconds: u16) -> Result<(), TimerError> {
-    let micros = seconds as u64*1_000_000;
-    let times = micros/MAX_COUNTER_VALUE_INPUT as u64;
-    let rest = (micros%MAX_COUNTER_VALUE_INPUT as u64) as u16;
+    let micros = seconds as u64 * 1_000_000;
+    let times = micros / MAX_COUNTER_VALUE_INPUT as u64;
+    let rest = (micros % MAX_COUNTER_VALUE_INPUT as u64) as u16;
     for i in 0..times {
         try_udelay(MAX_COUNTER_VALUE_INPUT)?
     }
@@ -60,9 +60,10 @@ pub fn wait_for_timeout() -> Result<(), TimerError> {
     }
 }
 pub const MAX_COUNTER_VALUE: u16 = 0xffff;
-pub const MAX_COUNTER_VALUE_INPUT: u16 = ((MAX_COUNTER_VALUE as u64*1_000_000u64)/BASE_FREQUENCY) as u16; //We could use .div_floor to be more explicit, but it's unstable ~= 54924.5630591142
+pub const MAX_COUNTER_VALUE_INPUT: u16 =
+    ((MAX_COUNTER_VALUE as u64 * 1_000_000u64) / BASE_FREQUENCY) as u16; //We could use .div_floor to be more explicit, but it's unstable ~= 54924.5630591142
 pub fn set(micros: u16) -> Result<(), TimerError> {
-    let counter = (BASE_FREQUENCY*micros as u64) / 1_000_000;
+    let counter = (BASE_FREQUENCY * micros as u64) / 1_000_000;
     if counter > MAX_COUNTER_VALUE as u64 {
         return Err(TimerError::OutOfRange);
     }

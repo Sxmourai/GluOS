@@ -62,7 +62,11 @@ impl FADT {
     pub fn new(bytes: &'static [u8]) -> &'static Self {
         let _self = unsafe { &*(bytes.as_ptr() as *const Self) };
 
-        if _self.smi_command_port==0 && _self.acpi_disable==0 && _self.acpi_enable==0 && _self.pm1a_control_block&0x1==1 {
+        if _self.smi_command_port == 0
+            && _self.acpi_disable == 0
+            && _self.acpi_enable == 0
+            && _self.pm1a_control_block & 0x1 == 1
+        {
             log::info!("ACPI is already enabled")
         } else if _self.enable_acpi().is_err() {
             log::error!("Error whilst enabling ACPI mode !")
@@ -70,19 +74,25 @@ impl FADT {
         _self
     }
     pub fn get_dsdt(&self) -> &'static super::dsdt::DSDT {
-        unsafe {&*(self.dsdt as *const super::dsdt::DSDT)}
+        unsafe { &*(self.dsdt as *const super::dsdt::DSDT) }
     }
     fn enable_acpi(&self) -> Result<(), AcpiEnablingError> {
-        unsafe { PortWrite::write_to_port(self.smi_command_port.try_into().unwrap(), self.acpi_enable) };
+        unsafe {
+            PortWrite::write_to_port(self.smi_command_port.try_into().unwrap(), self.acpi_enable)
+        };
         //Wait for 3 secs
         crate::time::sdelay(3);
         // Polling port
-        while unsafe { <u16 as PortRead>::read_from_port(self.pm1a_control_block.try_into().unwrap()) }&0x1==0 {}
-        
+        while unsafe {
+            <u16 as PortRead>::read_from_port(self.pm1a_control_block.try_into().unwrap())
+        } & 0x1
+            == 0
+        {}
+
         Ok(())
     }
 }
 
 enum AcpiEnablingError {
-    TimeOut
+    TimeOut,
 }

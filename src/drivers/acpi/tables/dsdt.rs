@@ -1,3 +1,1 @@
-pub struct DSDT {
-    
-}
+pub struct DSDT {}

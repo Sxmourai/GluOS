@@ -1,25 +1,33 @@
 pub mod entry;
-pub mod path;
 pub mod fs_driver;
-pub mod userland;
 pub mod partition;
+pub mod path;
+pub mod userland;
 // Specific fs's
 pub mod ext;
 pub mod fat;
 pub mod ntfs;
 
-
 use alloc::{boxed::Box, vec::Vec};
 use hashbrown::HashMap;
 
-use crate::{dbg, disk::{driver::DISK_MANAGER, DiskLoc}, fs_driver, state::FS_DRIVER};
+use crate::{
+    dbg,
+    disk::{driver::DISK_MANAGER, DiskLoc},
+    fs_driver,
+    state::FS_DRIVER,
+};
 
-use self::{path::FilePath, fs_driver::{Entry, FsDriver, FsDriverInitialiser, FsReadError}, partition::{HeaderType, Partition}};
+use self::{
+    fs_driver::{Entry, FsDriver, FsDriverInitialiser, FsReadError},
+    partition::{HeaderType, Partition},
+    path::FilePath,
+};
 
 /// Holds drivers for all of the partitions of all the disks
 pub struct FsDriverManager {
     pub drivers: HashMap<Partition, Box<dyn FsDriver>>,
-    pub partitions: HashMap<DiskLoc, Vec<Partition>>
+    pub partitions: HashMap<DiskLoc, Vec<Partition>>,
 }
 impl Default for FsDriverManager {
     fn default() -> Self {
@@ -42,9 +50,14 @@ impl FsDriverManager {
     pub fn new() -> Self {
         let mut self_drivers = HashMap::new();
         let mut self_partitions = HashMap::new();
-        for (i,(loc, (disk, drv))) in unsafe{&DISK_MANAGER.lock().as_mut().unwrap().disks}.iter().enumerate() {
+        for (i, (loc, (disk, drv))) in unsafe { &DISK_MANAGER.lock().as_mut().unwrap().disks }
+            .iter()
+            .enumerate()
+        {
             let header_type = partition::read_header_type(loc);
-            if header_type.is_none() {continue}
+            if header_type.is_none() {
+                continue;
+            }
             let header_type = header_type.unwrap();
             let partitions = match header_type {
                 HeaderType::GPT(gpt) => gpt,
@@ -57,7 +70,7 @@ impl FsDriverManager {
                 let drv = partition::find_and_init_fs_driver_for_part(part);
                 if drv.is_none() {
                     log::error!("Couldn't init a fs driver on partition {:?}", part);
-                    continue
+                    continue;
                 }
                 let drv = drv.unwrap();
                 self_drivers.insert(part.clone(), drv);

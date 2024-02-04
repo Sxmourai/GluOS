@@ -57,7 +57,8 @@ impl Executor {
                 Some(task) => task,
                 None => continue, // task no longer exists
             };
-            let waker = self.waker_cache
+            let waker = self
+                .waker_cache
                 .entry(task_id)
                 .or_insert_with(|| TaskWaker::get_waker(task_id, self.task_queue.clone()));
             let mut context = Context::from_waker(waker);

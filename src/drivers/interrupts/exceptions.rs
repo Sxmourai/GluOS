@@ -1,6 +1,9 @@
-use x86_64::structures::{idt::{InterruptStackFrame, PageFaultErrorCode}, paging::{FrameAllocator, PageTableFlags, Page}};
+use x86_64::structures::{
+    idt::{InterruptStackFrame, PageFaultErrorCode},
+    paging::{FrameAllocator, Page, PageTableFlags},
+};
 
-use crate::{println, mem_handler, memory::handler::map};
+use crate::{mem_handler, memory::handler::map, println};
 use log::error;
 
 pub extern "x86-interrupt" fn alignment_check(stack_frame: InterruptStackFrame, error_code: u64) {
