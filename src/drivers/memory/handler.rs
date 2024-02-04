@@ -86,8 +86,8 @@ pub fn map_frame(page: Page<Size4KiB>, frame: PhysFrame, flags: PageTableFlags) 
 #[macro_export]
 macro_rules! mem_map {
     (frame_addr=$addr: expr, $($arg: tt)*) => {
-        let page = x86_64::structures::paging::Page::containing_address(VirtAddr::new($addr));
-        let frame = x86_64::structures::paging::PhysFrame::containing_address(PhysAddr::new($addr));
+        let page = x86_64::structures::paging::Page::containing_address(x86_64::VirtAddr::new($addr));
+        let frame = x86_64::structures::paging::PhysFrame::containing_address(x86_64::PhysAddr::new($addr));
         crate::mem_map!(page, frame=frame, $($arg)*);
     };
     ($page: expr, frame=$frame: expr, WRITABLE) => {

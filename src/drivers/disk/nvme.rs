@@ -9,8 +9,9 @@ use x86_64::{structures::paging::{Page, PageTableFlags, PhysFrame}, PhysAddr, Vi
 use crate::{bit_manipulation::{all_zeroes, any_as_u8_slice}, dbg, mem_map, memory::handler::map_frame, pci::PciDevice};
 
 pub fn init(nvme_pci: &PciDevice) -> Option<Vec<NVMeDisk>> {
+    if true {return None}
     log::debug!("{}", nvme_pci);
-    let bar0 = nvme_pci.raw.bars[0] as u64 & 0xFFFF_0000;
+    let bar0 = nvme_pci.raw.determine_mem_base(0).unwrap().as_u64();
     // mem_map!(frame_addr=bar0, WRITABLE);
     for i in 0..64 {
         mem_map!(frame_addr=bar0+(0x1000*i), WRITABLE);

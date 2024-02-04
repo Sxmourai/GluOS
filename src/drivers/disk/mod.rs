@@ -15,11 +15,13 @@ pub fn init() {
                 }
             } else if device.subclass() == 0x8 {
                 log::info!("Found NVMe controller on bus {loc}");
-                // if let Some(nvme_disks) = nvme::init(device) {
-                //     for (i, disk) in nvme_disks.into_iter().enumerate() {
-                //         //     // disks.insert(DiskLoc::from_idx(i.try_into().unwrap()), disk);
-                //     }
-                // }
+                if let Some(nvme_disks) = nvme::init(device) {
+                    for (i, disk) in nvme_disks.into_iter().enumerate() {
+                        //     // disks.insert(DiskLoc::from_idx(i.try_into().unwrap()), disk);
+                    }
+                } else {
+                    log::error!("Failed initialising NVMe driver")
+                }
             }
         }
     }

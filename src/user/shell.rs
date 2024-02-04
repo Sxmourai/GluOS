@@ -314,7 +314,8 @@ fn lspci(rargs: String) -> Result<(), String> {
         let device = manager.get(&user_loc).ok_or("No device on this bus !")?;
         
         println!("{}",device);
-        println!("{}", device.display_classes());
+        println!("{}",device.display_classes());
+        println!("{:?}", device.raw.determine_mem_base(0));
         return Ok(())
     }
     for (loc, device) in manager.iter() {

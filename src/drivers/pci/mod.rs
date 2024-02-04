@@ -16,7 +16,7 @@ use core::ops::{Deref, DerefMut};
 use pci_ids::{Class, Classes, FromId, SubSystem, Subclass};
 use spin::{Mutex, Once, RwLock};
 use x86_64::instructions::port::Port;
-use x86_64::PhysAddr;
+use x86_64::{PhysAddr, VirtAddr};
 
 use crate::{dbg, serial_println};
 
@@ -97,10 +97,11 @@ impl PciDevice {
         self.class
     }
     pub fn display_classes(&self) -> String {
-        alloc::format!(
-            "Class: {:?} - Subclass: {:?}\nSubsystems {:?}",
-            self.class(), self.class().subclasses().collect::<Vec<&'static Subclass>>(), self.subsystems().collect::<Vec<&'static SubSystem>>(),
-        )
+        let mut classes = alloc::format!("Class: {}", self.class().name());
+        if let Some(subclass) = self.class().subclasses().find(|sub| sub.id()==self.raw.subclass) {
+            classes.push_str(alloc::format!(" - Subclass: {}", subclass.name()).as_str());
+        }
+        classes
     }
 }
 impl core::fmt::Display for PciDevice {
@@ -500,36 +501,37 @@ impl RawPciDevice {
     /// TODO: currently we assume the BAR represents a memory space (memory mapped I/O)
     ///       rather than I/O space like Port I/O. Obviously, this is not always the case.
     ///       Instead, we should return an enum specifying which kind of memory space the calculated base address is.
-    pub fn determine_mem_base(&self, bar_index: usize) -> Result<PhysAddr, &'static str> {
+    pub fn determine_mem_base(&self, bar_index: usize) -> Result<PciMemoryBase, &'static str> {
         let mut bar = if let Some(bar_value) = self.bars.get(bar_index) {
             *bar_value
         } else {
             return Err("BAR index must be between 0 and 5 inclusive");
         };
-
-        // Check bits [2:1] of the bar to determine address length (64-bit or 32-bit)
-        let mem_base = if bar.get_bits(1..3) == BAR_ADDRESS_IS_64_BIT {
-            // Here: this BAR is the lower 32-bit part of a 64-bit address,
-            // so we need to access the next highest BAR to get the address's upper 32 bits.
-            let next_bar = *self
-                .bars
-                .get(bar_index + 1)
-                .ok_or("next highest BAR index is out of range")?;
-            // Clear the bottom 4 bits because it's a 16-byte aligned address
-            PhysAddr::new(
-                (*bar.set_bits(0..4, 0) as usize | ((next_bar as usize) << 32))
-                    .try_into()
-                    .unwrap(),
-            )
-            // .ok_or("determine_mem_base(): [64-bit] BAR physical address was invalid")?
+        if bar.get_bit(0)==true {
+            let base = bar.get_bits(2..);
+            Ok(PciMemoryBase::IOSpace(base))
         } else {
-            // Here: this BAR is the lower 32-bit part of a 64-bit address,
-            // so we need to access the next highest BAR to get the address's upper 32 bits.
-            // Also, clear the bottom 4 bits because it's a 16-byte aligned address.
-            PhysAddr::new((*bar.set_bits(0..4, 0) as usize).try_into().unwrap())
-            // .ok_or("determine_mem_base(): [32-bit] BAR physical address was invalid")?
-        };
-        Ok(mem_base)
+            // Check bits [2:1] of the bar to determine address length (64-bit or 32-bit)
+            let base = if bar.get_bits(1..=2) == BAR_ADDRESS_IS_64_BIT {
+                // Here: this BAR is the lower 32-bit part of a 64-bit address,
+                // so we need to access the next highest BAR to get the address's upper 32 bits.
+                let next_bar = *self
+                    .bars
+                    .get(bar_index + 1)
+                    .ok_or("next highest BAR index is out of range")?;
+                // Clear the bottom 4 bits because it's a 16-byte aligned address
+                
+                (*bar.set_bits(0..4, 0) as usize | ((next_bar as usize) << 32))
+                // .ok_or("determine_mem_base(): [64-bit] BAR physical address was invalid")?
+            } else {
+                // Here: this BAR is the lower 32-bit part of a 64-bit address,
+                // so we need to access the next highest BAR to get the address's upper 32 bits.
+                // Also, clear the bottom 4 bits because it's a 16-byte aligned address.
+                (*bar.set_bits(0..4, 0) as usize)
+                // .ok_or("determine_mem_base(): [32-bit] BAR physical address was invalid")?
+            }.try_into().unwrap();
+            Ok(PciMemoryBase::MemorySpace(PhysAddr::new(base)))
+        }
     }
 
     /// Returns the size in bytes of the memory region specified by the given `BAR`
@@ -690,6 +692,20 @@ impl RawPciDevice {
         };
 
         Ok((int_line, int_pin))
+    }
+}
+
+#[derive(Debug)]
+pub enum PciMemoryBase {
+    MemorySpace(PhysAddr),
+    IOSpace(u32),
+}
+impl PciMemoryBase {
+    pub fn as_u64(&self) -> u64 {
+        match self {
+            PciMemoryBase::MemorySpace(m) => m.as_u64(),
+            PciMemoryBase::IOSpace(io) => *io as u64,
+        }
     }
 }
 

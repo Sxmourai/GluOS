@@ -46,6 +46,8 @@ run-args = [
     # ENDDISKFLAG
 "-drive", "file=build/fatgpt.img,format=raw,if=none,id=nvm",
 "-device", "nvme,serial=deadbeef,drive=nvm",
+"-net", "macaddr=00:11:22:33:44:55,model=e1000,type=nic",
+# "-netdev", "tap,id=mynet0,ifname=tap0,script=no,downscript=no", "-device", "e1000,netdev=mynet0",
     # If working on APIC and IPI/SMP: (sets amount of cores to 4)
     #TODO When APIC feature automatically set -smp 4
     "-smp","4"

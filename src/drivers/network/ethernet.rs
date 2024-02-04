@@ -1,12 +1,18 @@
-use core::{mem::forget, ptr::{addr_of, slice_from_raw_parts}};
+use core::{
+    mem::forget,
+    ptr::{addr_of, slice_from_raw_parts},
+};
 
 use alloc::vec::Vec;
+use bit_field::BitField;
 use x86_64::{
     instructions::port::{Port, PortGeneric},
     structures::port::{PortRead, PortWrite},
 };
 
-use crate::{bit_manipulation::{read_at, write_at}, dbg, mem_handler, pci::PciDevice};
+use crate::{
+    bit_manipulation::{read_at, write_at}, dbg, interrupts::{hardware::PIC_1_OFFSET, idt::IDT}, mem_handler, mem_map, pci::{PciDevice, PciMemoryBase}
+};
 
 ///! https://wiki.osdev.org/Intel_Ethernet_i217
 
@@ -69,13 +75,13 @@ const RCTL_BSIZE_8192: u32 = ((2 << 16) | (1 << 25));
 const RCTL_BSIZE_16384: u32 = ((1 << 16) | (1 << 25));
 
 // Transmit Command
-const CMD_EOP: u16 = (1 << 0); // End of Packet
-const CMD_IFCS: u16 = (1 << 1); // Insert FCS
-const CMD_IC: u16 = (1 << 2); // Insert Checksum
-const CMD_RS: u16 = (1 << 3); // Report Status
-const CMD_RPS: u16 = (1 << 4); // Report Packet Sent
-const CMD_VLE: u16 = (1 << 6); // VLAN Packet Enable
-const CMD_IDE: u16 = (1 << 7); // Interrupt Delay Enable
+const CMD_EOP: u8 = (1 << 0); // End of Packet
+const CMD_IFCS: u8 = (1 << 1); // Insert FCS
+const CMD_IC: u8 = (1 << 2); // Insert Checksum
+const CMD_RS: u8 = (1 << 3); // Report Status
+const CMD_RPS: u8 = (1 << 4); // Report Packet Sent
+const CMD_VLE: u8 = (1 << 6); // VLAN Packet Enable
+const CMD_IDE: u8 = (1 << 7); // Interrupt Delay Enable
 
 // TCTL Register
 const TCTL_EN: u16 = (1 << 1); // Transmit Enable
@@ -94,7 +100,7 @@ const E1000_NUM_RX_DESC: u16 = 32;
 const E1000_NUM_TX_DESC: u16 = 8;
 
 #[repr(packed)]
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 struct E1000RxDesc {
     addr: u64,
     length: u16,
@@ -105,7 +111,7 @@ struct E1000RxDesc {
 }
 
 #[repr(packed)]
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 struct E1000TxDesc {
     addr: u64,
     length: u16,
@@ -115,14 +121,8 @@ struct E1000TxDesc {
     css: u8,
     special: u16,
 }
-#[derive(Default)]
 pub struct E1000NetworkDriver {
-    /// Type of BAR0
-    bar_type: u8,
-    /// IO Base Address
-    io_base: u16,
-    /// MMIO Base Address
-    mem_base: u64,
+    base: PciMemoryBase,
     /// A flag indicating if eeprom exists
     eerprom_exists: bool,
     /// A buffer for storing the mack address  
@@ -135,127 +135,162 @@ pub struct E1000NetworkDriver {
     rx_cur: u16,
     /// Current Transmit Descriptor Buffer
     tx_cur: u16,
+    int_line: u8,
 }
 impl E1000NetworkDriver {
     pub fn new(pci_device: &PciDevice) -> Self {
         //TODO Enable bus mastering
         // Off course you will need here to map the memory address into you page tables and use corresponding virtual addresses
         // log::debug!("{:#b} {:#b}", pci_device.raw.bars[0], pci_device.raw.bars[0] & (1<<30|1<<31));
+        let base = pci_device.raw.determine_mem_base(0).unwrap();
         Self {
-            // Get BAR0 type, io_base address and MMIO base address
-            bar_type: if (pci_device.raw.bars[0] & (1<<30|1<<31))!=0 {1} else {0} as u8,
-            io_base: (pci_device.raw.bars[1] & !1).try_into().unwrap(),
-            mem_base: (pci_device.raw.bars[2]& !3).try_into().unwrap(),
+            base,
             eerprom_exists: false,
-            ..core::default::Default::default()
+            int_line: pci_device.raw.int_line,
+            mac: [0; 6],
+            rx_descs: [E1000RxDesc::default(); E1000_NUM_RX_DESC as usize],
+            tx_descs: [E1000TxDesc::default(); E1000_NUM_TX_DESC as usize],
+            rx_cur: 0,
+            tx_cur: 0,
         }
     }
-    //TODO return result
     pub fn start(&mut self) -> Result<(), E1000NetworkDriverInitError> {
+        mem_map!(frame_addr=self.base.as_u64(), WRITABLE);
         self.eerprom_exists = self.detect_ee_prom();
-        dbg!(self.eerprom_exists);
-        self.eerprom_exists = true;
-        self.read_mac_addr().or(Err(E1000NetworkDriverInitError::CantReadMac))?;
-        dbg!(self.mac);
-        self.start_link();
-        dbg!(self.mac);
- 
-        for i in 0..0x80 {
-            self.write_command(0x5200 + i*4, 0);
+        self.read_mac_addr()
+            .or(Err(E1000NetworkDriverInitError::CantReadMac))?;
+        log::info!("Found ethernet device with mac: {:x}:{:x}:{:x}:{:x}:{:x}:{:x}", self.mac[0],self.mac[1],self.mac[2],self.mac[3],self.mac[4],self.mac[5],);
+        //TODO What is it ? self.start_link();
+        match self.base {
+            PciMemoryBase::MemorySpace(mem) => {
+                for i in 0..10 {
+                    mem_map!(frame_addr=mem.as_u64()+0x1000*i, WRITABLE);
+                }
+            },
+            PciMemoryBase::IOSpace(io) => {},
         }
-        // if interruptManager->registerInterrupt(IRQ0+pciConfigHeader->getIntLine(),this))
-        // {
-            self.enable_interrupts();
-            self.rx_init();
-            self.tx_init();
-            dbg!("E1000 Started !");
-            return Ok(());
-        // }
+        for i in 0..0x80 {
+            self.write_command(0x5200 + i * 4, 0);
+        }
+        
+        unsafe{IDT.as_mut().unwrap().write()[PIC_1_OFFSET as usize+self.int_line as usize].set_handler_fn(handle_receive)};
+        self.enable_interrupts();
+        self.rx_init();
+        self.tx_init();
+        dbg!("E1000 Started !");
+        return Ok(());
     }
     pub fn fire(&self) {
         todo!()
     }
-    pub fn send_packet(p_data: &[u8]) -> Result<(), PacketSendError> {
-        todo!()
+    /// p_data.len() < u16::MAX
+    pub fn send_packet(&mut self, p_data: &[u8]) -> Result<(), PacketSendError> {
+        self.tx_descs[self.tx_cur as usize].addr = p_data.as_ptr() as u64;
+        self.tx_descs[self.tx_cur as usize].length = p_data.len().try_into().unwrap();
+        self.tx_descs[self.tx_cur as usize].cmd = CMD_EOP | CMD_IFCS | CMD_RS;
+        self.tx_descs[self.tx_cur as usize].status = 0;
+        let old_cur = self.tx_cur;
+        self.tx_cur = (self.tx_cur + 1) % E1000_NUM_TX_DESC;
+        self.write_command(REG_TXDESCTAIL, self.tx_cur as u32);   
+        for i in 0..100_000 {
+            if (self.tx_descs[old_cur as usize].status & 0xff != 0) {
+                return Ok(())
+            }
+        }
+        Err(PacketSendError::StatusTimeOut)
     }
     /// Send Commands and read results From NICs either using MMIO or IO Ports
-    fn write_command(&self,p_addr: u16, p_value: u32) {
-        if (self.bar_type == 0) {
-            unsafe{
-                write_at::<u32>(self.mem_base as usize + p_addr as usize, p_value)
-            };
-        } else {
-            dbg!(self.bar_type);
-            unsafe {
-                PortWrite::write_to_port(self.io_base, p_addr as u32);
-                PortWrite::write_to_port(self.io_base + 4, p_value);
+    fn write_command(&self, p_addr: u16, p_value: u32) {
+        // dbg!("Writing register", p_addr, "to", p_value);
+        match self.base {
+            PciMemoryBase::MemorySpace(mem) => unsafe {
+                write_at::<u32>(mem.as_u64() as usize + p_addr as usize, p_value)
+            },
+            PciMemoryBase::IOSpace(io) => {
+                dbg!(io);
+                unsafe {
+                    PortWrite::write_to_port(io.try_into().unwrap(), p_addr as u32);
+                    PortWrite::write_to_port(io as u16 + 4, p_value); // Can use as because it would crash up there when we do try_into
+                }
             }
         }
     }
     fn read_command(&self, p_addr: u16) -> u32 {
-        if (self.bar_type == 0) {
-            unsafe { read_at::<u32>(self.mem_base as usize + p_addr as usize) }
-        } else {
-            unsafe {
-                PortWrite::write_to_port(self.io_base, p_addr as u32);
-                PortRead::read_from_port(self.io_base + 4)
+        let r =match self.base {
+            PciMemoryBase::MemorySpace(mem) => unsafe {
+                read_at::<u32>(mem.as_u64() as usize + p_addr as usize)
+            },
+            PciMemoryBase::IOSpace(io) => {
+                let io = io.try_into().unwrap();
+                unsafe {
+                    PortWrite::write_to_port(io, p_addr as u32);
+                    PortRead::read_from_port(io + 4)
+                }
             }
-        }
+        };
+        // dbg!("Read",r,"from", p_addr);
+        r
     }
 
     /// Return true if EEProm exist, else it returns false and set the eerprom_existsdata member
     fn detect_ee_prom(&self) -> bool {
         let mut val = 0;
-        self.write_command(REG_EEPROM, 0x1); 
+        self.write_command(REG_EEPROM, 0x1);
         for i in 0..1000 {
             val = self.read_command(REG_EEPROM);
-            if val & 0x10!=0 {
+            if val & 0x10 != 0 {
                 return true;
             }
         }
         false
     }
-    /// Read 4 bytes from a specific EEProm Address
+    /// Read 2 bytes from a specific EEProm Address
     fn ee_prom_read(&self, addr: u8) -> u32 {
         let mut tmp = 0;
         if self.eerprom_exists {
-            self.write_command(REG_EEPROM, (1) | ((addr as u32) << 8) );
-        	loop {
-                tmp = self.read_command(REG_EEPROM);
-                log::debug!("{:#b}", tmp);
-                if tmp & (1<<4)!=0 {break}
+            self.write_command(REG_EEPROM, (1) | ((addr as u32) << 8));
+            for i in 0..1_000 {
+                let _tmp = self.read_command(REG_EEPROM);
+                if _tmp != tmp && _tmp.get_bit(4) {
+                    tmp = _tmp;
+                    break;
+                }
             }
-        }
-        else {
-            self.write_command(REG_EEPROM, (1) | ((addr as u32) << 2) );
+        } else {
+            self.write_command(REG_EEPROM, (1) | ((addr as u32) << 2));
             loop {
                 tmp = self.read_command(REG_EEPROM);
-                if tmp & (1<<1)!=0 {break}
+                if tmp & (1 << 1) != 0 {
+                    break;
+                }
             }
         }
-        (tmp >> 16) & 0xFFFF
+        ((tmp >> 16) & 0xFFFF)
     }
     /// Read MAC Address and returns true if success
-    /// TODO Return better result
     fn read_mac_addr(&mut self) -> Result<(), E1000ReadMac> {
         if self.eerprom_exists {
             let mut temp;
             temp = self.ee_prom_read(0);
-            self.mac[0] = (temp &0xff) as u8;
+            self.mac[0] = (temp & 0xff) as u8;
             self.mac[1] = (temp >> 8) as u8;
             temp = self.ee_prom_read(1);
-            self.mac[2] = (temp &0xff) as u8;
+            self.mac[2] = (temp & 0xff) as u8;
             self.mac[3] = (temp >> 8) as u8;
             temp = self.ee_prom_read(2);
-            self.mac[4] = (temp &0xff) as u8;
+            self.mac[4] = (temp & 0xff) as u8;
             self.mac[5] = (temp >> 8) as u8;
-        }
-        else {
-            let raw_mem_base_mac = slice_from_raw_parts((self.mem_base+0x5400) as *const u32, 6);
-            let mem_base_mac = unsafe {&*raw_mem_base_mac};
-            let raw_mem_base_macu8 = slice_from_raw_parts((self.mem_base+0x5400) as *const u8, 6);
-            let mem_base_macu8 = unsafe {&*raw_mem_base_macu8};
-            if ( mem_base_mac[0] != 0 ) {
+        } else {
+            // This breaks rust so hard 🤣 I got u8 == 857870592
+            mem_map!(frame_addr=self.mem_base() + 0x5400, WRITABLE);
+            let raw_mem_base_mac =
+                slice_from_raw_parts((self.mem_base() + 0x5400) as *const u32, 6);
+            let mem_base_mac = unsafe { &*raw_mem_base_mac };
+            let raw_mem_base_macu8 =
+                slice_from_raw_parts((self.mem_base() + 0x5400) as *const u8, 6);
+            let mem_base_macu8 = unsafe { &*raw_mem_base_macu8 };
+            let a = mem_base_macu8.into_iter().map(|a| *a).collect::<Vec<u8>>();
+            if (mem_base_mac[0] != 0) {
                 for i in 0..6 {
                     self.mac[i] = mem_base_macu8[i];
                 }
@@ -265,6 +300,12 @@ impl E1000NetworkDriver {
         }
         Ok(())
     }
+    fn mem_base(&self) -> u64 {
+        match self.base {
+            PciMemoryBase::MemorySpace(mem) => mem.as_u64(),
+            PciMemoryBase::IOSpace(io) => todo!(),
+        }
+    }
     /// Start up the network
     fn start_link(&mut self) {
         todo!()
@@ -272,7 +313,7 @@ impl E1000NetworkDriver {
     /// Initialize receive descriptors and buffers
     fn rx_init(&mut self) {
         for i in 0..E1000_NUM_RX_DESC {
-            let mut desc_vec = Vec::with_capacity(8192+16);
+            let mut desc_vec = Vec::with_capacity(8192 + 16);
             let ptr: &'static mut [u8] = desc_vec.leak();
             let desc_ptr = addr_of!(ptr);
             self.rx_descs[i as usize].addr = desc_ptr as u64;
@@ -281,16 +322,22 @@ impl E1000NetworkDriver {
         let ptr = addr_of!(self.rx_descs);
         self.write_command(REG_TXDESCLO, ((ptr as u64) >> 32) as u32);
         self.write_command(REG_TXDESCHI, ((ptr as u64) & 0xFFFFFFFF) as u32);
-    
+
         self.write_command(REG_RXDESCLO, ptr as u32);
         self.write_command(REG_RXDESCHI, 0);
-    
+
         self.write_command(REG_RXDESCLEN, E1000_NUM_RX_DESC as u32 * 16);
-    
+
         self.write_command(REG_RXDESCHEAD, 0);
-        self.write_command(REG_RXDESCTAIL, E1000_NUM_RX_DESC as u32-1);
+        self.write_command(REG_RXDESCTAIL, E1000_NUM_RX_DESC as u32 - 1);
         self.rx_cur = 0;
-        self.write_command(REG_RCTRL, (RCTL_EN| RCTL_SBP| RCTL_UPE | RCTL_MPE | RCTL_LBM_NONE | RTCL_RDMTS_HALF | RCTL_BAM) as u32 | RCTL_SECRC  | RCTL_BSIZE_8192);
+        self.write_command(
+            REG_RCTRL,
+            (RCTL_EN | RCTL_SBP | RCTL_UPE | RCTL_MPE | RCTL_LBM_NONE | RTCL_RDMTS_HALF | RCTL_BAM)
+                as u32
+                | RCTL_SECRC
+                | RCTL_BSIZE_8192,
+        );
     }
     /// Initialize transmit descriptors and buffers
     fn tx_init(&mut self) {
@@ -305,48 +352,59 @@ impl E1000NetworkDriver {
         //now setup total length of descriptors
         self.write_command(REG_TXDESCLEN, E1000_NUM_TX_DESC as u32 * 16);
         //setup numbers
-        self.write_command( REG_TXDESCHEAD, 0);
-        self.write_command( REG_TXDESCTAIL, 0);
+        self.write_command(REG_TXDESCHEAD, 0);
+        self.write_command(REG_TXDESCTAIL, 0);
         self.tx_cur = 0;
-        self.write_command(REG_TCTRL,  (TCTL_EN | TCTL_PSP) as u32 | (15 << TCTL_CT_SHIFT) | (64 << TCTL_COLD_SHIFT) | TCTL_RTLC);
-        // This line of code overrides the one before it but I left both to highlight that the previous one works with e1000 cards, but for the e1000e cards 
+        self.write_command(
+            REG_TCTRL,
+            (TCTL_EN | TCTL_PSP) as u32
+                | (15 << TCTL_CT_SHIFT)
+                | (64 << TCTL_COLD_SHIFT)
+                | TCTL_RTLC,
+        );
+        // This line of code overrides the one before it but I left both to highlight that the previous one works with e1000 cards, but for the e1000e cards
         // you should set the TCTRL register as follows. For detailed description of each bit, please refer to the Intel Manual.
         // In the case of I217 and 82577LM packets will not be sent if the TCTRL is not configured using the following bits.
-        self.write_command(REG_TCTRL,  0b0110000000000111111000011111010);
-        self.write_command(REG_TIPG,  0x0060200A);
+        self.write_command(REG_TCTRL, 0b0110000000000111111000011111010);
+        self.write_command(REG_TIPG, 0x0060200A);
     }
 
     fn enable_interrupts(&mut self) {
-        self.write_command(REG_IMASK ,0x1F6DC);
-        self.write_command(REG_IMASK ,0xff & !4);
+        self.write_command(REG_IMASK, 0x1F6DC);
+        self.write_command(REG_IMASK, 0xff & !4);
         self.read_command(0xc0);
     }
     /// Handle a packet reception
     fn handle_receive(&mut self) {
+        dbg!("Handling a packet");
         let mut old_cur = 0;
         let mut got_packet = false;
-    
-        while (self.rx_descs[self.rx_cur as usize].status & 0x1!=0) {
+
+        while (self.rx_descs[self.rx_cur as usize].status & 0x1 != 0) {
             got_packet = true;
             let buf = self.rx_descs[self.rx_cur as usize].addr;
             let len = self.rx_descs[self.rx_cur as usize].length;
 
             // Here you should inject the received packet into your network stack
 
-
             self.rx_descs[self.rx_cur as usize].status = 0;
             old_cur = self.rx_cur;
             self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC;
             self.write_command(REG_RXDESCTAIL, old_cur as u32);
-        }    
+        }
     }
 }
+extern "x86-interrupt" fn handle_receive(_stack_frame: x86_64::structures::idt::InterruptStackFrame) {
+    dbg!("Network", _stack_frame);
+}
+
 pub enum E1000ReadMac {
-    NoMemoryBase
+    NoMemoryBase,
 }
 pub enum E1000NetworkDriverInitError {
-    CantReadMac
+    CantReadMac,
 }
 
-
-pub enum PacketSendError {}
+pub enum PacketSendError {
+    StatusTimeOut,
+}
