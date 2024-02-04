@@ -168,7 +168,7 @@ pub fn inb(port: u16) -> u8 {
 /// # Safety
 /// Breaks memory safety from rust
 pub unsafe fn read_at<T: Clone>(addr: usize) -> T {
-    unsafe { (&*(addr as *const T)).clone() }
+    unsafe { (*(addr as *const T)).clone() }
     // todo!()
 }
 

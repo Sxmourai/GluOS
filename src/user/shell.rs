@@ -318,7 +318,7 @@ fn dump_disk(args: String) -> Result<(), String> {
 fn lspci(rargs: String) -> Result<(), String> {
     let manager = pci_manager!();
     if !rargs.is_empty() {
-        let mut args = rargs.split(" ");
+        let mut args = rargs.split(' ');
         let bus = args
             .next()
             .and_then(|s| s.parse().ok())

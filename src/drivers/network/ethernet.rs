@@ -1,3 +1,4 @@
+//! Helped a bit https://wiki.osdev.org/Intel_Ethernet_i217
 use core::{
     mem::forget,
     ptr::{addr_of, slice_from_raw_parts},
@@ -18,7 +19,6 @@ use crate::{
     pci::{PciDevice, PciMemoryBase},
 };
 
-///! https://wiki.osdev.org/Intel_Ethernet_i217
 
 const REG_CTRL: u16 = 0x0000;
 const REG_STATUS: u16 = 0x0008;
@@ -191,7 +191,7 @@ impl E1000NetworkDriver {
         self.enable_interrupts();
         self.rx_init();
         self.tx_init();
-        return Ok(());
+        Ok(())
     }
     pub fn fire(&self) {
         todo!()
@@ -206,7 +206,7 @@ impl E1000NetworkDriver {
         self.tx_cur = (self.tx_cur + 1) % E1000_NUM_TX_DESC;
         self.write_command(REG_TXDESCTAIL, self.tx_cur as u32);
         for i in 0..100_000 {
-            if (self.tx_descs[old_cur as usize].status & 0xff != 0) {
+            if (self.tx_descs[old_cur as usize].status != 0) {
                 return Ok(());
             }
         }
@@ -229,7 +229,9 @@ impl E1000NetworkDriver {
         }
     }
     fn read_command(&self, p_addr: u16) -> u32 {
-        let r = match self.base {
+        
+        // dbg!("Read",r,"from", p_addr);
+        match self.base {
             PciMemoryBase::MemorySpace(mem) => unsafe {
                 read_at::<u32>(mem.as_u64() as usize + p_addr as usize)
             },
@@ -240,9 +242,7 @@ impl E1000NetworkDriver {
                     PortRead::read_from_port(io + 4)
                 }
             }
-        };
-        // dbg!("Read",r,"from", p_addr);
-        r
+        }
     }
 
     /// Return true if EEProm exist, else it returns false and set the eerprom_existsdata member
@@ -302,11 +302,9 @@ impl E1000NetworkDriver {
             let raw_mem_base_macu8 =
                 slice_from_raw_parts((self.mem_base() + 0x5400) as *const u8, 6);
             let mem_base_macu8 = unsafe { &*raw_mem_base_macu8 };
-            let a = mem_base_macu8.into_iter().map(|a| *a).collect::<Vec<u8>>();
+            let a = mem_base_macu8.to_vec();
             if (mem_base_mac[0] != 0) {
-                for i in 0..6 {
-                    self.mac[i] = mem_base_macu8[i];
-                }
+                self.mac.copy_from_slice(mem_base_macu8);
             } else {
                 return Err(E1000ReadMac::NoMemoryBase);
             }

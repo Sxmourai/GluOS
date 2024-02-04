@@ -95,19 +95,19 @@ macro_rules! mem_map {
     (frame_addr=$addr: expr, $($arg: tt)*) => {
         let page = x86_64::structures::paging::Page::containing_address(x86_64::VirtAddr::new($addr));
         let frame = x86_64::structures::paging::PhysFrame::containing_address(x86_64::PhysAddr::new($addr));
-        crate::mem_map!(page, frame=frame, $($arg)*);
+        $crate::mem_map!(page, frame=frame, $($arg)*);
     };
     ($page: expr, frame=$frame: expr, WRITABLE) => {
         let flags = x86_64::structures::paging::PageTableFlags::PRESENT | x86_64::structures::paging::PageTableFlags::WRITABLE;
-        crate::mem_map!($page,frame=$frame, flags);
+        $crate::mem_map!($page,frame=$frame, flags);
     };
     ($page: expr, frame=$frame: expr, $flags: expr) => {
-        if unsafe{crate::mem_handler!().map_frame($page,$frame,$flags)}.is_err() {
+        if unsafe{$crate::mem_handler!().map_frame($page,$frame,$flags)}.is_err() {
             log::error!("Failed mapping {:?} -> {:?} with flags: {:#b}", $page, $frame, $flags);
         }
     };
     ($page: expr, $flags: expr) => {
-        if unsafe{crate::mem_handler!().map($page,$flags)}.is_err() {
+        if unsafe{$crate::mem_handler!().map($page,$flags)}.is_err() {
             log::error!("Failed mapping {:?} with flags: {:#b}", $page, $flags);
         }
     };

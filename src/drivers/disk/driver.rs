@@ -13,7 +13,7 @@ pub const SECTOR_SIZE: u16 = 512;
 macro_rules! disk_manager {
     () => {
         unsafe {
-            crate::drivers::disk::driver::DISK_MANAGER
+            $crate::drivers::disk::driver::DISK_MANAGER
                 .lock()
                 .as_mut()
                 .unwrap()
@@ -32,6 +32,12 @@ pub struct DiskManager<'a> {
     pub disks: HashMap<DiskLoc, (&'a dyn GenericDisk, usize)>,
     drivers: Vec<alloc::boxed::Box<dyn DiskDriver>>,
     selected_disk: usize, // u8 but usize because used for indexation
+}
+
+impl Default for DiskManager<'_> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DiskManager<'_> {

@@ -55,7 +55,7 @@ pub static mut MANAGER: Option<PciManager> = None;
 #[macro_export]
 macro_rules! pci_manager {
     () => {
-        unsafe { &crate::drivers::pci::MANAGER.as_ref().unwrap() }
+        unsafe { &$crate::drivers::pci::MANAGER.as_ref().unwrap() }
     };
 }
 
@@ -513,7 +513,7 @@ impl RawPciDevice {
         } else {
             return Err("BAR index must be between 0 and 5 inclusive");
         };
-        if bar.get_bit(0) == true {
+        if bar.get_bit(0) {
             let base = bar.get_bits(2..);
             Ok(PciMemoryBase::IOSpace(base))
         } else {

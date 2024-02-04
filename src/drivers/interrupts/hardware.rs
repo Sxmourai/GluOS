@@ -14,7 +14,7 @@ pub static PICS: Mutex<ChainedPics> =
     Mutex::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
 
 pub fn setup_hardware_interrupts(idt: &mut InterruptDescriptorTable) {
-    for (i, interrupt) in INTERRUPTS.into_iter().enumerate() {
+    for (i, interrupt) in INTERRUPTS.iter().enumerate() {
         idt[i + 32].set_handler_fn(*interrupt);
     }
 }
@@ -36,8 +36,9 @@ macro_rules! interrupt_handler {
         pub extern "x86-interrupt" fn $name(
             stack_frame: x86_64::structures::idt::InterruptStackFrame,
         ) {
+            #[allow(clippy::redundant_closure_call)]
             $f(stack_frame);
-            crate::interrupts::hardware::notify_end_of_interrupt($idx);
+            $crate::interrupts::hardware::notify_end_of_interrupt($idx);
         }
     };
 }

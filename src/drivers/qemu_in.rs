@@ -10,6 +10,12 @@ pub struct QemuIOReader {
     inputted: String,
 }
 
+impl Default for QemuIOReader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl QemuIOReader {
     pub fn new() -> Self {
         Self {
