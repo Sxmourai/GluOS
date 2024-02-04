@@ -2,18 +2,15 @@
 
 use alloc::{vec::Vec, string::{String, ToString}};
 
-use crate::{mem_handler, boot_info};
+use crate::{boot_info, mem_handler, memory::read_phys_memory_and_map};
 
-use self::acpi::AcpiHandler;
-
-use super::{handler::MemoryHandler, read_phys_memory_and_map};
-
-pub mod rsdt; // pub ?
+pub mod rsdt;
 pub mod madt;
 pub mod hpet;
 pub mod waet;
-pub mod acpi;
 pub mod fadt;
+pub mod dsdt;
+pub mod ssdt;
 
 static ACPI_HEAD_SIZE: usize = core::mem::size_of::<ACPISDTHeader>();
 
@@ -33,16 +30,15 @@ pub struct ACPISDTHeader {
 }
 
 pub struct DescriptorTablesHandler {
-    pub acpi: AcpiHandler,
+    pub fadt: &'static fadt::FADT,
     pub madt: madt::MADT,
     pub hpet: &'static hpet::HPET,
     pub waet: &'static waet::WAET,
 }
 impl DescriptorTablesHandler {
-    /// Initialises the descriptor tables handler, and makes it accessible via descriptor_tables!()
-    pub fn init() {
+    pub fn new() -> Option<Self> {
         let physical_memory_offset = unsafe{boot_info!()}.physical_memory_offset;
-        let rsdt = rsdt::search_rsdt(physical_memory_offset);
+        let rsdt = rsdt::search_rsdt(physical_memory_offset)?;
         let mut acpi = None;
         let mut madt = None;
         let mut hpet = None;
@@ -53,7 +49,7 @@ impl DescriptorTablesHandler {
 
             //TODO Make parsing in another function for cleaner code
             match String::from_utf8_lossy(&header.signature).to_string().as_str() {
-                "FACP" => acpi = Some(AcpiHandler::new(table_bytes)),
+                "FACP" => acpi = Some(fadt::FADT::new(table_bytes)),
                 "APIC" => madt = unsafe { madt::MADT::new(table_bytes) },
                 "HPET" => hpet = unsafe { hpet::handle_hpet(table_bytes) },
                 "WAET" => waet = unsafe { waet::handle_waet(table_bytes) },
@@ -69,13 +65,12 @@ impl DescriptorTablesHandler {
                 }
             };
         }
-        unsafe { crate::state::DESCRIPTOR_TABLES.replace(Self {
-            acpi: acpi.unwrap(), //TODO, handle if we don't find a table
-            madt: madt.unwrap(), //TODO, handle if we don't find a table
-            hpet: hpet.unwrap(), //TODO, handle if we don't find a table
-            waet: waet.unwrap(), //TODO, handle if we don't find a table
-        }) };
-        
+        Some(Self {
+            fadt: acpi.unwrap(),
+            madt: madt.unwrap(),
+            hpet: hpet.unwrap(),
+            waet: waet.unwrap(),
+        })
     }
 
     pub fn num_core(&self) -> usize {

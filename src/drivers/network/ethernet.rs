@@ -155,12 +155,6 @@ impl E1000NetworkDriver {
         }
     }
     pub fn start(&mut self) -> Result<(), E1000NetworkDriverInitError> {
-        mem_map!(frame_addr=self.base.as_u64(), WRITABLE);
-        self.eerprom_exists = self.detect_ee_prom();
-        self.read_mac_addr()
-            .or(Err(E1000NetworkDriverInitError::CantReadMac))?;
-        log::info!("Found ethernet device with mac: {:x}:{:x}:{:x}:{:x}:{:x}:{:x}", self.mac[0],self.mac[1],self.mac[2],self.mac[3],self.mac[4],self.mac[5],);
-        //TODO What is it ? self.start_link();
         match self.base {
             PciMemoryBase::MemorySpace(mem) => {
                 for i in 0..10 {
@@ -169,6 +163,11 @@ impl E1000NetworkDriver {
             },
             PciMemoryBase::IOSpace(io) => {},
         }
+        self.eerprom_exists = self.detect_ee_prom();
+        self.read_mac_addr()
+            .or(Err(E1000NetworkDriverInitError::CantReadMac))?;
+        log::info!("Found ethernet device with mac: {:x}:{:x}:{:x}:{:x}:{:x}:{:x}", self.mac[0],self.mac[1],self.mac[2],self.mac[3],self.mac[4],self.mac[5],);
+        //TODO What is it ? self.start_link();
         for i in 0..0x80 {
             self.write_command(0x5200 + i * 4, 0);
         }
@@ -177,7 +176,6 @@ impl E1000NetworkDriver {
         self.enable_interrupts();
         self.rx_init();
         self.tx_init();
-        dbg!("E1000 Started !");
         return Ok(());
     }
     pub fn fire(&self) {

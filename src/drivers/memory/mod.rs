@@ -18,32 +18,16 @@ pub mod acpi;
 pub mod allocator;
 pub mod frame_allocator;
 pub mod handler;
-pub mod tables;
 
 use crate::mem_handler;
 
 use self::handler::MemoryHandler;
 
+//TODO Make an allocator error handler
 // #[alloc_error_handler]
 // pub fn alloc_error(size: usize, align: usize) -> ! {
 
 // }
-
-/// Creates an example mapping for the given page to frame `0xb8000`.
-pub fn create_example_mapping(
-    page: Page,
-    mapper: &mut OffsetPageTable,
-    frame_allocator: &mut impl FrameAllocator<Size4KiB>,
-) {
-    let frame = PhysFrame::containing_address(PhysAddr::new(0xb8000));
-    let flags = Flags::PRESENT | Flags::WRITABLE;
-
-    let map_to_result = unsafe {
-        // FIXME: this is not safe, we do it only for testing
-        mapper.map_to(page, frame, flags, frame_allocator)
-    };
-    map_to_result.expect("map_to failed").flush();
-}
 
 /// Returns a mutable reference to the active level 4 table.
 ///

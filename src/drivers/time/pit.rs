@@ -29,7 +29,6 @@ pub fn try_sdelay(seconds: u16) -> Result<(), TimerError> {
     let micros = seconds as u64*1_000_000;
     let times = micros/MAX_COUNTER_VALUE_INPUT as u64;
     let rest = (micros%MAX_COUNTER_VALUE_INPUT as u64) as u16;
-    dbg!(times, rest);
     for i in 0..times {
         try_udelay(MAX_COUNTER_VALUE_INPUT)?
     }

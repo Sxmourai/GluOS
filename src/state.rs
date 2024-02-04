@@ -3,7 +3,7 @@ use core::cell::Cell;
 use bootloader::BootInfo;
 use spin::{Mutex, RwLock, RwLockWriteGuard};
 
-use crate::{drivers::memory::handler::MemoryHandler, memory::tables::DescriptorTablesHandler};
+use crate::{drivers::memory::handler::MemoryHandler, acpi::tables::DescriptorTablesHandler};
 
 pub static mut BOOT_INFO: Option<&'static bootloader::BootInfo> = None;
 pub static mut MEM_HANDLER: Option<MemoryHandler> = None;

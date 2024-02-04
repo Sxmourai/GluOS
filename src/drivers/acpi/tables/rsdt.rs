@@ -1,7 +1,9 @@
+use core::ptr::slice_from_raw_parts;
+
 use alloc::vec::Vec;
 use log::trace;
 
-use crate::memory::{handler::MemoryHandler, tables::{read_sdt, ACPI_HEAD_SIZE}};
+use crate::{acpi::tables::{read_sdt, ACPI_HEAD_SIZE}, bit_manipulation::any_as_u8_slice, memory::handler::MemoryHandler};
 
 use super::ACPISDTHeader;
 
@@ -75,7 +77,7 @@ pub struct RSDT {
 }
 
 
-fn get_rsdt(rsdt_addr: u64) -> RSDT {
+fn get_rsdt(rsdt_addr: u64) -> Option<RSDT> {
     trace!("Getting RSDT at {}", rsdt_addr);
     let (rsdt_header, raw) = read_sdt(rsdt_addr, rsdt_addr);
 
@@ -88,12 +90,23 @@ fn get_rsdt(rsdt_addr: u64) -> RSDT {
         let addr = crate::bit_manipulation::ptrlist_to_num(&mut sdts[i..i + 4].iter());
         pointer_to_other_sdt.push(addr);
     }
-    RSDT {
+    let rsdt = RSDT {
         header: rsdt_header,
         pointer_to_other_sdt,
+    };
+    // RSDT Checksum
+    let table_bytes = any_as_u8_slice(rsdt_header);
+    let mut sum: u8 = 0;
+    for byte in table_bytes {
+        sum = sum.wrapping_add(*byte);
     }
+    if sum==0 {
+        log::error!("Failed doing checksum of RSDT");
+        return None
+    }
+    Some(rsdt)
 }
-pub fn search_rsdt(physical_memory_offset: u64) -> RSDT {
+pub fn search_rsdt(physical_memory_offset: u64) -> Option<RSDT> {
     let rsdp = search_rsdp(physical_memory_offset);
     if rsdp.xsdt_addr != 0{
         let xsdt_addr = rsdp.xsdt_addr;

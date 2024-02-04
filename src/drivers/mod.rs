@@ -21,6 +21,7 @@ pub mod mouse;
 pub mod qemu_in;
 pub mod rand;
 pub mod network;
+pub mod acpi;
 
 pub trait Driver: Sync + Send {
     fn new() -> Self
@@ -53,7 +54,7 @@ pub const DRIVERS: &[(&str, fn() -> ())] = &[
     ("graphics", super::video::init_graphics),
     #[cfg(feature="fs")]
     ("filesystem (indexing disk)", fs::init),
-    ("descriptor tables", super::memory::tables::DescriptorTablesHandler::init),
+    ("ACPI", super::acpi::init),
     #[cfg(feature="apic")]
     ("APIC", super::interrupts::apic::init),
     #[cfg(feature="smp")]
