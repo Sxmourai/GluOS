@@ -144,7 +144,7 @@ fn write_sector(raw_args: String) -> Result<(), String> {
             bytes.push(c as u8);
         }
     }
-    write_to_disk(&DiskLoc(channel, drive), start, &bytes);
+    write_to_disk(&DiskLoc(channel, drive), start, &bytes).unwrap();
     println!("Done");
     Ok(())
 }
@@ -370,7 +370,7 @@ fn sysinfo(args: String) -> Result<(), String> {
         Some(brand) => brand.as_str().to_string(),
         None => "Unknown".to_string(),
     };
-    let cores = unsafe { descriptor_tables!().num_core() };
+    let cores = descriptor_tables!().num_core();
     println!("CPU:\n- Vendor: {vendor}\n- Brand: {brand}\n- Frequency: {freq}\n- Cores: {cores}");
     if let Some(cparams) = cpuid.get_cache_parameters() {
         for cache in cparams {

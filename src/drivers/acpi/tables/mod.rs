@@ -17,7 +17,7 @@ pub mod waet;
 
 static ACPI_HEAD_SIZE: usize = core::mem::size_of::<ACPISDTHeader>();
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[repr(C, packed)]
 pub struct ACPISDTHeader {
     signature: [u8; 4],
@@ -92,8 +92,8 @@ fn read_sdt(ptr: u64, end_page: u64) -> (&'static ACPISDTHeader, &'static [u8]) 
     (entry, bytes)
 }
 
-#[repr(C)]
-#[derive(Debug)]
+#[repr(C, packed)]
+#[derive(Debug, Clone)]
 pub struct GenericAddressStructure {
     address_space: u8,
     bit_width: u8,

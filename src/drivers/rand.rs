@@ -8,7 +8,7 @@ pub static GENERATOR: Lazy<Mutex<SmallRng>> =
 pub fn init() {}
 
 pub fn rand() -> u64 {
-    unsafe { GENERATOR.lock().next_u64() }
+    GENERATOR.lock().next_u64()
 }
 
 /// Reads stuff in memory to get some random numbers 🤣

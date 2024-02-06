@@ -8,7 +8,6 @@ pub mod gdt;
 pub mod graphics;
 pub mod interrupts;
 pub mod memory;
-#[cfg(feature = "pit")]
 pub mod mouse;
 pub mod network;
 #[cfg(feature = "pci-ids")]
@@ -20,8 +19,7 @@ pub mod terminal;
 pub mod time;
 pub mod userland;
 pub mod video;
-#[cfg(feature = "smp")]
-pub mod video;
+pub mod ps2;
 
 pub trait Driver: Sync + Send {
     fn new() -> Self
@@ -47,6 +45,8 @@ pub const DRIVERS: &[(&str, fn() -> ())] = &[
     ("log", crate::user::log::initialize_logger),
     ("heap & frame allocation", super::memory::handler::init),
     ("gdt", super::gdt::init),
+    ("ACPI", super::acpi::init),
+    ("Ps2 Controller", super::ps2::init),
     ("interrupts", super::interrupts::init),
     ("Pci devices", super::pci::init),
     ("disks", super::disk::init),
@@ -54,7 +54,7 @@ pub const DRIVERS: &[(&str, fn() -> ())] = &[
     ("graphics", super::video::init_graphics),
     #[cfg(feature = "fs")]
     ("filesystem (indexing disk)", fs::init),
-    ("ACPI", super::acpi::init),
+    // ("ACPI", super::acpi::init),
     #[cfg(feature = "apic")]
     ("APIC", super::interrupts::apic::init),
     #[cfg(feature = "smp")]
@@ -62,6 +62,7 @@ pub const DRIVERS: &[(&str, fn() -> ())] = &[
     // ("Userland (Ring 3)", super::userland::go_ring3),
     ("Random numbers", super::rand::init),
     ("Network", super::network::init),
+    ("Mouse", super::mouse::init),
 ];
 
 //TODO Specify a bit more what is a driver... Cuz rn it's just smth that needs to be initialised
