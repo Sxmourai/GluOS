@@ -10,7 +10,7 @@ pub fn init() {
                 log::info!("Found IDE controller on bus {loc}");
                 for (i, disk) in ata::init().into_iter().enumerate() {
                     if let Some(disk) = disk {
-                        disks.insert(DiskLoc::from_idx(i.try_into().unwrap()), disk);
+                        disks.insert(DiskLoc::from_idx(i.try_into().unwrap()).unwrap(), (disk, ));
                     }
                 }
             } else if device.subclass() == 0x8 {
@@ -25,11 +25,8 @@ pub fn init() {
             }
         }
     }
-    // unsafe{DISK_MANAGER.lock().replace(DiskManager {
-    //     disks,
-    //     drivers,
-    //     selected_disk: 0,
-    // })};
+    crate::dbg!(disks);
+    // unsafe{DISK_MANAGER.lock().replace(DiskManager::new(disks, drivers))};
 }
 
 

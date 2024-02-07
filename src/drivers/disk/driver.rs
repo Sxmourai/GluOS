@@ -1,6 +1,6 @@
 use core::fmt::{Debug, Display};
 
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 use hashbrown::HashMap;
 use spin::Mutex;
 
@@ -27,13 +27,19 @@ pub enum DiskDriverType {
 pub struct DiskManager<'a> {
     /// Values are the GenericDisk and the index of the driver to use to read the disk
     pub disks: HashMap<DiskLoc, (&'a dyn GenericDisk, usize)>,
-    drivers: Vec<alloc::boxed::Box<dyn DiskDriver>>,
+    pub drivers: Vec<Box<dyn DiskDriver>>,
     selected_disk: usize, // u8 but usize because used for indexation
 }
 
-impl DiskManager<'_> {
-    pub fn new() -> Self {
-        todo!()
+impl<'a> DiskManager<'a> {
+    pub fn new(disks: HashMap<DiskLoc, (&'a dyn GenericDisk, usize)>, 
+               drivers: Vec<Box<dyn DiskDriver>>,
+    ) -> Self {
+        Self {
+            disks,
+            drivers,
+            selected_disk: 0,
+        }
     }
     pub fn read_disk(
         &mut self,

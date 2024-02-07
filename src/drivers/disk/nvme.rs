@@ -1,5 +1,5 @@
 //! Used wiki.osdev.org/NVMe
-//! Used https://github.com/torvalds/linux/blob/master/include/linux/nvme.h
+//! Used mostly https://nvmexpress.org/wp-content/uploads/NVM-Express-Base-Specification-2.0d-2024.01.11-Ratified.pdf
 use core::ptr::addr_of;
 
 use alloc::vec::Vec;
@@ -9,7 +9,7 @@ use x86_64::{structures::paging::{Page, PageTableFlags, PhysFrame}, PhysAddr, Vi
 use crate::{bit_manipulation::{all_zeroes, any_as_u8_slice}, dbg, mem_map, memory::handler::map_frame, pci::PciDevice};
 
 pub fn init(nvme_pci: &PciDevice) -> Option<Vec<NVMeDisk>> {
-    if true {return None}
+    // if true {return None}
     log::debug!("{}", nvme_pci);
     let bar0 = nvme_pci.raw.determine_mem_base(0).unwrap().as_u64();
     // mem_map!(frame_addr=bar0, WRITABLE);
@@ -21,9 +21,9 @@ pub fn init(nvme_pci: &PciDevice) -> Option<Vec<NVMeDisk>> {
     regs.controller_status=0;
     // regs.nvm_subsystem_reset = 0x4E564D65; // Reset NVM
     while !regs.ready() {}
-    regs.admin_submission_queue = *(regs.base() as u64+0x1000).set_bits(0..11, 0);
-    regs.admin_completion_queue = *(regs.base() as u64+0x1000).set_bits(0..11, 0);
-    dbg!(regs);
+    // regs.admin_submission_queue = *(regs.base() as u64+0x1000).set_bits(0..11, 0);
+    // regs.admin_completion_queue = *(regs.base() as u64+0x1000).set_bits(0..11, 0);
+    // dbg!(regs);
     
     dbg!(regs.capas_doorbell_stride());
     let addr = 4096*390;
@@ -46,6 +46,7 @@ pub fn init(nvme_pci: &PciDevice) -> Option<Vec<NVMeDisk>> {
         let buffer = unsafe{core::slice::from_raw_parts(addr as *const u8, 4096)};
         // dbg!(q);
         if !all_zeroes(buffer) {
+            dbg!(buffer,q);
             break
         }
     }
@@ -122,7 +123,7 @@ impl NVMeRegisters {
     }
     ///((self.base() as u64+0x1000)+(2*0+1)*self.db_stride())
     pub fn add_submission_entry(&mut self, entry: SubmissionEntry) {
-        unsafe {*(self.admin_submission_queue as *mut SubmissionEntry) = entry}
+        unsafe {*((self.admin_submission_queue+2*self.db_stride()) as *mut SubmissionEntry) = entry}
     }
     pub fn completion_queue(&self) -> Vec<CompletionEntry> {
         // Can we know the size of the vec ? If so with_capacity()

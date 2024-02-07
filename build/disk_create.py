@@ -1,8 +1,12 @@
 # Example: python3 disk_create.py fat-disk.img 30M -format fat32
 import sys,os
-def cmd(command):
+
+def cmd(command, description):
+    print("\n\t", description)
     print(">",command)
     os.system(command)
+
+    
 def get(list, idx, default=None):
   try:
     return list[idx]
@@ -35,34 +39,24 @@ def main(args):
         print(f"Invalid format type: {list(filesystems.keys())}")
         exit(1)
     
-    print("\n\tCreating raw disk with QEMU")
-    cmd(f"qemu-img create -f raw {args.filename} {args.size}")
+    cmd(f"qemu-img create -f raw {args.filename} {args.size}", "Creating raw disk with QEMU")
     if args.partition:
-        print(f"\n\tFormatting disk to {format}")
-        cmd(f"{format} {args.filename}")
+        cmd(f"{format} {args.filename}", f"Formatting disk to {format}")
     else:
-        print(f"\n\tCreating label on disk ({args.header_type})")
-        cmd(f"parted {args.filename} mklabel {args.header_type} --script")
-        print(f"\n\tCreating partition")
-        cmd(fr"parted {args.filename} mkpart primary {args.format} 18432B 100% --script")
-        print(f"\n\tMounting partition on loop device")
-        cmd(fr"sudo losetup -o 18432 /dev/loop3 {args.filename}")
-        print(f"\n\tCreating fs on partition")
+        cmd(f"parted {args.filename} mklabel {args.header_type} --script", f"Creating label on disk ({args.header_type})")
+        cmd(fr"parted {args.filename} mkpart primary {args.format} 18432B 100% --script", f"Creating partition")
+        cmd(fr"sudo losetup -o 18432 /dev/loop3 {args.filename}", "Mounting partition on loop device")
         if "ntfs" in format:
             print("Ouhh NTFS, good luck =)")
             format += " -F "
-        cmd(fr"sudo {format} /dev/loop3") # Sudo because sometimes it's needed
-        print(f"\n\tMounting partition")
-        cmd(fr"sudo mount /dev/loop3 mounted_disk")
-        print(f"\n\tCreating a test file")
-        cmd(fr"echo hi | sudo tee -a mounted_disk/hello.txt")
-        print(f"\n\tCreating a test dir")
-        cmd(fr"sudo mkdir mounted_disk/hello_dirs")
-        cmd(fr"echo hello | sudo tee -a mounted_disk/hello_dirs/second_hello_wewe.txt")
-        print(f"\n\tUnmounting partition")
-        cmd(fr"sudo umount mounted_disk")
-        print(f"\n\tUnmounting partition from loop device")
-        cmd(fr"sudo losetup -d /dev/loop3")
+        cmd(fr"sudo {format} /dev/loop3", "Creating fs on partition") # Sudo because sometimes it's needed
+        cmd(fr"sudo mount /dev/loop3 mounted_disk", "Mounting partition")
+        cmd(fr"echo hi | sudo tee -a mounted_disk/hello.txt", "Creating a test file")
+        cmd(fr"sudo mkdir mounted_disk/hello_dirs", "Creating a test dir")
+        cmd(fr"echo hello | sudo tee -a mounted_disk/hello_dirs/second_hello_wewe.txt", "Creating another test file in the folder")
+        cmd(fr"sudo cp userland.o mounted_disk/userland.o", "Copying a simple executable file")
+        cmd(fr"sudo umount mounted_disk", "Unmounting partition")
+        cmd(fr"sudo losetup -d /dev/loop3", "Unmounting partition from loop device")
 
     drives = []
 
