@@ -79,8 +79,8 @@ impl FADT {
         unsafe {
             PortWrite::write_to_port(self.smi_command_port.try_into().unwrap(), self.acpi_enable)
         };
-        //Wait for 3 secs
-        crate::time::sdelay(3);
+        //TODO Do smth whilst waiting
+        crate::time::sdelay(1);
         // Polling port
         while unsafe {
             <u16 as PortRead>::read_from_port(self.pm1a_control_block.try_into().unwrap())

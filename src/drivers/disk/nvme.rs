@@ -17,7 +17,7 @@ use crate::{
 };
 
 pub fn init(nvme_pci: &PciDevice) -> Option<Vec<NVMeDisk>> {
-    // if true {return None}
+    if true {return None}
     log::debug!("{}", nvme_pci);
     let bar0 = nvme_pci.raw.determine_mem_base(0).unwrap().as_u64();
     // mem_map!(frame_addr=bar0, WRITABLE);

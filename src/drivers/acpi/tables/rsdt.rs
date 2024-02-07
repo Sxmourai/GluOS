@@ -1,6 +1,6 @@
 use core::ptr::slice_from_raw_parts;
 
-use alloc::vec::Vec;
+use alloc::{collections::btree_map::Range, vec::Vec};
 use log::trace;
 
 use crate::{
@@ -49,15 +49,11 @@ fn search_rsdp_in_page(page: u64, physical_memory_offset: u64) -> Option<&'stati
     let bytes_read =
         unsafe { core::slice::from_raw_parts((page + physical_memory_offset) as *const u8, 4096) };
     if let Some(offset) = find_string(bytes_read, RSDP_SIGNATURE) {
-        let sl: &[u8] = &bytes_read[offset..offset + core::mem::size_of::<RSDPDescriptor>()];
-        // Check that the bytes_in_memory size matches the size of RSDPDescriptor
-        assert_eq!(sl.len(), core::mem::size_of::<RSDPDescriptor>());
+        let sl = &bytes_read[offset..offset + core::mem::size_of::<RSDPDescriptor>()];
+ 
+        let rsdp_bytes: &[u8; core::mem::size_of::<RSDPDescriptor>()] = sl.try_into().expect("Invalid slice size");
+        let rsdp_descriptor = unsafe { &*(rsdp_bytes.as_ptr() as *const _) };
 
-        let rsdp_bytes: &[u8; core::mem::size_of::<RSDPDescriptor>()] =
-            sl.try_into().expect("Invalid slice size");
-        let rsdp_descriptor: &RSDPDescriptor = unsafe { &*(rsdp_bytes.as_ptr() as *const _) };
-
-        //TODO Verify checksum
         return Some(rsdp_descriptor);
     }
     None
@@ -65,8 +61,10 @@ fn search_rsdp_in_page(page: u64, physical_memory_offset: u64) -> Option<&'stati
 
 //TODO Support ACPI version 2 https://wiki.osdev.org/RSDP
 pub fn search_rsdp(physical_memory_offset: u64) -> &'static RSDPDescriptor {
+    // chains aren't const
+    let rsdp_addresses = (1003520..1003520+4096).chain(0x80000..0x9ffff).chain(0xe0000..0xfffff);
     trace!("Searching RSDP in first&second memory region");
-    for i in (0x80000..0x9ffff).chain(0xe0000..0xfffff).step_by(4096) {
+    for i in rsdp_addresses.step_by(4096) {
         if let Some(rsdp) = search_rsdp_in_page(i, physical_memory_offset) {
             return rsdp;
         }

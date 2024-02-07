@@ -70,6 +70,7 @@ impl DescriptorTablesHandler {
                 }
             };
         }
+        log::info!("Finished !");
         Some(Self {
             fadt: acpi.unwrap(),
             madt: madt.unwrap(),

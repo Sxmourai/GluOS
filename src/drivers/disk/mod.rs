@@ -25,7 +25,7 @@ pub fn init() {
             }
         }
     }
-    crate::dbg!(disks);
+    // crate::dbg!(disks);
     // unsafe{DISK_MANAGER.lock().replace(DiskManager::new(disks, drivers))};
 }
 
