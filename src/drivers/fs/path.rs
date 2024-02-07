@@ -8,7 +8,6 @@ use crate::{disk::DiskLoc, fs_driver};
 
 use super::{partition::Partition, userland::FatAttributes};
 
-
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
 pub enum FileSystemError {
     FileNotFound,
@@ -45,7 +44,10 @@ impl FilePath {
     /// Creates a new filepath poiting to parent
     pub fn parent(&self) -> FilePath {
         let splitted: Vec<&str> = self.raw_path.split('/').collect();
-        FilePath::new(splitted[0..splitted.len() - 2].join("/"), self.partition.clone())
+        FilePath::new(
+            splitted[0..splitted.len() - 2].join("/"),
+            self.partition.clone(),
+        )
     }
     pub fn path(&self) -> &String {
         &self.raw_path
@@ -55,12 +57,18 @@ impl FilePath {
         let mut path = self.raw_path.clone();
         assert_eq!(self.partition, other_path.partition);
         path.push_str(other_path.path());
-        Self::new(path.replace("//", "/").replace('\\', "/"), self.partition.clone())
+        Self::new(
+            path.replace("//", "/").replace('\\', "/"),
+            self.partition.clone(),
+        )
     }
     //TODO Return new or mutate self ?
     pub fn join_str(&self, other_path: String) -> FilePath {
         let path = &format!("{}/{}", self.path(), other_path);
-        Self::new(path.replace("//", "/").replace('\\', "/"), self.partition.clone())
+        Self::new(
+            path.replace("//", "/").replace('\\', "/"),
+            self.partition.clone(),
+        )
     }
     pub fn disk_loc(&self) -> DiskLoc {
         self.partition.0

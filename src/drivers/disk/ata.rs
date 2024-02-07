@@ -1,37 +1,29 @@
-use core::{
-    fmt::Display,
-    panic,
-};
+use core::{fmt::Display, panic};
 
 use alloc::string::ToString;
-use alloc::{
-    format,
-    vec::Vec,
-};
+use alloc::{format, vec::Vec};
 use log::{debug, error, info, trace};
 use spin::{Mutex, MutexGuard};
 
 use crate::bit_manipulation::{bytes, ptrlist_to_num, u16_to_u8};
 
-
-use crate::{dbg, disk_manager};
-#[cfg(feature="fs")]
-use crate::fs::path::FilePath;
-#[cfg(feature="fs")]
+#[cfg(feature = "fs")]
 use crate::fs::partition::Partition;
+#[cfg(feature = "fs")]
+use crate::fs::path::FilePath;
 use crate::x86_64::instructions::port::{PortRead, PortWrite};
+use crate::{dbg, disk_manager};
 
 use super::driver::{DiskDriver, SECTOR_SIZE};
 use super::{DiskError, DiskLoc};
-
 
 pub fn init() -> [Option<AtaDisk>; 4] {
     unsafe { u8::write_to_port(0x3f6, (1 << 1) | (1 << 2)) }
     unsafe { u8::write_to_port(0x376, (1 << 1) | (1 << 2)) }
     [
-        detect(&DiskLoc(Channel::Primary, Drive::Master)), 
+        detect(&DiskLoc(Channel::Primary, Drive::Master)),
         detect(&DiskLoc(Channel::Primary, Drive::Slave)),
-        detect(&DiskLoc(Channel::Secondary, Drive::Master)), 
+        detect(&DiskLoc(Channel::Secondary, Drive::Master)),
         detect(&DiskLoc(Channel::Secondary, Drive::Slave)),
     ]
 }
@@ -122,7 +114,7 @@ fn detect(addr: &DiskLoc) -> Option<AtaDisk> {
     Some(disk)
 }
 
-fn read_identify(command_port_addr: u16) -> [u16; SECTOR_SIZE as usize/2] {
+fn read_identify(command_port_addr: u16) -> [u16; SECTOR_SIZE as usize / 2] {
     trace!("Reading identify data");
     let mut data = [0u16; 256];
     for ele in &mut data {
@@ -161,7 +153,12 @@ pub struct AtaDriver {
     disks: [AtaDisk; 4],
 }
 impl DiskDriver for AtaDriver {
-    fn read(&mut self, loc: &DiskLoc, start_sector: u64, sector_count: u64) -> Result<Vec<u8>, DiskError> {
+    fn read(
+        &mut self,
+        loc: &DiskLoc,
+        start_sector: u64,
+        sector_count: u64,
+    ) -> Result<Vec<u8>, DiskError> {
         todo!()
     }
 
@@ -170,8 +167,8 @@ impl DiskDriver for AtaDriver {
     }
 
     fn select_disk(&mut self, loc: &DiskLoc) {
-        if loc.as_index()==self.selected_disk as usize {
-            return
+        if loc.as_index() == self.selected_disk as usize {
+            return;
         }
         let disk = &self.disks[loc.as_index()];
         self.selected_disk = loc.as_index().try_into().unwrap();
@@ -180,13 +177,11 @@ impl DiskDriver for AtaDriver {
         unsafe { bsy(base) };
         unsafe { u8::write_to_port(base + 6, drive) }; // Select drive of channel
         for _i in 0..14 {
-            unsafe { u8::read_from_port(loc.base()+7) };
+            unsafe { u8::read_from_port(loc.base() + 7) };
         }
         unsafe { bsy(loc.base()) };
     }
-    
 }
-
 
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub enum Channel {
@@ -223,13 +218,7 @@ pub struct AtaDisk {
     pub loc: DiskLoc, //TODO UDMA modes and store other infos...
 }
 impl AtaDisk {
-    pub fn new(
-        addr: &DiskLoc,
-        lba28: u32,
-        lba48: u64,
-        size: u64,
-        is_hardisk: bool,
-    ) -> Self {
+    pub fn new(addr: &DiskLoc, lba28: u32, lba48: u64, size: u64, is_hardisk: bool) -> Self {
         Self {
             addressing_modes: AddressingModes {
                 chs: true,
@@ -334,16 +323,17 @@ impl AtaDisk {
     }
     fn retrieve_read(&self, sector_count: u16) -> Result<Vec<u8>, DiskError> {
         trace!("Retrieving read !");
-        let mut buffer = Vec::with_capacity(sector_count as usize*512);
+        let mut buffer = Vec::with_capacity(sector_count as usize * 512);
         for _sector in 0..sector_count {
             self.poll()?;
-            for i in 0..SECTOR_SIZE / 4 { // Divide by 4 because we take 4 by 4 bytes
+            for i in 0..SECTOR_SIZE / 4 {
+                // Divide by 4 because we take 4 by 4 bytes
                 let data = unsafe { u32::read_from_port(self.data_reg()) };
                 // Do we make a for loop ?
                 buffer.push(data as u8); // Try push_within_capacity
-                buffer.push((data>>8) as u8);
-                buffer.push((data>>16) as u8);
-                buffer.push((data>>24) as u8);
+                buffer.push((data >> 8) as u8);
+                buffer.push((data >> 16) as u8);
+                buffer.push((data >> 24) as u8);
             }
         }
         Ok(buffer)
@@ -420,17 +410,17 @@ impl AtaDisk {
         self.poll()?;
         Ok(())
     }
-    
-        /*
-        #define ATA_SR_BSY     0x80    // Busy
-        #define ATA_SR_DRDY    0x40    // Drive ready
-        #define ATA_SR_DF      0x20    // Drive write fault
-        #define ATA_SR_DSC     0x10    // Drive seek complete
-        #define ATA_SR_DRQ     0x08    // Data request ready
-        #define ATA_SR_CORR    0x04    // Corrected data
-        #define ATA_SR_IDX     0x02    // Index
-        #define ATA_SR_ERR     0x01    // Error
-        */
+
+    /*
+    #define ATA_SR_BSY     0x80    // Busy
+    #define ATA_SR_DRDY    0x40    // Drive ready
+    #define ATA_SR_DF      0x20    // Drive write fault
+    #define ATA_SR_DSC     0x10    // Drive seek complete
+    #define ATA_SR_DRQ     0x08    // Data request ready
+    #define ATA_SR_CORR    0x04    // Corrected data
+    #define ATA_SR_IDX     0x02    // Index
+    #define ATA_SR_ERR     0x01    // Error
+    */
     fn poll(&self) -> Result<(), DiskError> {
         for _ in 0..4 {
             // Doing this 4 times creates a 400ns delay
@@ -441,18 +431,18 @@ impl AtaDisk {
             if status & 0x80 == 0 {
                 if status & 0x08 == 0x08 {
                     return Ok(()); // Read data available
-                }
-                else if status & 0x01 == 0x1 { // Error reading
+                } else if status & 0x01 == 0x1 {
+                    // Error reading
                     error!("Error reading disk !");
-                    return Err(DiskError::ReadDataNotAvailable)
-                }
-                else if status & 0x20 == 0x20 { // Error reading
+                    return Err(DiskError::ReadDataNotAvailable);
+                } else if status & 0x20 == 0x20 {
+                    // Error reading
                     error!("Error reading disk !");
-                    return Err(DiskError::ReadDataNotAvailable)
+                    return Err(DiskError::ReadDataNotAvailable);
                 }
             }
             if i == 100_000 - 1 {
-                log::error!("DRQ read timed out, polling with status 0x{:02X}",status);
+                log::error!("DRQ read timed out, polling with status 0x{:02X}", status);
                 return Err(DiskError::ReadDataNotAvailable);
             }
         }
@@ -476,12 +466,19 @@ impl AtaDisk {
         Ok(status)
     }
 
-    pub fn read_sectors(&self, sector_address: u64, sector_count: u16) -> Result<Vec<u8>, DiskError> {
+    pub fn read_sectors(
+        &self,
+        sector_address: u64,
+        sector_count: u16,
+    ) -> Result<Vec<u8>, DiskError> {
         //TODO Move from vecs to slices
         if self.addressing_modes.lba48 != 0 {
             if sector_address + (sector_count as u64) > self.addressing_modes.lba48 {
                 // > or >= ?
-                error!("Sector not in disk ({} - {}) -> {:?}", sector_address, sector_count, self.loc);
+                error!(
+                    "Sector not in disk ({} - {}) -> {:?}",
+                    sector_address, sector_count, self.loc
+                );
                 return Err(DiskError::NotFound);
             }
             self.read48(sector_address, sector_count)

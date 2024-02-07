@@ -6,15 +6,18 @@ use spin::Mutex;
 
 use super::{ata::AtaDisk, DiskError, DiskLoc};
 
-
 pub static mut DISK_MANAGER: Mutex<Option<DiskManager>> = Mutex::new(None); // Uninitialised
 pub const SECTOR_SIZE: u16 = 512;
-
 
 #[macro_export]
 macro_rules! disk_manager {
     () => {
-        unsafe{crate::drivers::disk::driver::DISK_MANAGER.lock().as_mut().unwrap()}
+        unsafe {
+            $crate::drivers::disk::driver::DISK_MANAGER
+                .lock()
+                .as_mut()
+                .unwrap()
+        }
     };
 }
 #[derive(Debug)]
@@ -30,6 +33,8 @@ pub struct DiskManager<'a> {
     pub drivers: Vec<Box<dyn DiskDriver>>,
     selected_disk: usize, // u8 but usize because used for indexation
 }
+
+
 
 impl<'a> DiskManager<'a> {
     pub fn new(disks: HashMap<DiskLoc, (&'a dyn GenericDisk, usize)>, 
@@ -64,7 +69,6 @@ impl<'a> DiskManager<'a> {
     }
 }
 
-
 pub fn read_from_disk(
     addr: &DiskLoc,
     start_sector: u64,
@@ -72,34 +76,47 @@ pub fn read_from_disk(
 ) -> Result<Vec<u8>, DiskError> {
     disk_manager!().read_disk(addr, start_sector, sector_count)
 }
-#[cfg(feature="fs")]
+#[cfg(feature = "fs")]
 pub fn read_from_partition(
     partition: &Partition,
     start_sector: u64,
     sector_count: u64,
 ) -> Result<Vec<u8>, DiskError> {
-    let start_sector = start_sector+partition.1;
-    assert!((start_sector+sector_count as u64)<partition.1+partition.2, "Trying to read outside of partition");
+    let start_sector = start_sector + partition.1;
+    assert!(
+        (start_sector + sector_count as u64) < partition.1 + partition.2,
+        "Trying to read outside of partition"
+    );
     read_from_disk(&partition.0, start_sector, sector_count)
 }
 pub fn write_to_disk(addr: &DiskLoc, start_sector: u64, content: &[u8]) -> Result<(), DiskError> {
     disk_manager!().write_disk(addr, start_sector, content)
 }
-#[cfg(feature="fs")]
-pub fn write_to_partition(partition: &Partition, start_sector: u64, content: &[u8]) -> Result<(), DiskError> {
-    let start_sector = start_sector+partition.1;
-    assert!((start_sector+content.len() as u64)<partition.1+partition.2, "Trying to write outside of partition");
+#[cfg(feature = "fs")]
+pub fn write_to_partition(
+    partition: &Partition,
+    start_sector: u64,
+    content: &[u8],
+) -> Result<(), DiskError> {
+    let start_sector = start_sector + partition.1;
+    assert!(
+        (start_sector + content.len() as u64) < partition.1 + partition.2,
+        "Trying to write outside of partition"
+    );
     disk_manager!().write_disk(&partition.0, start_sector, content)
 }
 
-
 pub trait DiskDriver: Debug {
-    fn read(&mut self, loc: &DiskLoc, start_sector: u64, sector_count: u64) -> Result<Vec<u8>, DiskError>;
+    fn read(
+        &mut self,
+        loc: &DiskLoc,
+        start_sector: u64,
+        sector_count: u64,
+    ) -> Result<Vec<u8>, DiskError>;
     fn write(&mut self, loc: &DiskLoc, start_sector: u64, content: &[u8]) -> Result<(), DiskError>;
     fn select_disk(&mut self, disk: &DiskLoc);
 }
 
 pub trait GenericDisk: core::fmt::Debug + Display {
     fn loc(&self) -> &DiskLoc;
-
 }

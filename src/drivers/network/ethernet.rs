@@ -1,3 +1,4 @@
+//! Helped a bit https://wiki.osdev.org/Intel_Ethernet_i217
 use core::{
     mem::forget,
     ptr::{addr_of, slice_from_raw_parts},
@@ -11,10 +12,13 @@ use x86_64::{
 };
 
 use crate::{
-    bit_manipulation::{read_at, write_at}, dbg, interrupts::{hardware::PIC_1_OFFSET, idt::IDT}, mem_handler, mem_map, pci::{PciDevice, PciMemoryBase}
+    bit_manipulation::{read_at, write_at},
+    dbg,
+    interrupts::{hardware::PIC_1_OFFSET, idt::IDT},
+    mem_handler, mem_map,
+    pci::{PciDevice, PciMemoryBase},
 };
 
-///! https://wiki.osdev.org/Intel_Ethernet_i217
 
 const REG_CTRL: u16 = 0x0000;
 const REG_STATUS: u16 = 0x0008;
@@ -158,25 +162,36 @@ impl E1000NetworkDriver {
         match self.base {
             PciMemoryBase::MemorySpace(mem) => {
                 for i in 0..10 {
-                    mem_map!(frame_addr=mem.as_u64()+0x1000*i, WRITABLE);
+                    mem_map!(frame_addr = mem.as_u64() + 0x1000 * i, WRITABLE);
                 }
-            },
-            PciMemoryBase::IOSpace(io) => {},
+            }
+            PciMemoryBase::IOSpace(io) => {}
         }
         self.eerprom_exists = self.detect_ee_prom();
         self.read_mac_addr()
             .or(Err(E1000NetworkDriverInitError::CantReadMac))?;
-        log::info!("Found ethernet device with mac: {:x}:{:x}:{:x}:{:x}:{:x}:{:x}", self.mac[0],self.mac[1],self.mac[2],self.mac[3],self.mac[4],self.mac[5],);
+        log::info!(
+            "Found ethernet device with mac: {:x}:{:x}:{:x}:{:x}:{:x}:{:x}",
+            self.mac[0],
+            self.mac[1],
+            self.mac[2],
+            self.mac[3],
+            self.mac[4],
+            self.mac[5],
+        );
         //TODO What is it ? self.start_link();
         for i in 0..0x80 {
             self.write_command(0x5200 + i * 4, 0);
         }
-        
-        unsafe{IDT.as_mut().unwrap().write()[PIC_1_OFFSET as usize+self.int_line as usize].set_handler_fn(handle_receive)};
+
+        unsafe {
+            IDT.as_mut().unwrap().write()[PIC_1_OFFSET as usize + self.int_line as usize]
+                .set_handler_fn(handle_receive)
+        };
         self.enable_interrupts();
         self.rx_init();
         self.tx_init();
-        return Ok(());
+        Ok(())
     }
     pub fn fire(&self) {
         todo!()
@@ -189,10 +204,10 @@ impl E1000NetworkDriver {
         self.tx_descs[self.tx_cur as usize].status = 0;
         let old_cur = self.tx_cur;
         self.tx_cur = (self.tx_cur + 1) % E1000_NUM_TX_DESC;
-        self.write_command(REG_TXDESCTAIL, self.tx_cur as u32);   
+        self.write_command(REG_TXDESCTAIL, self.tx_cur as u32);
         for i in 0..100_000 {
-            if (self.tx_descs[old_cur as usize].status & 0xff != 0) {
-                return Ok(())
+            if (self.tx_descs[old_cur as usize].status != 0) {
+                return Ok(());
             }
         }
         Err(PacketSendError::StatusTimeOut)
@@ -214,7 +229,9 @@ impl E1000NetworkDriver {
         }
     }
     fn read_command(&self, p_addr: u16) -> u32 {
-        let r =match self.base {
+        
+        // dbg!("Read",r,"from", p_addr);
+        match self.base {
             PciMemoryBase::MemorySpace(mem) => unsafe {
                 read_at::<u32>(mem.as_u64() as usize + p_addr as usize)
             },
@@ -225,9 +242,7 @@ impl E1000NetworkDriver {
                     PortRead::read_from_port(io + 4)
                 }
             }
-        };
-        // dbg!("Read",r,"from", p_addr);
-        r
+        }
     }
 
     /// Return true if EEProm exist, else it returns false and set the eerprom_existsdata member
@@ -280,18 +295,16 @@ impl E1000NetworkDriver {
             self.mac[5] = (temp >> 8) as u8;
         } else {
             // This breaks rust so hard 🤣 I got u8 == 857870592
-            mem_map!(frame_addr=self.mem_base() + 0x5400, WRITABLE);
+            mem_map!(frame_addr = self.mem_base() + 0x5400, WRITABLE);
             let raw_mem_base_mac =
                 slice_from_raw_parts((self.mem_base() + 0x5400) as *const u32, 6);
             let mem_base_mac = unsafe { &*raw_mem_base_mac };
             let raw_mem_base_macu8 =
                 slice_from_raw_parts((self.mem_base() + 0x5400) as *const u8, 6);
             let mem_base_macu8 = unsafe { &*raw_mem_base_macu8 };
-            let a = mem_base_macu8.into_iter().map(|a| *a).collect::<Vec<u8>>();
+            let a = mem_base_macu8.to_vec();
             if (mem_base_mac[0] != 0) {
-                for i in 0..6 {
-                    self.mac[i] = mem_base_macu8[i];
-                }
+                self.mac.copy_from_slice(mem_base_macu8);
             } else {
                 return Err(E1000ReadMac::NoMemoryBase);
             }
@@ -392,7 +405,9 @@ impl E1000NetworkDriver {
         }
     }
 }
-extern "x86-interrupt" fn handle_receive(_stack_frame: x86_64::structures::idt::InterruptStackFrame) {
+extern "x86-interrupt" fn handle_receive(
+    _stack_frame: x86_64::structures::idt::InterruptStackFrame,
+) {
     dbg!("Network", _stack_frame);
 }
 

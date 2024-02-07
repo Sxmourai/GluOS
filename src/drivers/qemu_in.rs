@@ -1,10 +1,19 @@
 use alloc::string::String;
 use x86_64::{instructions::hlt, structures::port::PortRead};
 
-use crate::{dbg, time::{async_sdelay, sdelay}};
+use crate::{
+    dbg,
+    time::{async_sdelay, sdelay},
+};
 
 pub struct QemuIOReader {
     inputted: String,
+}
+
+impl Default for QemuIOReader {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl QemuIOReader {
@@ -16,9 +25,9 @@ impl QemuIOReader {
     pub async fn run(mut self) {
         loop {
             let k = unsafe { u8::read_from_port(0x3F8) };
-            if k==13 {
+            if k == 13 {
                 crate::dbg!(k);
-                return
+                return;
             }
             if k != 0 {
                 dbg!(k)

@@ -1,5 +1,6 @@
 use self::memory::handler::MemoryHandler;
 
+pub mod acpi;
 pub mod disk;
 #[cfg(feature = "fs")]
 pub mod fs;
@@ -7,21 +8,18 @@ pub mod gdt;
 pub mod graphics;
 pub mod interrupts;
 pub mod memory;
-#[cfg(feature="pci-ids")]
-pub mod pci;// pci id's Adds 2MB to kernel size !
+pub mod mouse;
+pub mod network;
+#[cfg(feature = "pci-ids")]
+pub mod pci; // pci id's Adds 2MB to kernel size !
+pub mod qemu_in;
+pub mod rand;
 pub mod task;
 pub mod terminal;
 pub mod time;
-pub mod video;
 pub mod userland;
-#[cfg(feature="smp")]
 pub mod video;
-#[cfg(feature="pit")]
-pub mod mouse;
-pub mod qemu_in;
-pub mod rand;
-pub mod network;
-pub mod acpi;
+pub mod ps2;
 
 pub trait Driver: Sync + Send {
     fn new() -> Self
@@ -47,21 +45,24 @@ pub const DRIVERS: &[(&str, fn() -> ())] = &[
     ("log", crate::user::log::initialize_logger),
     ("heap & frame allocation", super::memory::handler::init),
     ("gdt", super::gdt::init),
+    ("ACPI", super::acpi::init),
+    ("Ps2 Controller", super::ps2::init),
     ("interrupts", super::interrupts::init),
     ("Pci devices", super::pci::init),
     ("disks", super::disk::init),
     ("timer", super::time::init),
     ("graphics", super::video::init_graphics),
-    #[cfg(feature="fs")]
+    #[cfg(feature = "fs")]
     ("filesystem (indexing disk)", fs::init),
-    ("ACPI", super::acpi::init),
-    #[cfg(feature="apic")]
+    // ("ACPI", super::acpi::init),
+    #[cfg(feature = "apic")]
     ("APIC", super::interrupts::apic::init),
-    #[cfg(feature="smp")]
+    #[cfg(feature = "smp")]
     ("multiprocessing (SMP)", super::smp::init),
     // ("Userland (Ring 3)", super::userland::go_ring3),
     ("Random numbers", super::rand::init),
-    ("Network", super::network::init)
+    ("Network", super::network::init),
+    ("Mouse", super::mouse::init),
 ];
 
 //TODO Specify a bit more what is a driver... Cuz rn it's just smth that needs to be initialised

@@ -1,10 +1,30 @@
-use alloc::{boxed::Box, format, string::{String, ToString}, vec::Vec};
+use alloc::{
+    boxed::Box,
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
 use hashbrown::HashMap;
 
-use crate::{bit_manipulation::any_as_u8_slice, dbg, disk::{driver::{read_from_partition, write_to_partition}, DiskError}, fs::path::FileSystemError, serial_print, serial_println};
+use crate::{
+    bit_manipulation::any_as_u8_slice,
+    dbg,
+    disk::{
+        driver::{read_from_partition, write_to_partition},
+        DiskError,
+    },
+    fs::path::FileSystemError,
+    serial_print, serial_println,
+};
 
-use super::{path::FilePath, fs_driver::{Dir, Entry, File, FsDriver, FsDriverEnum, FsDriverInitialiser, FsReadError, SoftEntry}, partition::Partition, userland::FatAttributes};
-
+use super::{
+    fs_driver::{
+        Dir, Entry, File, FsDriver, FsDriverEnum, FsDriverInitialiser, FsReadError, SoftEntry,
+    },
+    partition::Partition,
+    path::FilePath,
+    userland::FatAttributes,
+};
 
 #[derive(Debug)]
 pub struct Fat32Driver {
@@ -18,7 +38,7 @@ impl Fat32Driver {
         let fat_info = Self::get_fat_boot(partition).unwrap();
         if fat_info.0.fs_type_label[0..5] != [70, 65, 84, 51, 50] {
             // log::error!("Error reading fat info in {:?} {}",partition, crate::bit_manipulation::as_chars(&fat_info.0.fs_type_label));
-            return None
+            return None;
         }
         let first_fat_sector = fat_info.first_fat_sector();
         let first_data_sector = fat_info.get_first_data_sector();
@@ -43,7 +63,8 @@ impl Fat32Driver {
                 path: root,
                 is_file: false,
                 sector: root_sector,
-        });
+            },
+        );
         Some(Self {
             files,
             fat_info,
@@ -60,8 +81,9 @@ impl Fat32Driver {
         let mut chars = Vec::new();
         let mut reading = true;
         while reading {
-            for byte in
-                read_from_partition(&self.partition, sector + i, 1).unwrap().into_iter()
+            for byte in read_from_partition(&self.partition, sector + i, 1)
+                .unwrap()
+                .into_iter()
             {
                 if byte == 0 {
                     reading = false;
@@ -142,7 +164,8 @@ impl Fat32Driver {
             if last_sector != 0 {
                 break;
             }
-            let content = read_from_partition(partition, first_fat_sector as u64 + i as u64, 1).unwrap();
+            let content =
+                read_from_partition(partition, first_fat_sector as u64 + i as u64, 1).unwrap();
             for offset in 0..content.len() / 4 {
                 let table_value = &content[offset * 4..offset * 4 + 4];
                 let mut table_value = ((table_value[3] as u32) << 24)
@@ -188,7 +211,8 @@ impl Fat32Driver {
             // Should do current_sector-2 but we could have buffer underflows...
             log::error!(
                 "Can't read cluster if sector is to small ! {}<{}",
-                current_sector, first_data_sector
+                current_sector,
+                first_data_sector
             );
             return None;
         }
@@ -202,7 +226,7 @@ impl Fat32Driver {
             | ((table_value[1] as u32) << 8)
             | (table_value[0] as u32);
         table_value &= 0x0FFFFFFF;
-        if table_value >= 0x0FFFFFF8 || table_value==0 {
+        if table_value >= 0x0FFFFFF8 || table_value == 0 {
             Some(ClusterEnum::EndOfChain)
         } else if table_value == 0x0FFFFFF7 {
             Some(ClusterEnum::BadCluster)
@@ -349,7 +373,11 @@ impl Fat32Driver {
                         continue;
                     } as u32;
 
-                    let parsed_entry = Fat32SoftEntry { path, sector: sector as u64, is_file };
+                    let parsed_entry = Fat32SoftEntry {
+                        path,
+                        sector: sector as u64,
+                        is_file,
+                    };
                     files.push(parsed_entry);
 
                     i += 1; // Skip next entry cuz it's related to the current LFN
@@ -368,7 +396,9 @@ impl Fat32Driver {
     }
 }
 impl FsDriver for Fat32Driver {
-    fn as_enum(&self) -> FsDriverEnum {FsDriverEnum::Fat32}
+    fn as_enum(&self) -> FsDriverEnum {
+        FsDriverEnum::Fat32
+    }
     fn read(&self, path: &FilePath) -> Result<Entry, FsReadError> {
         let soft_entry = self.files.get(path).ok_or(FsReadError::EntryNotFound)?;
         let entry = match soft_entry.is_file {
@@ -380,13 +410,17 @@ impl FsDriver for Fat32Driver {
                     content,
                     size,
                 })
-            },
+            }
             false => {
-                let entries: Vec<SoftEntry> = self.read_dir(path).unwrap()
-                    .into_iter().map(|entry| SoftEntry {
+                let entries: Vec<SoftEntry> = self
+                    .read_dir(path)
+                    .unwrap()
+                    .into_iter()
+                    .map(|entry| SoftEntry {
                         path: entry.path,
                         size: 0,
-                    }).collect();
+                    })
+                    .collect();
                 Entry::Dir(Dir {
                     path: soft_entry.path.clone(),
                     size: entries.len(),
@@ -396,10 +430,15 @@ impl FsDriver for Fat32Driver {
         };
         Ok(entry)
     }
-    fn partition(&self) -> &Partition {&self.partition}
+    fn partition(&self) -> &Partition {
+        &self.partition
+    }
 }
 impl FsDriverInitialiser for Fat32Driver {
-    fn try_init(partition: &Partition) -> Option<Box<Self>> where Self: Sized {
+    fn try_init(partition: &Partition) -> Option<Box<Self>>
+    where
+        Self: Sized,
+    {
         Some(Box::new(Self::new(partition)?))
     }
 }
@@ -462,8 +501,6 @@ pub fn cluster_to_sector(cluster_number: u64, first_data_sector: u64) -> u64 {
 pub fn sector_to_cluster(sector_number: u64, first_data_sector: u64) -> u64 {
     (sector_number - first_data_sector) + 2
 }
-
-
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(packed)]
@@ -562,8 +599,6 @@ impl FatInfo {
     }
 }
 
-
-
 #[derive(Debug, Default)]
 pub struct FatTable {
     pub size: u32,
@@ -578,7 +613,6 @@ pub enum ClusterEnum {
     BadCluster,
     Cluster(u32),
 }
-
 
 #[derive(Default, Clone)]
 #[repr(C, packed)]
@@ -678,9 +712,6 @@ pub enum RawFat32Entry {
     LFN(LFN32),
     Standard(Standard32),
 }
-
-
-
 
 // pub fn write_file(
 //     &mut self,

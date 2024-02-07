@@ -45,26 +45,22 @@ impl KeyboardHandler {
             if let Some(key) = self.inner.process_keyevent(key_event) {
                 let mut key_handled = false;
                 match key {
-                    DecodedKey::RawKey(k) => {
-                        match k {
-                            KeyCode::ArrowUp => {
-                                if self.is_pressed(&KeyCode::LControl) {
-                                    WRITER.lock().move_down();
-                                    key_handled = true;
-                                }
+                    DecodedKey::RawKey(k) => match k {
+                        KeyCode::ArrowUp => {
+                            if self.is_pressed(&KeyCode::LControl) {
+                                WRITER.lock().move_down();
+                                key_handled = true;
                             }
-                            KeyCode::ArrowDown => {
-                                if self.is_pressed(&KeyCode::LControl) {
-                                    WRITER.lock().move_up();
-                                    key_handled = true;
-                                }
-                            }
-                            _ => {}
                         }
-                    }
-                    DecodedKey::Unicode(k) => {
-                        {}
-                    }
+                        KeyCode::ArrowDown => {
+                            if self.is_pressed(&KeyCode::LControl) {
+                                WRITER.lock().move_up();
+                                key_handled = true;
+                            }
+                        }
+                        _ => {}
+                    },
+                    DecodedKey::Unicode(k) => {}
                 }
                 if !key_handled {
                     for input in KB_INPUTS.lock().iter_mut() {

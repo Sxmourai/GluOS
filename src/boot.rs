@@ -2,8 +2,10 @@ use alloc::string::ToString;
 use log::info;
 use spin::Mutex;
 
-use crate::{task::{executor::Executor, Task}, user::shell::Shell};
-
+use crate::{
+    task::{executor::Executor, Task},
+    user::shell::Shell,
+};
 
 pub fn boot(boot_info: &'static bootloader::BootInfo) -> Executor {
     //TODO Can't use vecs, Strings before heap init (in memoryHandler init), which means we can't do trace... Use a constant-size list ?

@@ -3,7 +3,6 @@ use alloc::{
     vec::Vec,
 };
 
-
 use super::path::FilePath;
 
 #[derive(Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]

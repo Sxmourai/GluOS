@@ -3,7 +3,11 @@ use core::ptr::slice_from_raw_parts;
 use alloc::vec::Vec;
 use log::trace;
 
-use crate::{acpi::tables::{read_sdt, ACPI_HEAD_SIZE}, bit_manipulation::any_as_u8_slice, memory::handler::MemoryHandler};
+use crate::{
+    acpi::tables::{read_sdt, ACPI_HEAD_SIZE},
+    bit_manipulation::any_as_u8_slice,
+    memory::handler::MemoryHandler,
+};
 
 use super::ACPISDTHeader;
 
@@ -35,16 +39,15 @@ pub struct RSDPDescriptor {
     revision: u8,
     rsdt_addr: u32,
     // ! XSDT
-    len:u32,
-    xsdt_addr:u64,
+    len: u32,
+    xsdt_addr: u64,
     ext_chcksum: u8,
     reserved: [u8; 3],
 }
 
 fn search_rsdp_in_page(page: u64, physical_memory_offset: u64) -> Option<&'static RSDPDescriptor> {
-    let bytes_read = unsafe { 
-        core::slice::from_raw_parts((page + physical_memory_offset) as *const u8, 4096)
-    };
+    let bytes_read =
+        unsafe { core::slice::from_raw_parts((page + physical_memory_offset) as *const u8, 4096) };
     if let Some(offset) = find_string(bytes_read, RSDP_SIGNATURE) {
         let sl: &[u8] = &bytes_read[offset..offset + core::mem::size_of::<RSDPDescriptor>()];
         // Check that the bytes_in_memory size matches the size of RSDPDescriptor
@@ -76,7 +79,6 @@ pub struct RSDT {
     pub pointer_to_other_sdt: Vec<u32>,
 }
 
-
 fn get_rsdt(rsdt_addr: u64) -> Option<RSDT> {
     trace!("Getting RSDT at {}", rsdt_addr);
     let (rsdt_header, raw) = read_sdt(rsdt_addr, rsdt_addr);
@@ -100,15 +102,15 @@ fn get_rsdt(rsdt_addr: u64) -> Option<RSDT> {
     for byte in table_bytes {
         sum = sum.wrapping_add(*byte);
     }
-    if sum==0 {
+    if sum == 0 {
         log::error!("Failed doing checksum of RSDT");
-        return None
+        return None;
     }
     Some(rsdt)
 }
 pub fn search_rsdt(physical_memory_offset: u64) -> Option<RSDT> {
     let rsdp = search_rsdp(physical_memory_offset);
-    if rsdp.xsdt_addr != 0{
+    if rsdp.xsdt_addr != 0 {
         let xsdt_addr = rsdp.xsdt_addr;
         log::debug!("Xsdt address is set, we should maybe use it ?!");
     }

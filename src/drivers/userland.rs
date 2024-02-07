@@ -5,7 +5,7 @@ pub fn go_ring3() {
     //TODO Set up IDT for syscalls
     //TODO IRQ handling
     //TODO Plans for multitasking with task switching
-    unsafe{jump_usermode_iret()}
+    unsafe { jump_usermode_iret() }
 }
 #[allow(unused)]
 extern "C" fn test_user() {
@@ -14,7 +14,8 @@ extern "C" fn test_user() {
 }
 
 unsafe fn jump_usermode_iret() {
-    unsafe{core::arch::asm!("
+    unsafe {
+        core::arch::asm!("
         mov ax, (4 * 8) | 3
         mov ds, ax
         mov es, ax
@@ -28,14 +29,15 @@ unsafe fn jump_usermode_iret() {
         push {test_user_function}
         iretq
         ", test_user_function = sym test_user,
-    )}
+        )
+    }
 }
 
 // unsafe fn jump_usermode_sysretq() {
 //     unsafe{msr::set_msr(0xc0000081, (1<<3)|((3<<3)|3))};
 //     unsafe{msr::set_msr(0xc0000082, 0x00180008)};
 
-//     unsafe{core::arch::asm!(" 
+//     unsafe{core::arch::asm!("
 // 	mov ecx, {test_user_function} //to be loaded into RIP
 // 	mov r11, 0x202 //to be loaded into EFLAGS
 //     hlt
@@ -61,13 +63,13 @@ unsafe fn jump_usermode_iret() {
 // 	mov es, ax
 // 	mov fs, ax
 // 	mov gs, ax //sysexit sets SS
- 
+
 // 	//setup wrmsr inputs
 // 	xor edx, edx //not necessary//set to 0
 // 	mov eax, 0x8 //the segments are computed as follows: CS=MSR+0x10 (0x8+0x10=0x18), SS=MSR+0x18 (0x8+0x18=0x20).
 // 	mov ecx, 0x174 //MSR specifier: IA32_SYSENTER_CS
 // 	wrmsr //set sysexit segments
- 
+
 // 	//setup sysexit inputs
 // 	mov rdx, {test_user_function} //to be loaded into EIP
 // 	mov ecx, esp //to be loaded into ESP
