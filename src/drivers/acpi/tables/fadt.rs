@@ -40,6 +40,7 @@ pub struct FADT {
     pub day_alarm: u8,
     pub month_alarm: u8,
     pub century: u8,
+    /// reserved in ACPI 1.0; used since ACPI 2.0+
     pub boot_architecture_flags: u16,
     pub reserved2: u8,
     pub flags: u32,
@@ -60,7 +61,7 @@ pub struct FADT {
 impl FADT {
     pub fn new(bytes: &'static [u8]) -> &'static Self {
         let _self = unsafe { &*(bytes.as_ptr() as *const Self) };
-
+        let boot_architecture_flags = _self.boot_architecture_flags;
         if _self.smi_command_port == 0
             && _self.acpi_disable == 0
             && _self.acpi_enable == 0

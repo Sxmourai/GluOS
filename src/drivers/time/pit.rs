@@ -36,10 +36,10 @@ pub fn try_sdelay(seconds: u16) -> Result<(), TimerError> {
     Ok(())
 }
 pub fn udelay(micros: u16) {
-    try_sdelay(micros).unwrap()
+    try_udelay(micros).unwrap()
 }
 pub fn mdelay(millis: u16) {
-    try_sdelay(millis).unwrap()
+    try_mdelay(millis).unwrap()
 }
 pub fn sdelay(seconds: u16) {
     try_sdelay(seconds).unwrap()

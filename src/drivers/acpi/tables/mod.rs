@@ -5,7 +5,7 @@ use alloc::{
     vec::Vec,
 };
 
-use crate::{boot_info, mem_handler, memory::read_phys_memory_and_map};
+use crate::{boot_info, dbg, mem_handler, memory::read_phys_memory_and_map};
 
 pub mod dsdt;
 pub mod fadt;
@@ -30,17 +30,34 @@ pub struct ACPISDTHeader {
     creator_id: u32,
     creator_revision: u32,
 }
+pub enum AcpiVersion {
+    One,
+    Two,
+}
 
 pub struct DescriptorTablesHandler {
     pub fadt: &'static fadt::FADT,
     pub madt: madt::MADT,
     pub hpet: &'static hpet::HPET,
     pub waet: &'static waet::WAET,
+    pub version: AcpiVersion,
 }
 impl DescriptorTablesHandler {
     pub fn new() -> Option<Self> {
         let physical_memory_offset = unsafe { boot_info!() }.physical_memory_offset;
-        let rsdt = rsdt::search_rsdt(physical_memory_offset)?;
+        let rsdp = rsdt::search_rsdp(physical_memory_offset);
+        let version = if rsdp.revision == 0 {
+            log::info!("Found ACPI version 1.0");
+            AcpiVersion::One
+        } else if rsdp.revision == 2 {
+            log::info!("Found ACPI version 2.0-6.1");
+            AcpiVersion::Two
+        } else {
+            log::error!("Unknown ACPI version: {}", rsdp.revision);
+            return None
+        };
+        let rsdt = rsdt::get_rsdt(rsdp.rsdt_addr.into())?;
+        
         let mut acpi = None;
         let mut madt = None;
         let mut hpet = None;
@@ -54,7 +71,9 @@ impl DescriptorTablesHandler {
                 .to_string()
                 .as_str()
             {
-                "FACP" => acpi = Some(fadt::FADT::new(table_bytes)),
+                "FACP" => {
+                    acpi = {Some(fadt::FADT::new(table_bytes))}
+                }
                 "APIC" => madt = unsafe { madt::MADT::new(table_bytes) },
                 "HPET" => hpet = unsafe { hpet::handle_hpet(table_bytes) },
                 "WAET" => waet = unsafe { waet::handle_waet(table_bytes) },
@@ -76,6 +95,7 @@ impl DescriptorTablesHandler {
             madt: madt.unwrap(),
             hpet: hpet.unwrap(),
             waet: waet.unwrap(),
+            version,
         })
     }
 

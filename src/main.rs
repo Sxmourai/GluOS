@@ -7,7 +7,7 @@
 
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
-use kernel::{serial_print, test::exit_qemu};
+use kernel::{serial_print, serial_println, test::exit_qemu};
 use log::{error, info};
 
 // const CONFIG: bootloader_api::BootloaderConfig = {
@@ -29,6 +29,12 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 fn panic(info: &PanicInfo) -> ! {
     serial_print!("PANIC");
     error!("PANIC: {}", info);
+    // Prints traceback of 10 last items
+    let traces = kernel::user::log::TRACES.read();
+    let firsts = traces.len().saturating_sub(10);
+    for trace in traces[firsts..].iter() {
+        serial_println!("[TRACE] {}", trace);
+    }
     kernel::test::end()
 }
 
