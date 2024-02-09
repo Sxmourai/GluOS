@@ -116,7 +116,9 @@ fn detect(addr: &DiskLoc) -> Option<AtaDisk> {
     let lba48: u64 = ptrlist_to_num(&mut identify[100..103].iter());
     let is_hardisk = true; //TODO Parse if 'i24612s hard disk'
                            //TODO Parse ALL info returned by IDENTIFY https://wiki.osdev.org/ATA_PIO_Mode
-
+    if lba28 as u64+lba48==0 { // Skip if size = 0, because QEMU sometimes creates some disks with no size that isn't interesting
+        return None;
+    }
     trace!(
         "Found {:?} {:?} drive in {:?} channel of size: {}Ko",
         addr.drive(),
@@ -126,6 +128,7 @@ fn detect(addr: &DiskLoc) -> Option<AtaDisk> {
     );
     let disk = AtaDisk::new(
         addr,
+        false,
         lba28,
         lba48,
         lba48.max(lba28 as u64) * 512,
@@ -238,10 +241,10 @@ pub struct AtaDisk {
     pub loc: DiskLoc, //TODO UDMA modes and store other infos...
 }
 impl AtaDisk {
-    pub fn new(addr: &DiskLoc, lba28: u32, lba48: u64, size: u64, is_hardisk: bool) -> Self {
+    pub fn new(addr: &DiskLoc, chs:bool, lba28: u32, lba48: u64, size: u64, is_hardisk: bool) -> Self {
         Self {
             addressing_modes: AddressingModes {
-                chs: true,
+                chs,
                 lba28,
                 lba48,
             }, // Assume chs is supported on all ATA drives...
@@ -507,7 +510,8 @@ impl AtaDisk {
             let sector_count = sector_count.try_into().or(Err(DiskError::SectorTooBig))?;
             self.read28(sector_address, sector_count)
         } else if self.addressing_modes.chs {
-            todo!("Implement CHS pio mode");
+            log::error!("Implement CHS pio mode");
+            return Err(DiskError::NoReadModeAvailable)
             // return self.readchs(sector_address.try_into()?, sector_count.try_into()?)
         } else {
             Err(DiskError::NoReadModeAvailable)

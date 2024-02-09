@@ -77,6 +77,8 @@ pub fn read_from_disk(
     disk_manager!().read_disk(addr, start_sector, sector_count)
 }
 #[cfg(feature = "fs")]
+use crate::fs::partition::Partition;
+#[cfg(feature = "fs")]
 pub fn read_from_partition(
     partition: &Partition,
     start_sector: u64,

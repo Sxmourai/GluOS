@@ -65,11 +65,12 @@ impl ExtDriver {
 
         Ok(files)
     }
-    fn index_disk(&mut self) {
+    fn index_disk(&mut self) -> Result<(), FsReadError> {
         let root = ExtEntryDescriptor::new_raw(2, "/".to_string(), false);
-        self.files = self.walk_dir(&root).unwrap();
+        self.files = self.walk_dir(&root)?;
         self.files
             .insert(FilePath::new("/".to_string(), self.partition.clone()), root);
+        Ok(())
     }
     fn dir_entries_contain_type(&self) -> bool {
         self.extsuperblock().required_feat_present & 0x2 != 0
@@ -89,15 +90,15 @@ impl ExtDriver {
     fn get_inode(&self, inode_number: u32) -> Option<Inode> {
         let blk_grp_number =
             block_group_of_inode(inode_number as u64, self.superblock().inodes_per_group);
-        let blk_grp = &self.blk_grp_desc_table[blk_grp_number as usize];
+        let blk_grp = &self.blk_grp_desc_table.get(blk_grp_number as usize)?;
         let block_size = self.block_size();
         let inode_table_start_sector = (blk_grp.lo_block_addr_of_inode_start * block_size) as u64;
         let inode_size = self.extsuperblock().size_inode_struct as usize;
         let inode_table_start_sector =
             inode_table_start_sector + ((inode_number as u64 - 1) / (512 / inode_size as u64));
         let tables =
-            get_inode_table(&self.partition, inode_table_start_sector, inode_size).unwrap();
-        let inode = &tables[(inode_number as usize - 1) % (512 / inode_size)];
+            get_inode_table(&self.partition, inode_table_start_sector, inode_size)?;
+        let inode = tables.get((inode_number as usize - 1) % (512 / inode_size))?;
         Some(inode.clone())
     }
     fn read_inode_block(
@@ -231,6 +232,7 @@ impl FsDriverInitialiser for ExtDriver {
         let raw_bgdt = read_from_partition(partition, ((block_size) * 2).into(), 1)
             .expect("Failed reading Block Group Descriptor");
         let mut bgds = Vec::new();
+        dbg!(raw_bgdt);
         for raw_bgd in raw_bgdt.chunks_exact(32) {
             //TODO Support 64 bit mode for ext4 i.e.
             if raw_bgd.iter().all(|x| *x == 0) {
@@ -245,7 +247,8 @@ impl FsDriverInitialiser for ExtDriver {
             blk_grp_desc_table: bgds,
             files: HashMap::new(),
         };
-        _self.index_disk();
+        dbg!(_self);
+        _self.index_disk().ok()?;
         Some(Box::new(_self))
     }
 }

@@ -27,10 +27,10 @@ use super::prompt::{input, COMMANDS_HISTORY, COMMANDS_INDEX};
 #[command("lsdisk", "Lists plugged disks with size & slot")]
 fn lsdisk(_args: String) -> Result<(), String> {
     #[cfg(feature = "fs")]
-    let drvs = fs_driver!();
+    let drvs = crate::fs_driver!();
     #[cfg(feature = "fs")]
-    for (loc, (disk, drv)) in disk_manager!().disks.iter() {
-        println!("- {} {:?}", disk, drv);
+    for (loc, disk) in disk_manager!().disks.iter() {
+        println!("- {:?} {:?}", disk.loc, disk.drv);
         if let Some(partitions) = drvs.partitions.get(loc) {
             // If the partition start is 1 we know it's MBR because on GPT the first 33 sectors are reserved !
             let start_lba = partitions.first().map(|x| x.1).unwrap_or(0);
@@ -182,7 +182,7 @@ fn read(raw_args: String) -> Result<(), String> {
     #[cfg(feature = "fs")]
     let path = path.unwrap();
     #[cfg(feature = "fs")]
-    let fs_driver = fs_driver!();
+    let fs_driver = crate::fs_driver!();
     #[cfg(feature = "fs")]
     if let Ok(entry) = fs_driver.read(&path) {
         match entry {

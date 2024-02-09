@@ -25,7 +25,6 @@ pub fn init() {
             }
         }
     }
-    crate::dbg!(disks);
     unsafe{DISK_MANAGER.lock().replace(DiskManager {
         disks,
     })};
