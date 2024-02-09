@@ -37,7 +37,7 @@ impl KeyboardListener for Input {
 
 
 pub struct KeyboardHandler {
-    inner: Keyboard<layouts::AnyLayout, ScancodeSet1>,
+    inner: Keyboard<layouts::AnyLayout, ScancodeSet2>,
     pressed: Vec<KeyCode>,
 }
 impl KeyboardHandler {

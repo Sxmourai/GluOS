@@ -11,7 +11,7 @@ use crate::{terminal::writer::WRITER, user::prompt::KbInput};
 lazy_static! {
     pub static ref DEFAULT_KEYBOARD: Mutex<KeyboardHandler> = Mutex::new(KeyboardHandler {
         inner: Keyboard::new(
-            ScancodeSet1::new(),
+            pc_keyboard::ScancodeSet2::new(),
             layouts::AnyLayout::Us104Key(layouts::Us104Key),
             HandleControl::Ignore
         ),
@@ -21,7 +21,7 @@ lazy_static! {
 
 static KB_INPUTS: Mutex<Vec<Box<SendSyncWrapper<dyn KbInput>>>> = Mutex::new(Vec::new());
 pub struct KeyboardHandler {
-    inner: Keyboard<layouts::AnyLayout, ScancodeSet1>,
+    inner: Keyboard<layouts::AnyLayout, pc_keyboard::ScancodeSet2>,
     pressed: Vec<KeyCode>,
 }
 impl KeyboardHandler {
