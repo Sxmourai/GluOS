@@ -61,7 +61,7 @@ pub const DRIVERS: &[(&str, fn() -> ())] = &[
     ("multiprocessing (SMP)", super::smp::init),
     // ("Userland (Ring 3)", super::userland::go_ring3),
     ("Random numbers", super::rand::init),
-    ("Network", super::network::init),
+    // ("Network", super::network::init),
     // Don't need to init mouse driver cuz we don't have a use for it currently
     // ("Mouse", super::mouse::init),
 ];

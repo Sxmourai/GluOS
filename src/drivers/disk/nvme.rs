@@ -11,65 +11,258 @@ use x86_64::{
 
 use crate::{
     bit_manipulation::{all_zeroes, any_as_u8_slice},
-    dbg, mem_map,
+    dbg,
+    interrupts::hardware::InterruptIndex,
+    malloc, mem_map,
     memory::handler::map_frame,
     pci::PciDevice,
+    time::mdelay,
 };
 
+pub struct NVMeDisk {}
 pub fn init(nvme_pci: &PciDevice) -> Option<Vec<NVMeDisk>> {
-    if true {return None}
+    // if true {
+    //     return None;
+    // }
     log::debug!("{}", nvme_pci);
     let bar0 = nvme_pci.raw.determine_mem_base(0).unwrap().as_u64();
-    // mem_map!(frame_addr=bar0, WRITABLE);
+    // Enable bus mastering & memory space
+    let mut command = nvme_pci.raw.command;
+    command.set_bit(2, true);
+    command.set_bit(1, true);
+    command.set_bit(0, true);
+    nvme_pci
+        .raw
+        .location
+        .pci_write(crate::pci::PCI_COMMAND, command as u32);
     for i in 0..64 {
-        mem_map!(frame_addr = bar0 + (0x1000 * i), WRITABLE);
+        mem_map!(
+            frame_addr = bar0 + (0x1000 * i),
+            PageTableFlags::PRESENT
+                | PageTableFlags::WRITABLE
+                | PageTableFlags::NO_CACHE
+                | PageTableFlags::WRITE_THROUGH
+        );
     }
     let regs = unsafe { NVMeRegisters::new(bar0 as usize) };
-    dbg!(regs);
-    regs.controller_status = 0;
-    // regs.nvm_subsystem_reset = 0x4E564D65; // Reset NVM
-    while !regs.ready() {}
-    // regs.admin_submission_queue = *(regs.base() as u64+0x1000).set_bits(0..11, 0);
-    // regs.admin_completion_queue = *(regs.base() as u64+0x1000).set_bits(0..11, 0);
-    // dbg!(regs);
-    
-    dbg!(regs.capas_doorbell_stride());
-    let addr = 4096 * 390;
-    //TODO Does the NVMe needs it ?
-    //TODO Get a frame allocator for low memory
-    let buffer = unsafe { core::slice::from_raw_parts_mut(addr as *mut u8, 4096) }; // Rolled a dice, I swear it's random 🤣
-    mem_map!(frame_addr = addr, WRITABLE);
-    let identify = SubmissionEntry::new_identify(IdentifyType::Controller, None, buffer);
-    //
-    let submission_addr = regs.admin_submission_queue;
-    mem_map!(frame_addr = submission_addr, WRITABLE);
-    mem_map!(frame_addr = submission_addr + 0x1000, WRITABLE);
-    regs.add_submission_entry(identify);
-    loop {
-        let q = regs.completion_queue();
-        // if q.len()>0 {
-        //     dbg!(q);
-        //     break
-        // }
-        let buffer = unsafe { core::slice::from_raw_parts(addr as *const u8, 4096) };
-        // dbg!(q);
-        if !all_zeroes(buffer) {
+    log::info!(
+        "Found NVMe device with version {}.{}.{}, maximum queues supported: {}",
+        regs.version >> 16,
+        regs.version >> 8 & 0xff,
+        regs.version & 0xff,
+        regs.get_max_queue_entries()
+    );
+
+    // Disable
+    let mut config = regs.controller_config;
+    regs.controller_config = *config.set_bit(0, false);
+    let c = regs.controller_config;
+    let mut i = 500;
+    while i > 0 {
+        i -= 1;
+        let status = regs.controller_status;
+        let st = status.get_bit(0);
+        if !st {
             break;
         }
+        mdelay(10);
     }
-    Some(Vec::new())
+    if i == 0 {
+        log::warn!("NVMe device doesn't want to be disabled, skipping");
+        return None;
+    }
+
+    // Checking page size following https://github.com/LemonOSProject/LemonOS/blob/master/Kernel/include/Storage/NVMe.h#L18
+    if 0x1000 << ((regs.controller_caps >> 52) & 0xf) < 4096
+        || 0x1000 << ((regs.controller_caps >> 48) & 0xf) > 4096
+    {
+        log::warn!("NVMe device doesn't support 4k memory page size, skipping");
+        return None;
+    }
+    // We can now set page size to 4096
+    regs.controller_config =
+        (regs.controller_config & !NVME_CFG_MPS(NVME_CFG_MPS_MASK as u32)) | NVME_CFG_MPS(0); // 2^12+0 = 4096
+
+    regs.set_command_set(NVME_CONFIG_CMDSET_NVM);
+
+    regs.controller_config |= NVME_CFG_DEFAULT_IOCQES | NVME_CFG_DEFAULT_IOSQES;
+
+    regs.admin_completion_queue =
+        crate::malloc!(PageTableFlags::PRESENT | PageTableFlags::WRITABLE)?.as_u64();
+    regs.admin_submission_queue =
+        crate::malloc!(PageTableFlags::PRESENT | PageTableFlags::WRITABLE)?.as_u64();
+
+    let mut adm_queue = NVMeQueue {
+        queue_id: 0, /* admin queue ID is 0 */
+        completion_base: VirtAddr::new(regs.admin_completion_queue),
+        submission_base: VirtAddr::new(regs.admin_submission_queue),
+        completion_db: regs.get_completion_doorbell(0),
+        submission_db: regs.get_submission_doorbell(0),
+        completion_queue_size: 4096.min(regs.get_max_queue_entries()),
+        submission_queue_size: 4096.min(regs.get_max_queue_entries()),
+    };
+
+    regs.admin_queue_attrs = 0;
+
+    regs.set_admin_completion_queue_size(
+        adm_queue.completion_queue_size / core::mem::size_of::<NVMeCompletion>() as u16,
+    );
+    regs.set_admin_submission_queue_size(
+        adm_queue.submission_queue_size / core::mem::size_of::<NVMeCommand>() as u16,
+    );
+
+    log::info!(
+        "[NVMe] CQ size: {}, SQ size: {}",
+        (regs.admin_queue_attrs >> 16) + 1,
+        (regs.admin_queue_attrs & 0xffff) + 1
+    );
+    regs.enable();
+    let mut i = 500;
+    while i > 0 {
+        i -= 1;
+        let status = regs.controller_status;
+        let st = status.get_bit(0);
+        if st {
+            break;
+        }
+        mdelay(10);
+    }
+    if i == 0 {
+        log::warn!("NVMe device doesn't want to be enabled, skipping");
+        return None;
+    }
+    if (regs.controller_status & NVME_CSTS_FATAL as u32 != 0) {
+        log::warn!("[NVMe] Controller fatal error! (NVME_CSTS_FATAL set)");
+        return None;
+    }
+    dbg!(adm_queue);
+    adm_queue.identify();
+    // loop {
+    mdelay(100);
+    dbg!(regs);
+    let completion = unsafe {
+        core::slice::from_raw_parts(regs.admin_completion_queue as *const NVMeCompletion, 4)
+    };
+    dbg!(completion);
+
+    // }
+
+    return None;
 }
 
-pub struct NVMeDisk {}
+#[derive(Debug)]
+pub struct NVMeQueue {
+    pub queue_id: u16,
+    pub completion_base: VirtAddr,
+    pub submission_base: VirtAddr,
+    pub completion_db: u32,
+    pub submission_db: u32,
+    pub completion_queue_size: u16,
+    pub submission_queue_size: u16,
+}
+impl NVMeQueue {
+    fn identify(&mut self) {
+        let id = malloc!(PageTableFlags::PRESENT | PageTableFlags::WRITABLE).unwrap();
+        // TODO Proper command creation
+        let command = NVMeSubmission {
+            opcode: 0x6,
+            fuse_and_psdt: 0,
+            command_id: 0,
+            ns_id: 0,
+            _reserved: 0,
+            metadata_ptr: 0,
+            prp1: 0,
+            prp2: 0,
+            command: NVMeCommand {
+                raw: [1, 0, 0, 0, 0, 0],
+            },
+        }; //TODOOOOOOOOOOOOOOOOOOOOOO
+        let subs = unsafe {
+            core::slice::from_raw_parts_mut(self.submission_base.as_u64() as *mut NVMeSubmission, 4)
+        };
+        subs[0] = command;
+        dbg!((unsafe { *(self.submission_db as *mut u32) }));
+        unsafe {
+            *(self.submission_db as *mut u32) = 1;
+        }
+    }
+}
+#[repr(C, packed)]
+pub struct NVMeCommand {
+    raw: [u32; 6],
+}
 
+#[repr(C, packed)]
+pub struct NVMeSubmission {
+    opcode: u8,
+    fuse_and_psdt: u8,
+    command_id: u16,
+    ns_id: u32,
+    _reserved: u64,
+    metadata_ptr: u64,
+    prp1: u64,
+    prp2: u64,
+    command: NVMeCommand,
+}
+#[derive(Debug)]
+#[repr(C, packed)]
+pub struct NVMeCompletion {
+    dw0: u32,        // DWORD 0, Command specific
+    _reserved: u32,  // DWORD 1, Reserved
+    sq_head: u16,    // DWORD 2, Submission queue (indicated in sqID) head pointer
+    sq_id: u16,      // DWORD 2, Submission queue ID
+    command_id: u16, // Id of the command being completed
+    phase_tag_and_status: u16, // DWORD 3, Changed when a completion queue entry is new
+                     // status: u16,     // DWORD 3, Status of command being completed
+}
+
+// let int = nvme_pci.raw.int_pin;
+// dbg!(int, nvme_pci.raw.command);
+// //TODO The host configures the Admin Queue by setting the Admin Queue Attributes (AQA), Admin
+// // Submission Queue Base Address (ASQ), and Admin Completion Queue Base Address (ACQ) to
+// // appropriate values;
+// let caps = regs.controller_caps;
+// dbg!(regs);
+// // if caps.get_bit(37 + 7) {
+// //     dbg!(config);
+// // }
+// // regs.nvm_subsystem_reset = 0x4E564D65; // Reset NVM
+
+// dbg!(regs.capas_doorbell_stride());
+// let addr = 4096 * 390;
+// //TODO Does the NVMe needs it ?
+// //TODO Get a frame allocator for low memory
+// let buffer = unsafe { core::slice::from_raw_parts_mut(addr as *mut u8, 4096) }; // Rolled a dice, I swear it's random 🤣
+// mem_map!(frame_addr = addr, WRITABLE);
+// let identify = SubmissionEntry::new_identify(IdentifyType::Controller, None, buffer);
+// //
+// let submission_addr = regs.admin_submission_queue;
+// mem_map!(frame_addr = submission_addr, WRITABLE);
+// mem_map!(frame_addr = submission_addr + 0x1000, WRITABLE);
+// regs.add_submission_entry(identify);
+// loop {
+//     let q = regs.completion_queue();
+//     // if q.len()>0 {
+//     //     dbg!(q);
+//     //     break
+//     // }
+//     let buffer = unsafe { core::slice::from_raw_parts(addr as *const u8, 4096) };
+//     // dbg!(q);
+//     if !all_zeroes(buffer) {
+//         break;
+//     }
+// }
+// Some(Vec::new())
 #[derive(Debug)]
 #[repr(C, packed)]
 struct NVMeRegisters {
     controller_caps: u64,
-    version: u64,
+    version: u32,
     interrupt_mask_set: u32,
     interrupt_mask_clear: u32,
     controller_config: u32,
+    /// Something but idk, following the bad doc wiki.osdev.org/NVMe
+    _pad: u32,
     controller_status: u32,
     nvm_subsystem_reset: u32,
     admin_queue_attrs: u32,
@@ -83,6 +276,44 @@ struct NVMeRegisters {
     // controller_memory_buffer_memory_space_control: u32,
 }
 impl NVMeRegisters {
+    fn set_admin_completion_queue_size(&mut self, sz: u16) {
+        self.admin_queue_attrs = (self.admin_queue_attrs
+            & !NVME_AQA_ACQS(NVME_AQA_AQS_MASK) as u32)
+            | NVME_AQA_ACQS(sz as u64 - 1) as u32; // 0's based
+    }
+
+    fn set_admin_submission_queue_size(&mut self, sz: u16) {
+        self.admin_queue_attrs = (self.admin_queue_attrs
+            & !NVME_AQA_ASQS(NVME_AQA_AQS_MASK) as u32)
+            | NVME_AQA_ASQS(sz as u64 - 1) as u32; // 0's based
+    }
+
+    fn get_max_queue_entries(&self) -> u16 {
+        let max = (self.controller_caps & 0xffff) as u16;
+        if (max <= 0) {
+            return u16::MAX;
+        } else {
+            return max + 1;
+        }
+    }
+    fn set_command_set(&mut self, set: u8) {
+        self.controller_config = (self.controller_config & !NVME_CFG_CSS(NVME_CFG_CSS_MASK) as u32)
+            | NVME_CFG_CSS(set) as u32;
+    }
+    fn get_completion_doorbell(&mut self, queue_id: u16) -> u32 {
+        return (addr_of!(*self) as u32)
+            + 0x1000
+            + (2 * queue_id as u32 + 1) * (4 << self.capas_doorbell_stride());
+    }
+    fn get_submission_doorbell(&mut self, queue_id: u16) -> u32 {
+        return (addr_of!(*self) as u32)
+            + 0x1000
+            + (2 * queue_id as u32) * (4 << self.capas_doorbell_stride());
+    }
+    fn enable(&mut self) {
+        self.controller_config |= NVME_CFG_ENABLE;
+    }
+
     /// # Safety
     /// Ensure that bar0 address is the proper base for the NVMe registers
     pub unsafe fn new(bar0: usize) -> &'static mut Self {
@@ -276,3 +507,40 @@ enum IdentifyType {
     Controller = 1,
     NamespaceList = 2,
 }
+
+const NVME_CAP_CMBS: u64 = (1 << 57); // Controller memory buffer supported
+const NVME_CAP_PMRS: u64 = (1 << 56); // Persistent memory region supported
+const NVME_CAP_BPS: u64 = (1 << 45); // Boot partition support
+const NVME_CAP_NVM_CMD_SET: u64 = (1 << 37); // NVM command set supported
+const NVME_CAP_NSSRS: u64 = (1 << 36); // NVM subsystem reset supported
+const NVME_CAP_CQR: u32 = (1 << 16); // Contiguous Queues Required
+
+const NVME_CAP_MPS_MASK: u8 = 0xf;
+const NVME_CAP_MPSMAX: fn(u64) -> u64 = |x| ((x >> 52) & NVME_CAP_MPS_MASK as u64); // Max supported memory page size (2 ^ (12 + MPSMAX))
+const NVME_CAP_MPSMIN: fn(u64) -> u64 = |x| ((x >> 48) & NVME_CAP_MPS_MASK as u64); // Min supported memory page size (2 ^ (12 + MPSMIN))
+
+const NVME_CAP_DSTRD_MASK: u64 = 0xf;
+const NVME_CAP_DSTRD: fn(u64) -> u64 = |x| (((x) >> 32) & NVME_CAP_DSTRD_MASK); // Doorbell stride (2 ^ (2 + DSTRD)) bytes
+
+const NVME_CAP_MQES_MASK: u64 = 0xffff;
+const NVME_CAP_MQES: fn(u64) -> u64 = |x| ((x) & NVME_CAP_MQES_MASK); // Maximum queue entries supported
+
+const NVME_CFG_MPS_MASK: u8 = 0xf;
+const NVME_CFG_MPS: fn(u32) -> u32 = |x| (((x) & NVME_CFG_MPS_MASK as u32) << 7); // Host memory page size (2 ^ (12 + MPSMIN))
+const NVME_CFG_CSS_MASK: u8 = 0b111; // Command set selected
+const NVME_CFG_CSS: fn(u8) -> u8 = |x| (((x) & NVME_CFG_CSS_MASK) << 4);
+const NVME_CFG_ENABLE: u32 = (1 << 0);
+const NVME_CONFIG_CMDSET_NVM: u8 = 0;
+const NVME_CFG_DEFAULT_IOCQES: u32 = (4 << 20); // 16 bytes so log2(16) = 4
+const NVME_CFG_DEFAULT_IOSQES: u32 = (6 << 16); // 64 bytes so log2(64) = 6
+
+const NVME_CSTS_FATAL: u8 = (1 << 1);
+const NVME_CSTS_READY: u8 = (1 << 0); // Set to 1 when the controller is ready to accept submission queue doorbell writes
+const NVME_CSTS_NSSRO: u8 = (1 << 4); // NVM Subsystem reset occurred
+
+const NVME_AQA_AQS_MASK: u64 = 0xfff; // Admin queue size mask
+const NVME_AQA_ACQS: fn(u64) -> u64 = |x| (((x) & NVME_AQA_AQS_MASK) << 16); // Admin completion queue size
+const NVME_AQA_ASQS: fn(u64) -> u64 = |x| (((x) & NVME_AQA_AQS_MASK) << 0); // Admin submission queue size
+
+// "NVME", initiates a reset
+const NVME_NSSR_RESET_VALUE: u64 = 0x4E564D65;

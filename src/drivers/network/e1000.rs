@@ -150,8 +150,7 @@ impl E1000NetworkDriver {
         // Enable bus mastering
         pci_device.raw.location.pci_read_16(crate::pci::PCI_COMMAND);
         let mut command = pci_device.raw.command;
-        command.set_bit(3, true);
-        // TODO Be sure that writing u32 where the size of command is u16 isn't a problem
+        command.set_bit(2, true);
         pci_device
             .raw
             .location
@@ -223,14 +222,12 @@ impl E1000NetworkDriver {
         let old_cur = self.tx_cur;
         self.tx_cur = (self.tx_cur + 1) % E1000_NUM_TX_DESC;
         self.write_command(REG_TXDESCTAIL, self.tx_cur as u32);
-        dbg!(self.tx_descs);
         for i in 0..100_000 {
             if (self.tx_descs[old_cur as usize].status != 0) {
                 return Ok(());
             }
         }
         log::error!("Timed out sending packet");
-        dbg!(self.tx_descs);
         Err(PacketSendError::StatusTimeOut)
     }
     /// Send Commands and read results From NICs either using MMIO or IO Ports
