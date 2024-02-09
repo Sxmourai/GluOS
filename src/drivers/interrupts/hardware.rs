@@ -83,7 +83,30 @@ pub enum InterruptIndex {
     PrimaryAtaDisk=14,
     SecondaryAtaDisk=15,
 }
-
+impl InterruptIndex {
+    pub fn from_num_pic(num: u8) -> Option<Self> {
+        Some(match num {
+            0 => Self::Timer,
+            1 => Self::Keyboard,
+            3 => Self::COM2,
+            4 => Self::COM1,
+            5 => Self::LPT2,
+            6 => Self::Floppy,
+            7 => Self::LPT1,
+            8 => Self::CMOS,
+            9 => Self::FreeLegacySCSINic,
+            10 => Self::FreeSCSINic,
+            11 => Self::FreeSCSINic1,
+            12 => Self::PS2Mouse,
+            13 => Self::FPUCoprocessorInterProcessor,
+            14 => Self::PrimaryAtaDisk,
+            15 => Self::SecondaryAtaDisk,
+            _ => {
+                return None
+            }
+        })
+    }
+}
 
 
 // Safe wrapper because the interrupt index should always be valid (if InterruptIndex enum is right...)
