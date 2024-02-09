@@ -1,5 +1,7 @@
 //! Used wiki.osdev.org/NVMe
 //! Used mostly https://nvmexpress.org/wp-content/uploads/NVM-Express-Base-Specification-2.0d-2024.01.11-Ratified.pdf
+//! https://github.com/doug65536/dgos/blob/master/kernel/device/nvme/nvme.cc
+//! https://github.com/LemonOSProject/LemonOS/blob/master/Kernel/include/Storage/NVMe.h#L416
 use core::ptr::addr_of;
 
 use alloc::vec::Vec;
