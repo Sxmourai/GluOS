@@ -49,9 +49,9 @@ pub const DRIVERS: &[(&str, fn() -> ())] = &[
     ("PS/2 Controller", super::ps2::init),
     ("interrupts", super::interrupts::init),
     ("Pci devices", super::pci::init),
-    ("disks", super::disk::init),
     ("timer", super::time::init),
     ("graphics", super::video::init_graphics),
+    ("disks", super::disk::init),
     #[cfg(feature = "fs")]
     ("filesystem (indexing disk)", fs::init),
     // ("ACPI", super::acpi::init),

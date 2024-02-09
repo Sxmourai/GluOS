@@ -21,8 +21,22 @@ use crate::{
     time::mdelay,
 };
 
-pub struct NVMeDisk {}
-pub fn init(nvme_pci: &PciDevice) -> Option<Vec<NVMeDisk>> {
+use super::{driver::GenericDisk, DiskLoc};
+impl GenericDisk for NVMeDisk {
+    fn loc(&self) -> &super::DiskLoc {
+        &self.loc
+    }
+}
+impl core::fmt::Display for NVMeDisk {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(alloc::format!("NVME {:?}", self.loc).as_str())
+    }
+}
+#[derive(Debug)]
+pub struct NVMeDisk {
+    loc: DiskLoc,
+}
+pub fn init(nvme_pci: &PciDevice) -> Option<Vec<&'static NVMeDisk>> {
     if true {
         return None;
     }
