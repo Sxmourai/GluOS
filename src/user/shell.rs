@@ -165,6 +165,28 @@ fn parse_path(path: &str) -> Option<crate::fs::path::FilePath> {
     ))
 }
 
+#[command("exec", "Tries to execute a file from disk")]
+fn exec(raw_args: String) -> Result<(), String> {
+    use crate::fs::fs_driver::Entry;
+    let mut args = raw_args.split(' ');
+    let path = parse_path(args.next().ok_or("Please specify path !".to_string())?).ok_or("Not found !".to_string())?;
+    let fs_driver = crate::fs_driver!();
+    #[cfg(feature = "fs")]
+    if let Ok(entry) = fs_driver.read(&path) {
+        match entry {
+            Entry::File(mut f) => {
+                crate::fs::elf::execute(f.content);
+            }
+            Entry::Dir(mut d) => {
+                return Err("Entry is a dir !".to_string());
+            }
+        }
+    } else {
+        println!("Error reading file ! Maybe specified path couldn't be found")
+    }
+    Ok(())
+}
+
 // #[cfg(feature="fs")]
 #[command("read", "Reads a file/dir from disk")]
 fn read(raw_args: String) -> Result<(), String> {

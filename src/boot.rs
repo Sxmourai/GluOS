@@ -15,7 +15,7 @@ pub fn boot(boot_info: &'static bootloader::BootInfo) -> Executor {
     let mut executor = Executor::new();
     info!("Initialising shell");
     // executor.spawn(Task::new(QemuIOReader::new().run()));
-    executor.spawn(Task::new(Shell::default().run_with_command("".to_string())));
+    executor.spawn(Task::new(Shell::default().run_with_command("exec 10/userland.o".to_string())));
     executor
 }
 

@@ -1,3 +1,4 @@
+; TO COMPILE: nasm -felf64 kernel.asm -o kernel.o
 BITS 32
  
 VGA_WIDTH equ 80
@@ -166,4 +167,3 @@ terminal_color db 0
 terminal_cursor_pos:
 terminal_column db 0
 terminal_row db 0
-; TO COMPILE: nasm -felf64 kernel.asm -o kernel.o

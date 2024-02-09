@@ -232,7 +232,8 @@ impl FsDriverInitialiser for ExtDriver {
         let raw_bgdt = read_from_partition(partition, ((block_size) * 2).into(), 1)
             .expect("Failed reading Block Group Descriptor");
         let mut bgds = Vec::new();
-        dbg!(raw_bgdt);
+        //TODO Fix ext2 & NTFS drivers
+        // dbg!(raw_bgdt);
         for raw_bgd in raw_bgdt.chunks_exact(32) {
             //TODO Support 64 bit mode for ext4 i.e.
             if raw_bgd.iter().all(|x| *x == 0) {
@@ -247,7 +248,7 @@ impl FsDriverInitialiser for ExtDriver {
             blk_grp_desc_table: bgds,
             files: HashMap::new(),
         };
-        dbg!(_self);
+        // dbg!(_self);
         _self.index_disk().ok()?;
         Some(Box::new(_self))
     }
