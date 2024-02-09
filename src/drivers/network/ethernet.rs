@@ -170,7 +170,7 @@ impl E1000NetworkDriver {
         self.eerprom_exists = self.detect_ee_prom();
         self.read_mac_addr()
             .or(Err(E1000NetworkDriverInitError::CantReadMac))?;
-        log::info!(
+        crate::trace!(
             "Found ethernet device with mac: {:x}:{:x}:{:x}:{:x}:{:x}:{:x}",
             self.mac[0],
             self.mac[1],

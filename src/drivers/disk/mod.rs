@@ -7,14 +7,14 @@ pub fn init() {
     for (loc, device) in crate::pci_manager!().iter() {
         if device.class.id() == 0x1 {
             if device.subclass() == 0x1 {
-                log::info!("Found IDE controller on bus {loc}");
+                crate::trace!("Found IDE controller on bus {loc}");
                 for (i, disk) in ata::init().into_iter().enumerate() {
                     if let Some(disk) = disk {
                         disks.insert(DiskLoc::from_idx(i.try_into().unwrap()).unwrap(), (disk, ));
                     }
                 }
             } else if device.subclass() == 0x8 {
-                log::info!("Found NVMe controller on bus {loc}");
+                crate::trace!("Found NVMe controller on bus {loc}");
                 if let Some(nvme_disks) = nvme::init(device) {
                     for (i, disk) in nvme_disks.into_iter().enumerate() {
                         //     // disks.insert(DiskLoc::from_idx(i.try_into().unwrap()), disk);

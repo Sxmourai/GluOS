@@ -141,8 +141,11 @@ pub fn init() {
                     class,
                 },
             );
+        } else if pci_device.vendor_id==0x1234 && pci_device.device_id == 0x1111 { 
+            // VGA QEMU pci device, not on pci ids, but we can safely skip it
         } else {
-            log::error!("Failed parsing device: {:?}", pci_device);
+            log::error!("Unknown device: {:?}", pci_device);
+
         }
     }
 

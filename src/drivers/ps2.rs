@@ -135,13 +135,13 @@ impl Ps2Controller {
         trace!("Resetting devices");
         Self::device_send_data_first(0xFF);
         if Self::assert_ack() {
-            log::info!("First port reseted !")
+            log::trace!("First port reseted !")
         }
         if available_channels[1] {
             Self::device_send_data_second(0xFF);
             if Self::assert_ack() {
                 dbg!(1);
-                log::info!("Second port reseted !")
+                log::trace!("Second port reseted !")
             }
         }
         // Identify devices
