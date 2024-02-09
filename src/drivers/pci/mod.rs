@@ -337,17 +337,17 @@ impl PciLocation {
     }
 
     /// Read 16-bit data at the specified `offset` from this PCI device.
-    fn pci_read_16(&self, offset: u8) -> u16 {
+    pub fn pci_read_16(&self, offset: u8) -> u16 {
         self.pci_read_32(offset) as u16
     }
 
     /// Read 8-bit data at the specified `offset` from the PCI device.
-    fn pci_read_8(&self, offset: u8) -> u8 {
+    pub fn pci_read_8(&self, offset: u8) -> u8 {
         self.pci_read_32(offset) as u8
     }
 
     /// Write 32-bit data to the specified `offset` for the PCI device.
-    fn pci_write(&self, offset: u8, value: u32) {
+    pub fn pci_write(&self, offset: u8, value: u32) {
         unsafe {
             PCI_CONFIG_ADDRESS_PORT
                 .lock()

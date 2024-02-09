@@ -107,7 +107,7 @@ const E1000_NUM_RX_DESC: u16 = 32;
 const E1000_NUM_TX_DESC: u16 = 8;
 
 #[repr(packed)]
-#[derive(Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 struct E1000RxDesc {
     addr: u64,
     length: u16,
@@ -118,7 +118,7 @@ struct E1000RxDesc {
 }
 
 #[repr(packed)]
-#[derive(Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 struct E1000TxDesc {
     addr: u64,
     length: u16,
@@ -147,6 +147,15 @@ pub struct E1000NetworkDriver {
 impl E1000NetworkDriver {
     pub fn new(pci_device: &PciDevice) -> Self {
         let base = pci_device.raw.determine_mem_base(0).unwrap();
+        // Enable bus mastering
+        pci_device.raw.location.pci_read_16(crate::pci::PCI_COMMAND);
+        let mut command = pci_device.raw.command;
+        command.set_bit(3, true);
+        // TODO Be sure that writing u32 where the size of command is u16 isn't a problem
+        pci_device
+            .raw
+            .location
+            .pci_write(crate::pci::PCI_COMMAND, command as u32);
         Self {
             base,
             eerprom_exists: false,
@@ -158,7 +167,13 @@ impl E1000NetworkDriver {
             tx_cur: 0,
         }
     }
+    pub fn reset(&mut self) {
+        let mut ctrl = self.read_command(0x0);
+        ctrl.set_bit(26, true);
+        self.write_command(0x0, ctrl);
+    }
     pub fn start(&mut self) -> Result<(), E1000NetworkDriverInitError> {
+        //TODO Enable bus mastering https://forum.osdev.org/viewtopic.php?f=1&t=56275
         match self.base {
             PciMemoryBase::MemorySpace(mem) => {
                 for i in 0..10 {
@@ -167,6 +182,7 @@ impl E1000NetworkDriver {
             }
             PciMemoryBase::IOSpace(io) => {}
         }
+        self.reset();
         self.eerprom_exists = self.detect_ee_prom();
         self.read_mac_addr()
             .or(Err(E1000NetworkDriverInitError::CantReadMac))?;
@@ -180,9 +196,9 @@ impl E1000NetworkDriver {
             self.mac[5],
         );
         //TODO What is it ? self.start_link();
-        for i in 0..0x80 {
-            self.write_command(0x5200 + i * 4, 0);
-        }
+        // for i in 0..0x80 {
+        //     self.write_command(0x5200 + i * 4, 0);
+        // }
 
         crate::interrupts::hardware::register_interrupt(
             InterruptIndex::from_num_pic(self.int_line).unwrap(),
@@ -191,6 +207,7 @@ impl E1000NetworkDriver {
         self.enable_interrupts();
         self.rx_init();
         self.tx_init();
+        self.send_packet(&[10; 4096]);
         Ok(())
     }
     pub fn fire(&self) {
@@ -198,6 +215,7 @@ impl E1000NetworkDriver {
     }
     /// p_data.len() < u16::MAX
     pub fn send_packet(&mut self, p_data: &[u8]) -> Result<(), PacketSendError> {
+        log::info!("Sending packet of {} bytes", p_data.len());
         self.tx_descs[self.tx_cur as usize].addr = p_data.as_ptr() as u64;
         self.tx_descs[self.tx_cur as usize].length = p_data.len().try_into().unwrap();
         self.tx_descs[self.tx_cur as usize].cmd = CMD_EOP | CMD_IFCS | CMD_RS;
@@ -205,11 +223,14 @@ impl E1000NetworkDriver {
         let old_cur = self.tx_cur;
         self.tx_cur = (self.tx_cur + 1) % E1000_NUM_TX_DESC;
         self.write_command(REG_TXDESCTAIL, self.tx_cur as u32);
+        dbg!(self.tx_descs);
         for i in 0..100_000 {
             if (self.tx_descs[old_cur as usize].status != 0) {
                 return Ok(());
             }
         }
+        log::error!("Timed out sending packet");
+        dbg!(self.tx_descs);
         Err(PacketSendError::StatusTimeOut)
     }
     /// Send Commands and read results From NICs either using MMIO or IO Ports
@@ -380,8 +401,10 @@ impl E1000NetworkDriver {
     }
 
     fn enable_interrupts(&mut self) {
-        self.write_command(REG_IMASK, 0x1F6DC);
-        self.write_command(REG_IMASK, 0xff & !4);
+        self.write_command(REG_IMASK, u32::MAX);
+        self.write_command(REG_IMASK, u32::MAX);
+        // dbg!(0xff & (!4));
+        // self.write_command(REG_IMASK, 0xff & (!4));
         self.read_command(0xc0);
     }
     /// Handle a packet reception
