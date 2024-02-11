@@ -12,7 +12,7 @@ bootloader = { version = "0.9.23", features = [
 ] } #"map_physical_memory"
 # Some utils data types (std::collections, asyncs, hashmaps...)
 spin = "0.9.8" # We have our allocator, so we can use std::spin
-hashbrown = "0.14.0" # A hashmap/hashset & all implementation
+hashbrown = "0.14.3" # A hashmap/hashset & all implementation
 crossbeam-queue = { version = "0.3.10", default-features = false, features = [
     "alloc",
 ] }

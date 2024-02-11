@@ -8,17 +8,25 @@ This is a minimal, modular and lightweight kernel in rust
 - CPU exceptions and interrupts
 - Paging, heap allocation and multitasking
 - ATA reading
-- FAT32 Reading (dirs & files & recursively)
+- Fat32, ext2, NTFS (only read)
 - Can draw some graphics, but no gui present
+- Timer delay (no interrupts for now)
+
+### Working on features
+- NVMe (see src/drivers/disk/nvme.rs)
+- Ethernet (see src/drivers/network/e1000.rs)
+- ELF loading (see src/drivers/elf.rs & the associated command in src/user/shell.rs -> Execute)
 
 ## Dev requirements
 - Linux system (wsl2 works)
 - Nightly rust (should be by default, if not : `rustup override set nightly`)
 - qemu (arch: qemu (qemu-full for gui app), debian: qemu-system-x86 (apt))
 - rust-src toolchain on nightly rust (`rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu`)
-- bootimage (`cargo install bootimage`)
 - llvm tools (`rustup component add llvm-tools-preview`)
+- bootimage (`cargo install bootimage`)
+- LLD
 - run and code ^^ (`cargo run`)
+
 ### Caution with WSL !
 If you have your compile on wsl but the code is on your local drive (so wsl path is: /mnt/c/.../GluOS) the compile times will be horrible (30s instead of ~2s)
 Move it into /home/\[user\] instead
@@ -26,11 +34,8 @@ Move it into /home/\[user\] instead
 ## Additional work
 - Our own bootloader (maybe)
 - Full Graphical interface
-- Write to FAT32
-- Other filesystems
 - Network, NTP & all
-- Optimising & refactoring cuz this code smell bru
-- Proper malloc function
+- Optimising & refactoring
 
 ## Ressources
 - An amazing blog to start out: https://os.phil-opp.com

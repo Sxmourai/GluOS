@@ -1,60 +1,149 @@
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
+use bit_field::BitField;
+use x86_64::{
+    structures::paging::{Page, PageTableFlags, PhysFrame},
+    PhysAddr, VirtAddr,
+};
+
+use crate::{dbg, mem_handler, mem_map};
 const ELF_MAGIC: [u8; 4] = [0x7F, 'E' as u8, 'L' as u8, 'F' as u8];
 
 ///TODO Take a file descriptor, not full content
 pub fn execute(content: String) -> Result<(), ElfError> {
-    let chars = content
+    let bytes = content
         .chars()
         .map(|c| c as u8)
         .collect::<alloc::vec::Vec<u8>>();
-    if chars[0..4] != ELF_MAGIC {
+    if bytes[0..4] != ELF_MAGIC {
         // Simple check of magic number
         return Err(ElfError::InvalidEntry);
     }
-    let start = unsafe { &*(chars.as_ptr() as *const ELFStart) };
-    let (middle, idx) = match start.format().ok_or(ElfError::InvalidEntry)? {
-        ElfFormat::_32Bit => (
-            ElfMiddle::_32(unsafe {
-                *(chars[core::mem::size_of::<ELFStart>()..].as_ptr() as *const ElfMiddle32)
-            }),
-            core::mem::size_of::<ElfMiddle32>(),
-        ),
-        ElfFormat::_64Bit => (
-            ElfMiddle::_64(unsafe {
-                *(chars[core::mem::size_of::<ELFStart>()..].as_ptr() as *const ElfMiddle64)
-            }),
-            core::mem::size_of::<ElfMiddle64>(),
-        ),
-    };
-    let end =
-        unsafe { &*(chars[core::mem::size_of::<ELFStart>() + idx..].as_ptr() as *const ElfEnd) };
-    let elf = ELF { start, middle, end };
-    let section_header = match start.format().unwrap() {
-        ElfFormat::_32Bit => ElfSectionHeader::_32(unsafe {
-            *(chars[elf.middle.start_section_header_table_ptr() as usize
-                + elf.end.header_size as usize..]
-                .as_ptr() as *const ElfSectionHeader32)
-        }),
-        ElfFormat::_64Bit => ElfSectionHeader::_64(unsafe {
-            *(chars[elf.middle.start_section_header_table_ptr() as usize
-                + elf.end.header_size as usize..]
-                .as_ptr() as *const ElfSectionHeader64)
-        }),
-    };
+    let elf = ELF::new(&bytes)?;
+    // dbg!(elf);
+    let format = elf.start.format().ok_or(ElfError::InvalidEntry)?;
+    let mut program_headers = Vec::new();
+    for i in 0..elf.end.program_header_entries_count {
+        //TODO Should we make a mut offset and then increment it on each iteration ?
+        let offset = elf.middle.start_program_header_ptr() as usize
+            + (i as usize) * elf.end.program_header_table_entry_size as usize;
+        let program_header =
+            ElfProgramHeader::new(&bytes[offset..], format).ok_or(ElfError::InvalidEntry)?;
+        program_headers.push(program_header);
+    }
+    for ph in program_headers {
+        let segment_type = ph.segment_type();
+        if segment_type.is_none() {
+            continue;
+        }
+        let segment_type = segment_type.unwrap();
+        match segment_type {
+            ElfSegmentType::LOAD => {
+                dbg!(ph);
+                if ph
+                .dependant_flags()
+                .ok_or(ElfError::InvalidEntry)?
+                .get_bit(ElfDependantFlags::Executable as usize)
+                {
+                    dbg!(ph);
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut section_headers = Vec::new();
+    for i in 0..elf.end.section_header_entries_count {
+        let offset = elf.middle.start_section_header_table_ptr() as usize
+            + (i as usize) * elf.end.section_header_entry_size as usize;
+        let section_header =
+            ElfSectionHeader::new(&bytes[offset..], format).ok_or(ElfError::InvalidEntry)?;
+        section_headers.push(section_header);
+    }
+    let names_entry = &section_headers[elf.end.index_section_header_table_entry as usize];
+    
+    let names = String::from_utf8_lossy(&bytes[names_entry.offset_section_img() as usize..names_entry.offset_section_img() as usize+names_entry.img_size() as usize]);
+    dbg!(names);
+    for header in section_headers {
+        let mut name = String::new();
+        for char in names[header.name() as usize..].chars() {
+            if char == '\0' {break}
+            name.push(char);
+        }
+        dbg!(name, header.name(), header);
+    }
+    //     match program_header
+    //     .segment_type()
+    //     .ok_or(ElfError::InvalidEntry)?
+    // {
+    //     ElfSegmentType::LOAD => {
+    //         //TODO Possible relocation
+    //         // mem_map!(
+    //         //     frame_addr = program_header.virt_addr(),
+    //         //     PageTableFlags::PRESENT
+    //         //         | PageTableFlags::USER_ACCESSIBLE
+    //         //         | PageTableFlags::WRITABLE
+    //         // );
+    //         let addr = VirtAddr::new(program_header.virt_addr());
+    //         let page = unsafe {
+    //             core::slice::from_raw_parts_mut(
+    //                 addr.as_mut_ptr::<u8>(),
+    //                 program_header.size_mem() as usize,
+    //             )
+    //         };
+    //         let ptr: *const () = addr.as_ptr();
+    //         dbg!(1);
+    //         let program: extern "C" fn() = unsafe { core::mem::transmute(ptr) };
+    //         dbg!(program_header, program);
+    //         unsafe{mem_handler!().map(Page::containing_address(addr), PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::USER_ACCESSIBLE)}.unwrap();
 
-    crate::dbg!(section_header, section_header.type_header(), section_header.flags());
+    //         // (program)();
+    //         dbg!(1);
+    //         dbg!(
+    //             &bytes[program_header.offset() as usize
+    //                 ..program_header.offset() as usize + program_header.size_img() as usize]
+    //         );
+    //     }
+    //     _ => {} //TODO
+    // }
     Ok(())
 }
 #[derive(Debug)]
-pub enum ElfSectionHeader {
-    _32(ElfSectionHeader32),
-    _64(ElfSectionHeader64),
+pub enum ElfSectionHeader<'a> {
+    _32(&'a ElfSectionHeader32),
+    _64(&'a ElfSectionHeader64),
 }
-impl ElfSectionHeader {
+impl ElfSectionHeader<'_> {
+    pub fn new<'a>(bytes: &'a [u8], format: ElfFormat) -> Option<Self> {
+        Some(match format {
+            ElfFormat::_32Bit => {
+                Self::_32(unsafe { &*(bytes.as_ptr() as *const ElfSectionHeader32) })
+            }
+            ElfFormat::_64Bit => {
+                Self::_64(unsafe { &*(bytes.as_ptr() as *const ElfSectionHeader64) })
+            }
+        })
+    }
     pub fn type_header(&self) -> Option<ElfSectionHeaderType> {
         match self {
             ElfSectionHeader::_32(sh) => sh.type_header(),
             ElfSectionHeader::_64(sh) => sh.type_header(),
+        }
+    }
+    pub fn offset_section_img(&self) -> u64 {
+        match self {
+            ElfSectionHeader::_32(sh) => sh.offset_section_img.into(),
+            ElfSectionHeader::_64(sh) => sh.offset_section_img,
+        }
+    }
+    pub fn name(&self) -> u32 {
+        match self {
+            ElfSectionHeader::_32(sh) => sh.name,
+            ElfSectionHeader::_64(sh) => sh.name,
+        }
+    }
+    pub fn img_size(&self) -> u64 {
+        match self {
+            ElfSectionHeader::_32(sh) => sh.section_size_img.into(),
+            ElfSectionHeader::_64(sh) => sh.section_size_img,
         }
     }
     pub fn flags(&self) -> Option<ElfSectionHeaderFlags> {
@@ -213,10 +302,90 @@ impl ElfSectionHeaderType {
         })
     }
 }
+#[derive(Debug)]
+pub enum ElfProgramHeader<'a> {
+    _32(&'a ElfProgramHeader32),
+    _64(&'a ElfProgramHeader64),
+}
+impl ElfProgramHeader<'_> {
+    pub fn virt_addr(&self) -> u64 {
+        match self {
+            ElfProgramHeader::_32(ph) => ph.virt_addr as u64,
+            ElfProgramHeader::_64(ph) => ph.virt_addr,
+        }
+    }
+    pub fn size_mem(&self) -> u64 {
+        match self {
+            ElfProgramHeader::_32(ph) => ph.size_mem as u64,
+            ElfProgramHeader::_64(ph) => ph.size_mem,
+        }
+    }
+    pub fn size_img(&self) -> u64 {
+        match self {
+            ElfProgramHeader::_32(ph) => ph.size_img as u64,
+            ElfProgramHeader::_64(ph) => ph.size_img,
+        }
+    }
+    pub fn offset(&self) -> u64 {
+        match self {
+            ElfProgramHeader::_32(ph) => ph.offset as u64,
+            ElfProgramHeader::_64(ph) => ph.offset,
+        }
+    }
+    pub fn new<'a>(bytes: &'a [u8], format: ElfFormat) -> Option<Self> {
+        Some(match format {
+            ElfFormat::_32Bit => {
+                Self::_32(unsafe { &*(bytes.as_ptr() as *const ElfProgramHeader32) })
+            }
+            ElfFormat::_64Bit => {
+                Self::_64(unsafe { &*(bytes.as_ptr() as *const ElfProgramHeader64) })
+            }
+        })
+    }
+    pub fn segment_type(&self) -> Option<ElfSegmentType> {
+        match self {
+            ElfProgramHeader::_32(ph) => ph.segment_type(),
+            ElfProgramHeader::_64(ph) => ph.segment_type(),
+        }
+    }
+    pub fn dependant_flags(&self) -> Option<u32> {
+        match self {
+            ElfProgramHeader::_32(_) => None,
+            ElfProgramHeader::_64(ph) => Some(ph.dependant_flags()),
+        }
+    }
+}
+
+impl core::fmt::Display for ElfProgramHeader<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            ElfProgramHeader::_32(ph) => {
+                todo!()
+            }
+            ElfProgramHeader::_64(ph) => {
+                let size = ph.size_img;
+                write!(
+                    f,
+                    "Program header: {:?} {:?} Size: {:?}",
+                    ph.segment_type(),
+                    ph.dependant_flags(),
+                    size
+                )
+            }
+        }
+    }
+}
 
 #[derive(Debug)]
 #[repr(C, packed)]
 pub struct ElfProgramHeader32 {
+    /// Segment types:
+    /// 0 = null - ignore the entry;
+    /// 1 = load - clear p_memsz bytes at p_vaddr to 0, then copy p_filesz bytes from p_offset to p_vaddr;
+    /// 2 = dynamic - requires dynamic linking;
+    /// 3 = interp - contains a file path to an executable to use as an interpreter for the following segment;
+    /// 4 = note section.
+    /// There are more values, but mostly contain architecture/environment specific information, which is probably not required for the majority of ELF files.
     type_img: u32,
     /// Offset of the segment in the file image
     offset: u32,
@@ -261,20 +430,17 @@ impl ElfProgramHeader64 {
     pub fn segment_type(&self) -> Option<ElfSegmentType> {
         ElfSegmentType::from_type(self.type_img)
     }
-    pub fn dependant_flags(&self) -> Option<ElfDependantFlags> {
-        Some(match self.seg_dependant_flags {
-            0x1 => ElfDependantFlags::Executable, // Executable segment.
-            0x2 => ElfDependantFlags::Writable,   // Writeable segment.
-            0x4 => ElfDependantFlags::Readable,   // Readable segment
-            _ => return None,
-        })
+    pub fn dependant_flags(&self) -> u32 {
+        self.seg_dependant_flags
     }
 }
+#[derive(Debug)]
 pub enum ElfDependantFlags {
     Executable = 0x1, // Executable segment.
     Writable = 0x2,   // Writeable segment.
     Readable = 0x4,   // Readable segment
 }
+#[derive(Debug)]
 pub enum ElfSegmentType {
     NULL = 0x00000000,    //	Program header table entry unused.
     LOAD = 0x00000001,    //	Loadable segment.
@@ -292,23 +458,24 @@ pub enum ElfSegmentType {
 impl ElfSegmentType {
     pub fn from_type(_type: u32) -> Option<Self> {
         Some(match _type {
-            0x00000000 => Self::NULL,    //	Program header table entry unused.
-            0x00000001 => Self::LOAD,    //	Loadable segment.
-            0x00000002 => Self::DYNAMIC, //	Dynamic linking information.
-            0x00000003 => Self::INTERP,  //	Interpreter information.
-            0x00000004 => Self::NOTE,    //	Auxiliary information.
-            0x00000005 => Self::SHLIB,   //	Reserved.
-            0x00000006 => Self::PHDR,    //	Segment containing program header table itself.
-            0x00000007 => Self::TLS,     //	Thread-Local Storage template.
-            0x60000000 => Self::LOOS,    //	Reserved inclusive range. Operating system specific.
-            0x6FFFFFFF => Self::HIOS,    //
-            0x70000000 => Self::LOPROC,  //	Reserved inclusive range. Processor specific.
-            0x7FFFFFFF => Self::HIPROC,  //
+            0x00000000 => Self::NULL,              //	Program header table entry unused.
+            0x00000001 => Self::LOAD,              //	Loadable segment.
+            0x00000002 => Self::DYNAMIC,           //	Dynamic linking information.
+            0x00000003 => Self::INTERP,            //	Interpreter information.
+            0x00000004 => Self::NOTE,              //	Auxiliary information.
+            0x00000005 => Self::SHLIB,             //	Reserved.
+            0x00000006 => Self::PHDR,              //	Segment containing program header table itself.
+            0x00000007 => Self::TLS,               //	Thread-Local Storage template.
+            0x6FFFFFFF => Self::HIOS,              //
+            0x60000000..=0x6FFFFFFF => Self::LOOS, //	Reserved inclusive range. Operating system specific.
+            0x7FFFFFFF => Self::HIPROC,            //
+            0x70000000..=0x7FFFFFFF => Self::LOPROC, //	Reserved inclusive range. Processor specific.
             _ => return None,
         })
     }
 }
 
+#[derive(Debug)]
 pub enum ElfError {
     InvalidEntry,
 }
@@ -317,17 +484,59 @@ pub struct ELF<'a> {
     start: &'a ELFStart,
     middle: ElfMiddle,
     end: &'a ElfEnd,
+    size: usize,
 }
+impl ELF<'_> {
+    pub fn new(bytes: &[u8]) -> Result<Self, ElfError> {
+        let start = unsafe { &*(bytes.as_ptr() as *const ELFStart) };
+        let (middle, idx) = match start.format().ok_or(ElfError::InvalidEntry)? {
+            ElfFormat::_32Bit => (
+                ElfMiddle::_32(unsafe {
+                    *(bytes[core::mem::size_of::<ELFStart>()..].as_ptr() as *const ElfMiddle32)
+                }),
+                core::mem::size_of::<ElfMiddle32>(),
+            ),
+            ElfFormat::_64Bit => (
+                ElfMiddle::_64(unsafe {
+                    *(bytes[core::mem::size_of::<ELFStart>()..].as_ptr() as *const ElfMiddle64)
+                }),
+                core::mem::size_of::<ElfMiddle64>(),
+            ),
+        };
+        let end = unsafe {
+            &*(bytes[core::mem::size_of::<ELFStart>() + idx..].as_ptr() as *const ElfEnd)
+        };
+        Ok(Self {
+            start,
+            middle,
+            end,
+            size: core::mem::size_of::<ELFStart>() + idx + core::mem::size_of::<ElfEnd>(),
+        })
+    }
+}
+
 #[derive(Debug)]
 pub enum ElfMiddle {
     _32(ElfMiddle32),
     _64(ElfMiddle64),
 }
 impl ElfMiddle {
-    pub fn start_section_header_table_ptr(&self) -> u32 {
+    pub fn start_section_header_table_ptr(&self) -> u64 {
         match self {
-            ElfMiddle::_32(m) => m.start_section_header_table_ptr,
-            ElfMiddle::_64(m) => m.start_section_header_table_ptr.try_into().unwrap(),
+            ElfMiddle::_32(m) => m.start_section_header_table_ptr as u64,
+            ElfMiddle::_64(m) => m.start_section_header_table_ptr,
+        }
+    }
+    pub fn entry(&self) -> u64 {
+        match self {
+            ElfMiddle::_32(m) => m.entry as u64,
+            ElfMiddle::_64(m) => m.entry,
+        }
+    }
+    pub fn start_program_header_ptr(&self) -> u64 {
+        match self {
+            ElfMiddle::_32(m) => m.start_program_header_ptr as u64,
+            ElfMiddle::_64(m) => m.start_program_header_ptr,
         }
     }
 }
@@ -365,6 +574,11 @@ pub struct ElfEnd {
     program_header_table_entry_size: u16,
     /// Contains the number of entries in the program header table.
     program_header_entries_count: u16,
+    /// Contains the size of a section header table entry.
+    /// As explained below, this will typically be 0x28 (32 bit) or 0x40 (64 bit).
+    section_header_entry_size: u16,
+    /// Contains the number of entries in the section header table.
+    section_header_entries_count: u16,
     /// Contains index of the section header table entry that contains the section names.
     index_section_header_table_entry: u16,
 }
@@ -442,6 +656,7 @@ impl ELFStart {
         })
     }
 }
+#[derive(Debug, Copy, Clone)]
 pub enum ElfFormat {
     _32Bit,
     _64Bit,

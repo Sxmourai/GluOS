@@ -175,7 +175,9 @@ fn exec(raw_args: String) -> Result<(), String> {
     if let Ok(entry) = fs_driver.read(&path) {
         match entry {
             Entry::File(mut f) => {
-                crate::fs::elf::execute(f.content);
+                if crate::fs::elf::execute(f.content).is_err() {
+                    return Err("Failed executing file".to_string());
+                }
             }
             Entry::Dir(mut d) => {
                 return Err("Entry is a dir !".to_string());
