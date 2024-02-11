@@ -38,7 +38,6 @@ pub fn execute(content: String) -> Result<(), ElfError> {
         let segment_type = segment_type.unwrap();
         match segment_type {
             ElfSegmentType::LOAD => {
-                dbg!(ph);
                 if ph
                 .dependant_flags()
                 .ok_or(ElfError::InvalidEntry)?
@@ -61,14 +60,12 @@ pub fn execute(content: String) -> Result<(), ElfError> {
     let names_entry = &section_headers[elf.end.index_section_header_table_entry as usize];
     
     let names = String::from_utf8_lossy(&bytes[names_entry.offset_section_img() as usize..names_entry.offset_section_img() as usize+names_entry.img_size() as usize]);
-    dbg!(names);
     for header in section_headers {
         let mut name = String::new();
         for char in names[header.name() as usize..].chars() {
             if char == '\0' {break}
             name.push(char);
         }
-        dbg!(name, header.name(), header);
     }
     //     match program_header
     //     .segment_type()
