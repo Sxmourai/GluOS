@@ -1,9 +1,10 @@
+use core::cell::OnceCell;
 use core::{fmt::Display, panic};
 
 use alloc::string::ToString;
 use alloc::{format, vec::Vec};
 use log::{debug, error, info, trace};
-use spin::{Mutex, MutexGuard};
+use spin::{Mutex, MutexGuard, Once, RwLock};
 
 use crate::bit_manipulation::{bytes, ptrlist_to_num, u16_to_u8};
 
@@ -14,18 +15,37 @@ use crate::fs::path::FilePath;
 use crate::x86_64::instructions::port::{PortRead, PortWrite};
 use crate::{dbg, disk_manager};
 
-use super::driver::{DiskDriver, SECTOR_SIZE};
+use super::driver::{Disk, DiskDriver, DiskDriverEnum, GenericDisk, SECTOR_SIZE};
 use super::{DiskError, DiskLoc};
 
-pub fn init() -> [Option<AtaDisk>; 4] {
+pub static mut ATA_DRIVER: Option<RwLock<AtaDriver>> = None;
+
+pub fn init() -> Vec<super::driver::Disk> {
     unsafe { u8::write_to_port(0x3f6, (1 << 1) | (1 << 2)) }
     unsafe { u8::write_to_port(0x376, (1 << 1) | (1 << 2)) }
-    [
-        detect(&DiskLoc(Channel::Primary, Drive::Master)),
-        detect(&DiskLoc(Channel::Primary, Drive::Slave)),
-        detect(&DiskLoc(Channel::Secondary, Drive::Master)),
-        detect(&DiskLoc(Channel::Secondary, Drive::Slave)),
-    ]
+    let raw_disks = [
+        (detect(&DiskLoc(Channel::Primary, Drive::Master)), DiskLoc(Channel::Primary, Drive::Master)),
+        (detect(&DiskLoc(Channel::Primary, Drive::Slave)), DiskLoc(Channel::Primary, Drive::Slave)),
+        (detect(&DiskLoc(Channel::Secondary, Drive::Master)), DiskLoc(Channel::Secondary, Drive::Master)),
+        (detect(&DiskLoc(Channel::Secondary, Drive::Slave)), DiskLoc(Channel::Secondary, Drive::Slave)),
+    ];
+    let mut disks = Vec::with_capacity(4);
+    let mut gen_disks = Vec::with_capacity(4);
+    for (disk, loc) in raw_disks {
+        if let Some(disk) = &disk {
+            gen_disks.push(Disk {
+                loc,
+                drv: DiskDriverEnum::Ata,
+            });
+        }
+        disks.push(disk);
+    }
+    disks.shrink_to_fit();
+    unsafe{ATA_DRIVER.replace(RwLock::new(AtaDriver {
+        selected_disk: 0,
+        disks: disks.try_into().unwrap(),
+    }))};
+    gen_disks
 }
 
 //Detects a disk at specified channel and drive
@@ -96,7 +116,9 @@ fn detect(addr: &DiskLoc) -> Option<AtaDisk> {
     let lba48: u64 = ptrlist_to_num(&mut identify[100..103].iter());
     let is_hardisk = true; //TODO Parse if 'i24612s hard disk'
                            //TODO Parse ALL info returned by IDENTIFY https://wiki.osdev.org/ATA_PIO_Mode
-
+    if lba28 as u64+lba48==0 { // Skip if size = 0, because QEMU sometimes creates some disks with no size that isn't interesting
+        return None;
+    }
     trace!(
         "Found {:?} {:?} drive in {:?} channel of size: {}Ko",
         addr.drive(),
@@ -106,6 +128,7 @@ fn detect(addr: &DiskLoc) -> Option<AtaDisk> {
     );
     let disk = AtaDisk::new(
         addr,
+        false,
         lba28,
         lba48,
         lba48.max(lba28 as u64) * 512,
@@ -150,7 +173,7 @@ fn get_selected_drive_type(channel: Channel) -> DriveType {
 #[derive(Debug)]
 pub struct AtaDriver {
     selected_disk: u8,
-    disks: [AtaDisk; 4],
+    disks: [Option<AtaDisk>; 4],
 }
 impl DiskDriver for AtaDriver {
     fn read(
@@ -159,7 +182,7 @@ impl DiskDriver for AtaDriver {
         start_sector: u64,
         sector_count: u64,
     ) -> Result<Vec<u8>, DiskError> {
-        todo!()
+        self.disks[loc.as_index()].as_mut().ok_or(DiskError::NotFound)?.read_sectors(start_sector, sector_count.try_into().unwrap())
     }
 
     fn write(&mut self, loc: &DiskLoc, start_sector: u64, content: &[u8]) -> Result<(), DiskError> {
@@ -218,10 +241,10 @@ pub struct AtaDisk {
     pub loc: DiskLoc, //TODO UDMA modes and store other infos...
 }
 impl AtaDisk {
-    pub fn new(addr: &DiskLoc, lba28: u32, lba48: u64, size: u64, is_hardisk: bool) -> Self {
+    pub fn new(addr: &DiskLoc, chs:bool, lba28: u32, lba48: u64, size: u64, is_hardisk: bool) -> Self {
         Self {
             addressing_modes: AddressingModes {
-                chs: true,
+                chs,
                 lba28,
                 lba48,
             }, // Assume chs is supported on all ATA drives...
@@ -487,7 +510,8 @@ impl AtaDisk {
             let sector_count = sector_count.try_into().or(Err(DiskError::SectorTooBig))?;
             self.read28(sector_address, sector_count)
         } else if self.addressing_modes.chs {
-            todo!("Implement CHS pio mode");
+            log::error!("Implement CHS pio mode");
+            return Err(DiskError::NoReadModeAvailable)
             // return self.readchs(sector_address.try_into()?, sector_count.try_into()?)
         } else {
             Err(DiskError::NoReadModeAvailable)
@@ -510,6 +534,12 @@ impl Display for AtaDisk {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str(&format!("Disk: {}Ko on {:?}", self.size / 1024, self.loc))?;
         Ok(())
+    }
+}
+
+impl GenericDisk for AtaDisk {
+    fn loc(&self) -> &DiskLoc {
+        &self.loc
     }
 }
 

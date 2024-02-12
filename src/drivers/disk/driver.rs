@@ -4,7 +4,7 @@ use alloc::{boxed::Box, vec::Vec};
 use hashbrown::HashMap;
 use spin::Mutex;
 
-use super::{ata::AtaDisk, DiskError, DiskLoc};
+use super::{ata::{AtaDisk, ATA_DRIVER}, DiskError, DiskLoc};
 
 pub static mut DISK_MANAGER: Mutex<Option<DiskManager>> = Mutex::new(None); // Uninitialised
 pub const SECTOR_SIZE: u16 = 512;
@@ -27,34 +27,37 @@ pub enum DiskDriverType {
 }
 
 #[derive(Debug)]
-pub struct DiskManager<'a> {
+pub struct DiskManager {
     /// Values are the GenericDisk and the index of the driver to use to read the disk
-    pub disks: HashMap<DiskLoc, (&'a dyn GenericDisk, usize)>,
-    pub drivers: Vec<Box<dyn DiskDriver>>,
-    selected_disk: usize, // u8 but usize because used for indexation
+    pub disks: HashMap<DiskLoc, Disk>,
+}
+#[derive(Debug)]
+pub struct Disk {
+    pub loc: DiskLoc,
+    pub drv: DiskDriverEnum,
+}
+#[derive(Debug)]
+pub enum DiskDriverEnum {
+    Ata,
+    NVMe, // Not supported for now
 }
 
-
-
-impl<'a> DiskManager<'a> {
-    pub fn new(disks: HashMap<DiskLoc, (&'a dyn GenericDisk, usize)>, 
-               drivers: Vec<Box<dyn DiskDriver>>,
-    ) -> Self {
-        Self {
-            disks,
-            drivers,
-            selected_disk: 0,
-        }
-    }
+impl DiskManager {
     pub fn read_disk(
         &mut self,
         loc: &DiskLoc,
         start_sector: u64,
         sector_count: u64,
     ) -> Result<Vec<u8>, DiskError> {
-        let drv = self.get_drv(loc);
-        drv.select_disk(loc);
-        drv.read(loc, start_sector, sector_count)
+        match self.disks.get(loc).ok_or(DiskError::NotFound)?.drv {
+            DiskDriverEnum::Ata => {
+                let mut ata_drv = unsafe{ATA_DRIVER.as_mut().unwrap().write()};
+                ata_drv.read(loc, start_sector, sector_count)
+            },
+            DiskDriverEnum::NVMe => {
+                todo!()
+            },
+        }
     }
     pub fn write_disk(
         &mut self,
@@ -62,9 +65,6 @@ impl<'a> DiskManager<'a> {
         start_sector: u64,
         content: &[u8],
     ) -> Result<(), DiskError> {
-        todo!()
-    }
-    pub fn get_drv(&self, loc: &DiskLoc) -> &mut dyn DiskDriver {
         todo!()
     }
 }
@@ -76,6 +76,8 @@ pub fn read_from_disk(
 ) -> Result<Vec<u8>, DiskError> {
     disk_manager!().read_disk(addr, start_sector, sector_count)
 }
+#[cfg(feature = "fs")]
+use crate::fs::partition::Partition;
 #[cfg(feature = "fs")]
 pub fn read_from_partition(
     partition: &Partition,

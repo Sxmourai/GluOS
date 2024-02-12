@@ -6,3 +6,4 @@ build/*.img
 build/mounted_disk
 .stignore
 .stfolder
+dump.pcap

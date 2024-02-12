@@ -77,23 +77,9 @@ impl Fat32Driver {
     }
     pub fn read_file(&self, path: &FilePath) -> Option<String> {
         let sector = self.get_sector(path)?;
-        let mut i = 0;
-        let mut chars = Vec::new();
-        let mut reading = true;
-        while reading {
-            for byte in read_from_partition(&self.partition, sector + i, 1)
-                .unwrap()
-                .into_iter()
-            {
-                if byte == 0 {
-                    reading = false;
-                    break;
-                }
-                chars.push(byte);
-            }
-            i += 1;
-        }
-        Some(String::from_utf8_lossy(&chars).to_string())
+        let raw = Self::read_and_follow_clusters(&self.partition, sector, self.fat_info.get_first_data_sector(), self.fat_info.first_fat_sector() as u64)?;
+        let content = String::from_utf8_lossy(&raw).to_string();
+        Some(content)
     }
     pub fn read_dir(&self, path: &FilePath) -> Option<Vec<Fat32SoftEntry>> {
         let sector = self.get_sector(path)?;
@@ -132,7 +118,6 @@ impl Fat32Driver {
                     ClusterEnum::EndOfChain => reading = false,
                     ClusterEnum::BadCluster => reading = false,
                     ClusterEnum::Cluster(cluster) => {
-                        dbg!(cluster, first_data_sector);
                         next_sector = cluster_to_sector(cluster as u64, first_data_sector);
                     }
                 };

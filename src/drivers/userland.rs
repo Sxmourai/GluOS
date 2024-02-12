@@ -1,16 +1,16 @@
 use crate::{boot::hlt_loop, interrupts::msr, println};
 
+extern "C" fn test_user() {
+    loop {}
+    // unsafe{core::arch::asm!("cli")}
+}
+
 pub fn go_ring3() {
     // GDT setup, Barebone TSS and stack start is already done
     //TODO Set up IDT for syscalls
     //TODO IRQ handling
     //TODO Plans for multitasking with task switching
     unsafe { jump_usermode_iret() }
-}
-#[allow(unused)]
-extern "C" fn test_user() {
-    hlt_loop()
-    // unsafe{core::arch::asm!("cli")}
 }
 
 unsafe fn jump_usermode_iret() {

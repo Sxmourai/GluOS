@@ -100,7 +100,7 @@ pub fn init() {
             months,
             years,
         };
-        serial_println!("Current time is {}", date);
+        crate::trace!("Current time is {}", date);
     });
 }
 

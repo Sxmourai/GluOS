@@ -5,28 +5,29 @@ pub mod nvme;
 pub fn init() {
     let mut disks = hashbrown::HashMap::new();
     for (loc, device) in crate::pci_manager!().iter() {
-        if device.class.id() == 0x1 {
-            if device.subclass() == 0x1 {
-                log::info!("Found IDE controller on bus {loc}");
-                for (i, disk) in ata::init().into_iter().enumerate() {
-                    if let Some(disk) = disk {
-                        disks.insert(DiskLoc::from_idx(i.try_into().unwrap()).unwrap(), (disk, ));
-                    }
+        if device.class.id() != 0x1 {continue}
+        if device.subclass() == 0x1 {
+            crate::trace!("Found IDE controller on bus {loc}");
+            for (i, disk) in ata::init().into_iter().enumerate() {
+                disks.insert(DiskLoc::from_idx(i.try_into().unwrap()).unwrap(), disk);
+            }
+        } else if device.subclass() == 0x8 {
+            crate::trace!("Found NVMe controller on bus {loc}");
+            if let Some(nvme_disks) = nvme::init(device) {
+                for (i, disk) in nvme_disks.into_iter().enumerate() {
+                    disks.insert(DiskLoc::from_idx(i.try_into().unwrap()).unwrap(), driver::Disk {
+                        loc: DiskLoc(Channel::Secondary, Drive::Slave),
+                        drv: driver::DiskDriverEnum::NVMe,
+                    });
                 }
-            } else if device.subclass() == 0x8 {
-                log::info!("Found NVMe controller on bus {loc}");
-                if let Some(nvme_disks) = nvme::init(device) {
-                    for (i, disk) in nvme_disks.into_iter().enumerate() {
-                        //     // disks.insert(DiskLoc::from_idx(i.try_into().unwrap()), disk);
-                    }
-                } else {
-                    log::error!("Failed initialising NVMe driver")
-                }
+            } else {
+                log::error!("Failed initialising NVMe driver")
             }
         }
     }
-    // crate::dbg!(disks);
-    // unsafe{DISK_MANAGER.lock().replace(DiskManager::new(disks, drivers))};
+    unsafe{DISK_MANAGER.lock().replace(DiskManager {
+        disks,
+    })};
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
@@ -40,7 +41,7 @@ pub enum DiskError {
     TimeOut,
     DRQRead, //TODO Handle all errors from the register
 }
-use crate::disk::ata::{Channel, Drive};
+use crate::disk::{ata::{Channel, Drive}, driver::GenericDisk};
 
 use self::driver::{DiskManager, DISK_MANAGER};
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]

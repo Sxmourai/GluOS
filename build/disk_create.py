@@ -26,26 +26,25 @@ filesystems = {
 
 def main(args):
     parser = argparse.ArgumentParser("Disk creator", description="Creates disk to test my kernel !")
-    parser.add_argument("filename", default="disk.img")
     parser.add_argument("size",)
-    parser.add_argument("-format")
+    parser.add_argument("format")
     parser.add_argument('-partition', action='store_true')
     parser.add_argument('-header_type', default="gpt")
     args = parser.parse_args(args)
-    if not args.filename.endswith(".img"):args.filename+=".img"
+    filename = f"{args.format}-{args.header_type}.img"
     if args.format.lower() in filesystems.keys():
         format = filesystems[args.format.lower()]
     else:
         print(f"Invalid format type: {list(filesystems.keys())}")
         exit(1)
     
-    cmd(f"qemu-img create -f raw {args.filename} {args.size}", "Creating raw disk with QEMU")
+    cmd(f"qemu-img create -f raw {filename} {args.size}", "Creating raw disk with QEMU")
     if args.partition:
-        cmd(f"{format} {args.filename}", f"Formatting disk to {format}")
+        cmd(f"{format} {filename}", f"Formatting disk to {format}")
     else:
-        cmd(f"parted {args.filename} mklabel {args.header_type} --script", f"Creating label on disk ({args.header_type})")
-        cmd(fr"parted {args.filename} mkpart primary {args.format} 18432B 100% --script", f"Creating partition")
-        cmd(fr"sudo losetup -o 18432 /dev/loop3 {args.filename}", "Mounting partition on loop device")
+        cmd(f"parted {filename} mklabel {args.header_type} --script", f"Creating label on disk ({args.header_type})")
+        cmd(fr"parted {filename} mkpart primary {args.format} 18432B 100% --script", f"Creating partition")
+        cmd(fr"sudo losetup -o 18432 /dev/loop3 {filename}", "Mounting partition on loop device")
         if "ntfs" in format:
             print("Ouhh NTFS, good luck =)")
             format += " -F "

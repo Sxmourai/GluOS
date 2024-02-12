@@ -1,4 +1,4 @@
-use alloc::format;
+use alloc::{format, string::String};
 
 use crate::serial_println;
 
@@ -124,5 +124,17 @@ macro_rules! pretty_dbg {
             file!(),
             line!(),
         );
+    };
+}
+use alloc::vec::Vec;
+use spin::RwLock;
+pub static TRACES: RwLock<Vec<String>> = RwLock::new(Vec::new());
+
+#[macro_export]
+macro_rules! trace {
+    ($($arg:tt)*) => {
+        let args = alloc::format!("{}:{}\t - {}",file!(),line!(), alloc::format!($($arg)*));
+        crate::user::log::TRACES.write().push(args.clone());
+        log::trace!("{}", args)
     };
 }

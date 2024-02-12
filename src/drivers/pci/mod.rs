@@ -141,8 +141,11 @@ pub fn init() {
                     class,
                 },
             );
+        } else if pci_device.vendor_id==0x1234 && pci_device.device_id == 0x1111 { 
+            // VGA QEMU pci device, not on pci ids, but we can safely skip it
         } else {
-            log::error!("Failed parsing device: {:?}", pci_device);
+            log::error!("Unknown device: {:?}", pci_device);
+
         }
     }
 
@@ -334,17 +337,17 @@ impl PciLocation {
     }
 
     /// Read 16-bit data at the specified `offset` from this PCI device.
-    fn pci_read_16(&self, offset: u8) -> u16 {
+    pub fn pci_read_16(&self, offset: u8) -> u16 {
         self.pci_read_32(offset) as u16
     }
 
     /// Read 8-bit data at the specified `offset` from the PCI device.
-    fn pci_read_8(&self, offset: u8) -> u8 {
+    pub fn pci_read_8(&self, offset: u8) -> u8 {
         self.pci_read_32(offset) as u8
     }
 
     /// Write 32-bit data to the specified `offset` for the PCI device.
-    fn pci_write(&self, offset: u8, value: u32) {
+    pub fn pci_write(&self, offset: u8, value: u32) {
         unsafe {
             PCI_CONFIG_ADDRESS_PORT
                 .lock()

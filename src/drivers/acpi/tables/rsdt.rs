@@ -4,9 +4,7 @@ use alloc::{collections::btree_map::Range, vec::Vec};
 use log::trace;
 
 use crate::{
-    acpi::tables::{read_sdt, ACPI_HEAD_SIZE},
-    bit_manipulation::any_as_u8_slice,
-    memory::handler::MemoryHandler,
+    acpi::tables::{read_sdt, ACPI_HEAD_SIZE}, bit_manipulation::any_as_u8_slice, dbg, memory::handler::MemoryHandler
 };
 
 use super::ACPISDTHeader;
@@ -31,16 +29,17 @@ pub fn find_string(bytes: &[u8], search_string: &[u8]) -> Option<usize> {
 
 pub const RSDP_SIGNATURE: &[u8; 8] = b"RSD PTR ";
 
+#[derive(Debug)]
 #[repr(C, packed)]
 pub struct RSDPDescriptor {
     signature: [u8; 8],
     checksum: u8,
     oemid: [u8; 6],
-    revision: u8,
-    rsdt_addr: u32,
+    pub revision: u8,
+    pub rsdt_addr: u32,
     // ! XSDT
     len: u32,
-    xsdt_addr: u64,
+    pub xsdt_addr: u64,
     ext_chcksum: u8,
     reserved: [u8; 3],
 }
@@ -77,7 +76,7 @@ pub struct RSDT {
     pub pointer_to_other_sdt: Vec<u32>,
 }
 
-fn get_rsdt(rsdt_addr: u64) -> Option<RSDT> {
+pub fn get_rsdt(rsdt_addr: u64) -> Option<RSDT> {
     trace!("Getting RSDT at {}", rsdt_addr);
     let (rsdt_header, raw) = read_sdt(rsdt_addr, rsdt_addr);
 
@@ -105,12 +104,4 @@ fn get_rsdt(rsdt_addr: u64) -> Option<RSDT> {
         return None;
     }
     Some(rsdt)
-}
-pub fn search_rsdt(physical_memory_offset: u64) -> Option<RSDT> {
-    let rsdp = search_rsdp(physical_memory_offset);
-    if rsdp.xsdt_addr != 0 {
-        let xsdt_addr = rsdp.xsdt_addr;
-        log::debug!("Xsdt address is set, we should maybe use it ?!");
-    }
-    get_rsdt(rsdp.rsdt_addr.into())
 }

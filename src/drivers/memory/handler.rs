@@ -82,6 +82,14 @@ impl MemoryHandler {
         }
         Ok(())
     }
+    pub fn malloc(&mut self, flags: PageTableFlags) -> Option<VirtAddr> {
+        let frame = self.frame_allocator.allocate_frame()?;
+        let virt_addr = VirtAddr::new(frame.start_address().as_u64());
+        let page = Page::from_start_address(virt_addr).ok()?;
+        unsafe{self.map_frame(page, frame, flags)}.ok()?;
+        Some(virt_addr)
+    }
+
 }
 ///TODO Is it unsafe ?
 pub fn map(page: Page<Size4KiB>, flags: PageTableFlags) -> PhysAddr {
@@ -112,6 +120,14 @@ macro_rules! mem_map {
         }
     };
 }
+
+#[macro_export]
+macro_rules! malloc {
+    ($flags: expr) => {
+        $crate::mem_handler!().malloc($flags)
+    };
+}
+
 #[derive(Debug)]
 pub enum MapFrameError {
     CantAllocateFrame,
