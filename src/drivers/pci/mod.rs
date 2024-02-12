@@ -120,7 +120,7 @@ impl core::fmt::Display for PciDevice {
         ))
     }
 }
-
+/// Scans the different pci devices connected to the system, and put them in a hashmap for easier use
 pub fn init() {
     //TODO With_capacity
     let mut devices = HashMap::new();

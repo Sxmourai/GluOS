@@ -5,6 +5,7 @@ pub static GENERATOR: Lazy<Mutex<SmallRng>> =
     Lazy::new(|| Mutex::new(rand::SeedableRng::seed_from_u64(get_pseudo_rand())));
 
 /// Don't do anything for now... We could try initialising the Lazy GENERATOR
+/// Supposed to init the rdseed
 pub fn init() {}
 
 pub fn rand() -> u64 {

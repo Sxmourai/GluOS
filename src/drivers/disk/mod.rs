@@ -2,6 +2,8 @@ pub mod ata;
 pub mod driver;
 pub mod nvme;
 
+/// Identifies the different ATA disks (and we are working on NVMe which is hard asf)
+/// Puts them into a hashmap, for easier use
 pub fn init() {
     let mut disks = hashbrown::HashMap::new();
     for (loc, device) in crate::pci_manager!().iter() {

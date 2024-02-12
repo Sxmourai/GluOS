@@ -53,7 +53,16 @@ impl Log for Logger {
     }
     fn log(&self, record: &Record) {
         let _buffer = [0u8; 128];
+        #[cfg(debug_assertions)]
         serial_println!(
+            "[\x1b[1;3{}m{}{}] {}",
+            Color::from(record.level() as u8) as u8,
+            record.level(),
+            Codes::reset(),
+            record.args()
+        );
+        #[cfg(not(debug_assertions))]
+        crate::println!(
             "[\x1b[1;3{}m{}{}] {}",
             Color::from(record.level() as u8) as u8,
             record.level(),
@@ -67,6 +76,7 @@ impl Log for Logger {
     }
 }
 const MAX_LEVEL: Level = Level::Trace;
+/// Initialises a log system for the os (sends logs to qemu if in debug mode)
 pub fn initialize_logger() {
     static LOGGER: Logger = Logger;
     log::set_logger(&LOGGER).unwrap();

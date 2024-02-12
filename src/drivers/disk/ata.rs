@@ -19,7 +19,11 @@ use super::driver::{Disk, DiskDriver, DiskDriverEnum, GenericDisk, SECTOR_SIZE};
 use super::{DiskError, DiskLoc};
 
 pub static mut ATA_DRIVER: Option<RwLock<AtaDriver>> = None;
-
+/// Scans the different ATA disks
+/// The buses are:
+/// Primary Channel:   Slave & Master
+/// Secondary Channel: Slave & Master
+/// So the IDE controller only has a max of 4 drives
 pub fn init() -> Vec<super::driver::Disk> {
     unsafe { u8::write_to_port(0x3f6, (1 << 1) | (1 << 2)) }
     unsafe { u8::write_to_port(0x376, (1 << 1) | (1 << 2)) }
@@ -48,7 +52,8 @@ pub fn init() -> Vec<super::driver::Disk> {
     gen_disks
 }
 
-//Detects a disk at specified channel and drive
+/// Detects a disk at specified channel and drive
+/// Reads identify data & sets it up correctly
 fn detect(addr: &DiskLoc) -> Option<AtaDisk> {
     let drive_addr = addr.drive_select_addr();
     let channel = addr.channel();

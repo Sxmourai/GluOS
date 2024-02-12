@@ -92,6 +92,11 @@ pub fn get_fs_driver(loc: &Partition) -> Option<&Box<dyn FsDriver>> {
     fs_driver!().drivers.get(loc)
 }
 
+/// Tries to identify the different filesystems on all of the drives, and binds a driver to it if there is a supported driver
+/// Supported fs:
+/// - NTFS
+/// - Fat32
+/// - Ext2/3/4
 pub fn init() {
     unsafe { FS_DRIVER.replace(FsDriverManager::new()) };
 }

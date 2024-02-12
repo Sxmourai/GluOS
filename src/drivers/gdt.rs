@@ -8,6 +8,10 @@ use x86_64::VirtAddr;
 
 pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;
 
+/// Initialises the GDT
+/// See https://wiki.osdev.org/GDT for more infos
+/// Also used by interrupt handler
+/// See src/drivers/interrupts
 pub fn init() {
     GDT.0.load();
     unsafe {

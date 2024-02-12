@@ -29,6 +29,10 @@ pub const STATUS_PARITY: u8 = 1 << 7;
 // Simple utility to turn on/off error messages when assert_ack isn't equals to ack
 const ACK_LOGGING: bool = false;
 
+/// Initialises & resets the ps2 controller
+/// Ps2 controller is used for keyboard input and mouse.
+/// Currently we don't have a great driver, but it works under QEMU
+/// TODO Indentify the different devices on the ps2 controller
 pub fn init() {
     Ps2Controller::init().unwrap();
 }

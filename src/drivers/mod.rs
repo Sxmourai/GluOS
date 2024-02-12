@@ -1,5 +1,3 @@
-use self::memory::handler::MemoryHandler;
-
 pub mod acpi;
 pub mod disk;
 #[cfg(feature = "fs")]
@@ -67,6 +65,7 @@ pub const DRIVERS: &[(&str, fn() -> ())] = &[
 ];
 
 //TODO Specify a bit more what is a driver... Cuz rn it's just smth that needs to be initialised
+/// Calls the specifed above methods ^^
 pub fn init_drivers() {
     'main: for (name, init_fun) in DRIVERS.iter() {
         log::info!("Initialising {}... ", name);

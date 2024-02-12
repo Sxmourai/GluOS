@@ -177,7 +177,8 @@ pub fn create() {
     });
 }
 
-// needs to be called by every core exactly once to use apic (after gdt is initialized)
+/// needs to be called by every core exactly once to use apic (after gdt is initialized)
+/// Initialises an APIC which is the advanced PIC
 pub fn init() {
     create();
     interrupts::without_interrupts(|| {

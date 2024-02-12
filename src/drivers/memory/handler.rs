@@ -13,6 +13,7 @@ use crate::{boot_info, mem_handler};
 
 use super::{active_level_4_table, frame_allocator::BootInfoFrameAllocator};
 
+/// Initialises the heap allocator and the memory paging driver
 pub fn init() {
     let off = unsafe { boot_info!() }.physical_memory_offset;
     let mem_handler = MemoryHandler::new(off, &unsafe { boot_info!() }.memory_map);
