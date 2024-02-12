@@ -32,10 +32,6 @@ impl QemuIOReader {
             if k != 0 {
                 dbg!(k)
             }
-            ahlt().await
         }
     }
-}
-async fn ahlt() {
-    hlt()
 }
