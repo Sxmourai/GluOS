@@ -14,8 +14,21 @@ The boot order goes this way: (this might change A LOT)
 
 ### Drivers
 All paths are relative to "src/drivers"
-- [ACPI](acpi.md)
-
+- [ACPI](acpi.md): Usefull for PS/2 & other stuff
+- [Disk](disk.md): ATA reading (working on NVMe)
+- [File systems](fs.md): FAT32 & Ext2 & NTFS
+- [Graphics](graphics.md): Vga text buffer...
+- [Interrupts](interrupts.md): Hot load IDT
+- [Memory](memory.md): Heap allocation, frame mapping & global allocator
+- [Network](net.md): Nothing for now, but will have WIFI & Ethernet
+- [PCI](pci.md): Pci devices scanning & parsing
+- [Multiprocessing](smp.md): SMP Multiprocessing not supported (but should use all cores)
+- [Executor & Tasks](task.md): An executor to use async/await in the os, but not used much
+- [Time](time.md): PIT for delays... And getting current time (from CMOS)
+- [GDT](gdt.md): Uses the GDT from x86_64 crate
+- [PS/2 Controller](ps2.md): Resets the PS/2 controller, needed by PS/2 mouse, but keyboard works by default
+- [PS/2 Keyboard](keyboard.md): Parses the scancodes and supported inputs (like python's input())
+- [PS/2 Mouse](mouse.md): A PS/2 mouse, but we don't have any use for it
 
 
 # Inspiration & Sources

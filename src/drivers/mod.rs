@@ -3,7 +3,6 @@ pub mod disk;
 #[cfg(feature = "fs")]
 pub mod fs;
 pub mod gdt;
-pub mod graphics;
 pub mod interrupts;
 pub mod memory;
 pub mod mouse;
