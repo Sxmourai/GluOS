@@ -35,14 +35,25 @@ Move it into /home/\[user\] instead
 - Our own bootloader (maybe)
 - Full Graphical interface
 - Network, NTP & all
+- More drivers:
+- NVMe
+- Ethernet
+- USB
 - Optimising & refactoring
 
 ## Ressources
 - An amazing blog to start out: https://os.phil-opp.com
 - Posts on actuality in os dev: https://rust-osdev.com and their github https://github.com/rust-osdev/about
-- The "hub" of os deving: https://wiki.osdev.org
-- -> List of os's made with Rust https://wiki.osdev.org/Rust
-- (a better one): https://github.com/flosse/rust-os-comparison
+- The main wiki of os deving: https://wiki.osdev.org (has been my goto for nearly everything)
+
+### Some other os's in Rust
+- https://github.com/nuta/kerla/tree/main/kernel
+- https://github.com/llenotre/maestro
+- https://github.com/intermezzOS/kernel
+- https://github.com/hermit-os/hermit-rs
+- And for more:
+- https://wiki.osdev.org/Rust
+- https://github.com/flosse/rust-os-comparison
 
 ## Stuff to check
 - `cargo audit`
