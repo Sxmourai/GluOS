@@ -56,7 +56,6 @@ run-args = [
     # DISKFLAG for build script (see build/disk_create.py)
 "-drive", "file=build/fat32-gpt.img,format=raw",
 "-drive", "file=build/ntfs-gpt.img,format=raw",
-"-drive", "file=build/ext2-gpt.img,format=raw",
     # ENDDISKFLAG
     # "-drive",
     # "file=build/ext2-gpt.img,format=raw,if=none,id=nvm",
