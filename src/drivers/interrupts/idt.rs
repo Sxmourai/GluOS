@@ -38,7 +38,7 @@ pub fn create_idt() -> InterruptDescriptorTable {
     idt.segment_not_present.set_handler_fn(segment_not_present);
     idt.simd_floating_point.set_handler_fn(simd_floating_point);
     idt.stack_segment_fault.set_handler_fn(stack_segment_fault);
-    idt.virtualization.set_handler_fn(virtualization); //TODO: Search if it's an exception or an interrupt of different type (exceptions are interrupts)
+    idt.virtualization.set_handler_fn(virtualization);
     idt.vmm_communication_exception
         .set_handler_fn(vmm_communication_exception);
     idt.x87_floating_point.set_handler_fn(x87_floating_point);
@@ -47,7 +47,6 @@ pub fn create_idt() -> InterruptDescriptorTable {
     idt.debug.set_handler_fn(debug_handler);
 
     // HARDWARE INTERRUPTS
-    //TODO: SUPPORT ALL HI: https://os.phil-opp.com/hardware-interrupts/
     crate::interrupts::hardware::setup_hardware_interrupts(&mut idt);
     idt
 }

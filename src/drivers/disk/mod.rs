@@ -41,7 +41,9 @@ pub enum DiskError {
     NoReadModeAvailable,
     DiskNotFound,
     TimeOut,
-    DRQRead, //TODO Handle all errors from the register
+    DRQRead, 
+    //TODO Handle all errors from the register
+    // ErrorRegister {...}
 }
 use crate::disk::{ata::{Channel, Drive}, driver::GenericDisk};
 

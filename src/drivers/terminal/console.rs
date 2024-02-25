@@ -49,27 +49,21 @@ impl Console {
                 self.remove(x, y);
             }
         }
-        self.top_buffer = ConsoleBuffer::new(); // Don't use clear because the allocated size doesn't change
-        self.bottom_buffer = ConsoleBuffer::new(); // Don't use clear because the allocated size doesn't change
-                                                   // Could use clear then shrink to fit I think
-                                                   //TODO: Find out which is faster (even tho I don't think it will be a gigantic improvement)
+        self.top_buffer.inner.clear();
+        self.top_buffer.inner.shrink_to(2); // Sets up a 2 lines capacity... This is for speed but idk if it's that important
+        self.bottom_buffer.inner.clear();
+        self.bottom_buffer.inner.shrink_to(2);
     }
 
     pub fn remove(&mut self, x: u8, y: u8) {
         self.write_char_at(x, y, DEFAULT_CHAR);
     }
-    // Note that this makes a copy
-    //TODO Support top and bottom buffer ?
-    pub fn get_str_at(&self, pos: &ScreenPos, len: u16) -> Vec<ScreenChar> {
-        let mut buffer = Vec::new();
+    //Doesn't support top and bottom buffer because we ScreenPos is u8's, where the max value is 256, which means we won't be able to read a lot from the buffers
+    pub fn get_str_at(&self, pos: &ScreenPos, len: u16) -> &'static [ScreenChar] {
         let (width, _height) = self.size();
-        for i in 0..len {
-            buffer.push(self.get_char_at(
-                (pos.0 as u16 + i) as u8 % width,
-                (i / width as u16) as u8 + pos.1,
-            )); // Wrap around
-        }
-        buffer
+        let mut first_char = core::ptr::addr_of!(self.buffer) as *const ScreenChar;
+        first_char = unsafe{first_char.add(width as usize*pos.1 as usize+pos.0 as usize)};
+        unsafe{core::slice::from_raw_parts(first_char, len as usize)}
     }
     pub fn size(&self) -> (u8, u8) {
         (super::buffer::BUFFER_WIDTH, super::buffer::BUFFER_HEIGHT)

@@ -146,7 +146,7 @@ impl Writer {
             }
             self.console.bottom_buffer.append(schrs);
             for y in 2..=height {
-                let line: Vec<ScreenChar> = self
+                let line = self
                     .console
                     .get_str_at(&ScreenPos(0, height - y), width as u16);
                 self.write_screenchars_at_no_wrap(0, height - y + 1, line.iter());

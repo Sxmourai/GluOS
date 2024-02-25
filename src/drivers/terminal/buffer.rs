@@ -7,8 +7,7 @@ pub const BUFFER_WIDTH: u8 = 80;
 pub const SBUFFER_HEIGHT: usize = BUFFER_HEIGHT as usize;
 pub const SBUFFER_WIDTH: usize = BUFFER_WIDTH as usize;
 
-// ScreenChars buffer
-//TODO Make a more generic buffer type
+/// A buffer of Screenchar
 pub trait Buffer {
     type SIZE;
     fn size(&self) -> Self::SIZE;
@@ -24,7 +23,7 @@ pub struct VgaBuffer {
 }
 
 pub struct ConsoleBuffer {
-    inner: Vec<[ScreenChar; SBUFFER_WIDTH]>,
+    pub inner: Vec<[ScreenChar; SBUFFER_WIDTH]>,
 }
 impl Default for ConsoleBuffer {
     fn default() -> Self {
@@ -42,10 +41,7 @@ impl ConsoleBuffer {
     }
     // pushes item at start of buffer and moves everything else
     pub fn push(&mut self, line: [ScreenChar; SBUFFER_WIDTH]) {
-        //TODO Fix trash code
-        let mut inner = alloc::vec![line];
-        inner.append(&mut self.inner);
-        self.inner = inner;
+        self.inner.insert(0, line);
     }
     pub fn get_youngest_line(&self) -> Option<[ScreenChar; BUFFER_WIDTH as usize]> {
         self.inner.last().copied()

@@ -1,6 +1,4 @@
-//TODO: Implement proper paging & all
-//TODO: Make a "simple" function to map ANY frame to a new page. Need this to access rsdp pointer
-// https://os.phil-opp.com/paging-implementation/#using-offsetpagetable
+//TODO: Implement a real driver for paging, without using x86_64 crate (we can use their structures)
 
 use x86_64::structures::paging::PageTableFlags as Flags;
 use x86_64::structures::paging::PageTableFlags;
@@ -20,11 +18,15 @@ use crate::mem_handler;
 
 use self::handler::MemoryHandler;
 
-//TODO Make an allocator error handler
-// #[alloc_error_handler]
-// pub fn alloc_error(size: usize, align: usize) -> ! {
-
-// }
+/// https://github.com/rust-lang/rust/issues/51540
+#[alloc_error_handler]
+pub fn alloc_error(layout: core::alloc::Layout) -> ! {
+    panic!(
+        "Allocation error !\nTried to allocate {} bytes with an alignment: {}",
+        layout.size(),
+        layout.align()
+    )
+}
 
 /// Returns a mutable reference to the active level 4 table.
 ///
@@ -56,9 +58,8 @@ unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut
 // }
 
 // end_page is using .containing address
-//TODO Map a page when a page fault occurs (in interrupts/exceptions.rs)
 pub fn read_phys_memory_and_map(location: u64, size: usize, end_page: u64) -> &'static [u8] {
-    let flags: PageTableFlags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE; // TODO Change this to a constant
+    let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
 
     let _size_64 = size as u64;
     let start_frame_addr = PhysFrame::<Size4KiB>::containing_address(PhysAddr::new(location))

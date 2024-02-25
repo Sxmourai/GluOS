@@ -73,7 +73,7 @@ impl BootInfoFrameAllocator {
 
 unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
     fn allocate_frame(&mut self) -> Option<PhysFrame> {
-        let frame = self.usable_frames().nth(self.next); //TODO: Store usable frames as a struct field
+        let frame = self.usable_frames().nth(self.next);
         self.next += 1;
         frame
     }

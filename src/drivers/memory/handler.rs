@@ -92,7 +92,8 @@ impl MemoryHandler {
     }
 
 }
-///TODO Is it unsafe ?
+/// Unsafe not set for ease of use... Maybe change that
+/// TODO Do we want to keep this function not unsafe even though it is ?
 pub fn map(page: Page<Size4KiB>, flags: PageTableFlags) -> PhysAddr {
     unsafe { mem_handler!().map(page, flags) }.unwrap()
 }

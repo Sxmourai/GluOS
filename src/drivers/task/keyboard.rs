@@ -30,6 +30,7 @@ impl KeyboardHandler {
     }
 
     pub fn process_keyevent(&mut self, scancode: u8) {
+        //TODO Make this simpler, I think there's a lot of overhead in there
         if let Ok(Some(key_event)) = self.inner.add_byte(scancode) {
             let state = key_event.state;
             if state == KeyState::Down {

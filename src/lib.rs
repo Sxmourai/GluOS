@@ -7,6 +7,7 @@
 #![feature(const_mut_refs)]
 #![feature(linkage)]
 #![feature(naked_functions)]
+#![feature(alloc_error_handler)]
 #![cfg_attr(debug_assertions, allow(unused))]
 #![allow(dead_code)]
 #![deny(unsafe_op_in_unsafe_fn)]

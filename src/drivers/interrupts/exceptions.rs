@@ -93,9 +93,10 @@ pub extern "x86-interrupt" fn stack_segment_fault(
         stack_frame, error_code
     );
 }
+/// For more infos on this exception: https://stackoverflow.com/questions/70730829/access-to-virtualization-exception-area-inside-a-guest-os
+/// And maybe: https://kib.kiev.ua/kib/ia32-exceptions.pdf
 pub extern "x86-interrupt" fn virtualization(stack_frame: InterruptStackFrame) {
-    //TODO: Do some research on wtf when this is called
-    panic!("EXCEPTION: virtualization\n{:#?}", stack_frame); // Idk what this means
+    panic!("EXCEPTION: virtualization\n{:#?}", stack_frame);
 }
 pub extern "x86-interrupt" fn vmm_communication_exception(
     stack_frame: InterruptStackFrame,
@@ -116,7 +117,6 @@ pub extern "x86-interrupt" fn page_fault_handler(
     error_code: PageFaultErrorCode,
 ) {
     use x86_64::registers::control::Cr2;
-    //TODO Map a page to a frame when page fault
     let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
     map(Page::containing_address(Cr2::read()), flags);
     error!(

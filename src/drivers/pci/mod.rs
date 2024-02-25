@@ -3,7 +3,6 @@
 // Usefull links: all of classes: https://pci-ids.ucw.cz/read/PD/
 // Intel devices : https://pci-ids.ucw.cz/read/PC/8086
 
-pub mod pci_data;
 pub mod port;
 
 use alloc::string::String;
@@ -122,9 +121,9 @@ impl core::fmt::Display for PciDevice {
 }
 /// Scans the different pci devices connected to the system, and put them in a hashmap for easier use
 pub fn init() {
-    //TODO With_capacity
-    let mut devices = HashMap::new();
-    for pci_device in get_pci_buses().iter().flat_map(|b| b.devices.iter()) {
+    let buses = get_pci_buses();
+    let mut devices = HashMap::with_capacity(buses.len());
+    for pci_device in buses.iter().flat_map(|b| b.devices.iter()) {
         if let Some(device) =
             pci_ids::Device::from_vid_pid(pci_device.vendor_id, pci_device.device_id)
         {
@@ -506,10 +505,6 @@ impl RawPciDevice {
     /// Note that if the given `BAR` actually indicates it is part of a 64-bit address,
     /// it will be used together with the BAR right above it (`bar + 1`), e.g., `BAR1:BAR0`.
     /// If it is a 32-bit address, then only the given `BAR` will be accessed.
-    ///
-    /// TODO: currently we assume the BAR represents a memory space (memory mapped I/O)
-    ///       rather than I/O space like Port I/O. Obviously, this is not always the case.
-    ///       Instead, we should return an enum specifying which kind of memory space the calculated base address is.
     pub fn determine_mem_base(&self, bar_index: usize) -> Result<PciMemoryBase, &'static str> {
         let mut bar = if let Some(bar_value) = self.bars.get(bar_index) {
             *bar_value
@@ -821,16 +816,6 @@ pub struct Device {
 }
 
 impl Device {
-    //     //TODO: Make a function to create a pci device from only vendor and product ids
-    // Make sure vendor and product ids are valid
-    // pub fn new(vendor_id:u16, product_id:u16) -> Self {
-    //     // let class_id = 1;
-    //     Self {
-    //         class: Class::from_id(class_id).unwrap(),
-    //         device: pci_ids::Device::from_vid_pid(vendor_id, product_id).unwrap(),
-    //         bus_device: RawPciDevice { location: (), class: (), subclass: (), prog_if: (), bars: (), vendor_id: (), device_id: (), command: (), status: (), revision_id: (), cache_line_size: (), latency_timer: (), header_type: (), bist: (), int_pin: (), int_line: () }
-    //     }
-    // }
     pub fn at_bus(bus: u8) -> Vec<Self> {
         let mut devices: Vec<Self> = Vec::new();
         for slot in 0..MAX_SLOTS_PER_BUS {

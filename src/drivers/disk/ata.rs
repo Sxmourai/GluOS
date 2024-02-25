@@ -3,6 +3,7 @@ use core::{fmt::Display, panic};
 
 use alloc::string::ToString;
 use alloc::{format, vec::Vec};
+use bit_field::BitField;
 use log::{debug, error, info, trace};
 use spin::{Mutex, MutexGuard, Once, RwLock};
 
@@ -28,10 +29,22 @@ pub fn init() -> Vec<super::driver::Disk> {
     unsafe { u8::write_to_port(0x3f6, (1 << 1) | (1 << 2)) }
     unsafe { u8::write_to_port(0x376, (1 << 1) | (1 << 2)) }
     let raw_disks = [
-        (detect(&DiskLoc(Channel::Primary, Drive::Master)), DiskLoc(Channel::Primary, Drive::Master)),
-        (detect(&DiskLoc(Channel::Primary, Drive::Slave)), DiskLoc(Channel::Primary, Drive::Slave)),
-        (detect(&DiskLoc(Channel::Secondary, Drive::Master)), DiskLoc(Channel::Secondary, Drive::Master)),
-        (detect(&DiskLoc(Channel::Secondary, Drive::Slave)), DiskLoc(Channel::Secondary, Drive::Slave)),
+        (
+            detect(&DiskLoc(Channel::Primary, Drive::Master)),
+            DiskLoc(Channel::Primary, Drive::Master),
+        ),
+        (
+            detect(&DiskLoc(Channel::Primary, Drive::Slave)),
+            DiskLoc(Channel::Primary, Drive::Slave),
+        ),
+        (
+            detect(&DiskLoc(Channel::Secondary, Drive::Master)),
+            DiskLoc(Channel::Secondary, Drive::Master),
+        ),
+        (
+            detect(&DiskLoc(Channel::Secondary, Drive::Slave)),
+            DiskLoc(Channel::Secondary, Drive::Slave),
+        ),
     ];
     let mut disks = Vec::with_capacity(4);
     let mut gen_disks = Vec::with_capacity(4);
@@ -45,10 +58,12 @@ pub fn init() -> Vec<super::driver::Disk> {
         disks.push(disk);
     }
     disks.shrink_to_fit();
-    unsafe{ATA_DRIVER.replace(RwLock::new(AtaDriver {
-        selected_disk: 0,
-        disks: disks.try_into().unwrap(),
-    }))};
+    unsafe {
+        ATA_DRIVER.replace(RwLock::new(AtaDriver {
+            selected_disk: 0,
+            disks: disks.try_into().unwrap(),
+        }))
+    };
     gen_disks
 }
 
@@ -97,11 +112,10 @@ fn detect(addr: &DiskLoc) -> Option<AtaDisk> {
         trace!("ATAPI drive detected !");
     } else if unsafe { check_drq_or_err(base) }.is_err() {
         error!(
-            "Drive {:?} in {:?} channel returned an error after IDENTIFY command",
+            "Drive {:?} in {:?} channel returned an error after IDENTIFY command, please post an issue on github",
             addr.drive(),
             channel
         );
-        //TODO Try to handle the error
         return None;
     }
     let identify = read_identify(base);
@@ -119,9 +133,11 @@ fn detect(addr: &DiskLoc) -> Option<AtaDisk> {
     // let rev = identify[60..61].iter().rev().collect::<Vec<u16>>();
     let lba28 = ptrlist_to_num(&mut identify[60..61].iter());
     let lba48: u64 = ptrlist_to_num(&mut identify[100..103].iter());
-    let is_hardisk = true; //TODO Parse if 'i24612s hard disk'
-                           //TODO Parse ALL info returned by IDENTIFY https://wiki.osdev.org/ATA_PIO_Mode
-    if lba28 as u64+lba48==0 { // Skip if size = 0, because QEMU sometimes creates some disks with no size that isn't interesting
+    let is_hardisk = true;
+    //TODO Parse ALL info returned by IDENTIFY https://wiki.osdev.org/ATA_PIO_Mode
+    // i.e. UDMA
+    if lba28 as u64 + lba48 == 0 {
+        // Skip if size = 0, because QEMU sometimes creates some disks with no size that isn't interesting
         return None;
     }
     trace!(
@@ -187,7 +203,10 @@ impl DiskDriver for AtaDriver {
         start_sector: u64,
         sector_count: u64,
     ) -> Result<Vec<u8>, DiskError> {
-        self.disks[loc.as_index()].as_mut().ok_or(DiskError::NotFound)?.read_sectors(start_sector, sector_count.try_into().unwrap())
+        self.disks[loc.as_index()]
+            .as_mut()
+            .ok_or(DiskError::NotFound)?
+            .read_sectors(start_sector, sector_count.try_into().unwrap())
     }
 
     fn write(&mut self, loc: &DiskLoc, start_sector: u64, content: &[u8]) -> Result<(), DiskError> {
@@ -243,16 +262,20 @@ pub struct AtaDisk {
     pub addressing_modes: AddressingModes,
     pub size: u64,
     pub is_hardisk: bool,
-    pub loc: DiskLoc, //TODO UDMA modes and store other infos...
+    pub loc: DiskLoc, 
+    //TODO Store UDMA modes
 }
 impl AtaDisk {
-    pub fn new(addr: &DiskLoc, chs:bool, lba28: u32, lba48: u64, size: u64, is_hardisk: bool) -> Self {
+    pub fn new(
+        addr: &DiskLoc,
+        chs: bool,
+        lba28: u32,
+        lba48: u64,
+        size: u64,
+        is_hardisk: bool,
+    ) -> Self {
         Self {
-            addressing_modes: AddressingModes {
-                chs,
-                lba28,
-                lba48,
-            }, // Assume chs is supported on all ATA drives...
+            addressing_modes: AddressingModes { chs, lba28, lba48 }, // Assume chs is supported on all ATA drives...
             size,
             is_hardisk,
             loc: addr.as_diskloc(),
@@ -499,7 +522,7 @@ impl AtaDisk {
         sector_address: u64,
         sector_count: u16,
     ) -> Result<Vec<u8>, DiskError> {
-        //TODO Move from vecs to slices
+        //TODO Move from vecs to slices, to have same way of functionning than NVMe for example
         if self.addressing_modes.lba48 != 0 {
             if sector_address + (sector_count as u64) > self.addressing_modes.lba48 {
                 // > or >= ?
@@ -516,7 +539,7 @@ impl AtaDisk {
             self.read28(sector_address, sector_count)
         } else if self.addressing_modes.chs {
             log::error!("Implement CHS pio mode");
-            return Err(DiskError::NoReadModeAvailable)
+            return Err(DiskError::NoReadModeAvailable);
             // return self.readchs(sector_address.try_into()?, sector_count.try_into()?)
         } else {
             Err(DiskError::NoReadModeAvailable)
@@ -662,18 +685,18 @@ unsafe fn check_drq_or_err(base: u16) -> Result<(), DiskError> {
     let mut status = unsafe { u8::read_from_port(base + 7) };
     let mut i = 0;
     loop {
-        if status & 0x01 != 0x00 {
+        if status.get_bit(0) {
             error!(
                 "Error reading DRQ from drive: {}",
                 bytes(unsafe { u8::read_from_port(base + 1) })
             );
             return Err(DiskError::DRQRead);
         } //TODO Make better error handling... Or make error handling in top level function
-        if status & 0x08 != 0x00 {
+        if status.get_bit(4) {
             break;
-        } //TODO When doing binary operations with ==, find a way to always do it the same way (see this line and line on top)
+        }
         if i > 10000000 {
-            error!("Error reading DRQ from drive: TIMEOUT");
+            error!("Error reading DRQ from drive: TIMEOUT"); // TODO Timeout with PIT
             return Err(DiskError::TimeOut);
         }
         status = unsafe { u8::read_from_port(base + 7) };

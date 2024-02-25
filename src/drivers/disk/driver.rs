@@ -61,11 +61,19 @@ impl DiskManager {
     }
     pub fn write_disk(
         &mut self,
-        disk_address: &DiskLoc,
+        loc: &DiskLoc,
         start_sector: u64,
         content: &[u8],
     ) -> Result<(), DiskError> {
-        todo!()
+        match self.disks.get(loc).ok_or(DiskError::NotFound)?.drv {
+            DiskDriverEnum::Ata => {
+                let mut ata_drv = unsafe{ATA_DRIVER.as_mut().unwrap().write()};
+                ata_drv.write(loc, start_sector, content)
+            },
+            DiskDriverEnum::NVMe => {
+                todo!()
+            },
+        }
     }
 }
 
