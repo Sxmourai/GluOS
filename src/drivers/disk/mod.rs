@@ -34,6 +34,7 @@ pub fn init() {
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub enum DiskError {
+    Unitialised,
     NotFound,
     ReadDataNotAvailable,
     PermissionDenied, // Shouldn't happen... But keep this for rlib ?

@@ -107,8 +107,8 @@ pub fn read_header_type(disk: &DiskLoc) -> Option<HeaderType> {
             return Some(HeaderType::MBR(partitions));
         }
     }
-    // No MBR / GPT On disk (raw contents then or maybe not even a disk ?!)
-    crate::dbg!("No MBR/GPT on partition ?", disk);
+    // No MBR / GPT On disk (maybe a raw partition, or an empty disk)
+    log::warn!("No MBR/GPT on disk at {:?}", disk);
     None
 }
 pub struct _FsDriverWrapper<'a>(pub &'a Partition);

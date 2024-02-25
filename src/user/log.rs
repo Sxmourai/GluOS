@@ -84,6 +84,9 @@ pub fn initialize_logger() {
 
 #[macro_export]
 macro_rules! dbg {
+    () => {
+        $crate::dbg!("Nothing")
+    };
     ($variable:expr) => {
         $crate::serial_println!(
             "{} = {:?} at {}:{}",
