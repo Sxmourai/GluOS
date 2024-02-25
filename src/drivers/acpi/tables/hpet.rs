@@ -1,15 +1,13 @@
-use super::{ACPISDTHeader, AddressStructure};
-
 #[repr(C, packed)]
 pub struct HPET {
-    header: ACPISDTHeader,
+    header: super::ACPISDTHeader,
     hardware_rev_id: u8,
     comparator_count: u8,
     counter_size: u8,
     reserved: u8,
     legacy_replacement: u8,
     pci_vendor_id: u16,
-    address: AddressStructure,
+    address: super::GenericAddressStructure,
     hpet_number: u8,
     minimum_tick: u16,
     page_protection: u8,

@@ -8,7 +8,6 @@ use crate::{
 };
 
 pub fn boot(boot_info: &'static bootloader::BootInfo) -> Executor {
-    //TODO Can't use vecs, Strings before heap init (in memoryHandler init), which means we can't do trace... Use a constant-size list ?
     unsafe { crate::state::BOOT_INFO.replace(boot_info) };
     crate::drivers::init_drivers();
 

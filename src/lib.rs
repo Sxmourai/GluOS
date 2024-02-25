@@ -27,7 +27,6 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
     test::panic_handler(info)
 }
 
-//TODO: Remove the need for these
 extern crate alloc; // Lib which stores some useful structs on the heap / smart pointers from stdlib like Vec, String, Box...
 extern crate bootloader; // The bootloader crate, usefull for boot_info, paging and other stuff
 extern crate hashbrown;
@@ -37,5 +36,4 @@ extern crate pic8259; //TODO: Switch from PIC (Programmable interupt controller)
 extern crate spin; // Mutex and lock
 extern crate uart_16550; // Helps us to talk to QEMU (serial print and shutdown)
 extern crate x86_64; // A lot of asm macros, and useful for paging... Everything far and near CPU related // Reimplementation of HashMap and HashSet from stdlib
-                     //TODO Make vga cursor move (os dev vga terminal doc) so we don't need to do our blinking, which means we don't need hashmaps anymore
 extern crate bitfield;

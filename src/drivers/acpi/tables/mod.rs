@@ -7,6 +7,8 @@ use alloc::{
 
 use crate::{boot_info, dbg, mem_handler, memory::read_phys_memory_and_map};
 
+use self::rsdt::{RSDPDescriptor, XSDPDescriptor};
+
 pub mod dsdt;
 pub mod fadt;
 pub mod hpet;
@@ -16,6 +18,11 @@ pub mod ssdt;
 pub mod waet;
 
 static ACPI_HEAD_SIZE: usize = core::mem::size_of::<ACPISDTHeader>();
+
+pub enum AcpiVersion {
+    One,
+    Two,
+}
 
 #[derive(Debug, Clone)]
 #[repr(C, packed)]
@@ -30,9 +37,30 @@ pub struct ACPISDTHeader {
     creator_id: u32,
     creator_revision: u32,
 }
-pub enum AcpiVersion {
-    One,
-    Two,
+pub enum SystemDescriptionPtr {
+    Root(&'static RSDPDescriptor),
+    Extended(&'static XSDPDescriptor),
+}
+impl SystemDescriptionPtr {
+    pub fn addr(&self) -> u64 {
+        match self {
+            SystemDescriptionPtr::Root(rsdp) => rsdp.rsdt_addr.into(),
+            SystemDescriptionPtr::Extended(xsdp) => xsdp.xsdt_addr,
+        }
+    }
+}
+
+pub enum SystemDescriptionTable {
+    Root((&'static ACPISDTHeader, Vec<u32>)),
+    Extended((&'static ACPISDTHeader, Vec<u64>)),
+}
+impl SystemDescriptionTable {
+    pub fn tables(&self) -> Vec<u64> {
+        match self {
+            SystemDescriptionTable::Root(rsdt) => rsdt.1.iter().map(|ptr| *ptr as u64).collect(),
+            SystemDescriptionTable::Extended(xsdt) => xsdt.1.clone(),
+        }
+    }
 }
 
 pub struct DescriptorTablesHandler {
@@ -40,33 +68,32 @@ pub struct DescriptorTablesHandler {
     pub madt: madt::MADT,
     pub hpet: &'static hpet::HPET,
     pub waet: &'static waet::WAET,
-    pub version: AcpiVersion,
+    pub description_table: SystemDescriptionTable,
 }
 impl DescriptorTablesHandler {
     pub fn new() -> Option<Self> {
         let physical_memory_offset = unsafe { boot_info!() }.physical_memory_offset;
         let rsdp = rsdt::search_rsdp(physical_memory_offset);
-        let version = if rsdp.revision == 0 {
+        let sys_desc_ptr = if rsdp.revision == 0 {
             crate::trace!("Found ACPI version 1.0");
-            AcpiVersion::One
+            SystemDescriptionPtr::Root(rsdp)
         } else if rsdp.revision == 2 {
             crate::trace!("Found ACPI version 2.0-6.1");
-            AcpiVersion::Two
+            SystemDescriptionPtr::Extended(unsafe{&*(core::ptr::addr_of!(rsdp) as *const _)})
         } else {
             log::error!("Unknown ACPI version: {}", rsdp.revision);
             return None
         };
-        let rsdt = rsdt::get_rsdt(rsdp.rsdt_addr.into())?;
+        let sdt = rsdt::get_rsdt(&sys_desc_ptr)?;
         
         let mut acpi = None;
         let mut madt = None;
         let mut hpet = None;
         let mut waet = None;
-        for (i, ptr) in rsdt.pointer_to_other_sdt.iter().enumerate() {
+        for (i, ptr) in sdt.tables().iter().enumerate() {
             let end_page = 0xFFFFFFFF + (i * 4096) as u64;
-            let (header, table_bytes) = read_sdt(*ptr as u64, end_page);
+            let (header, table_bytes) = read_sdt(*ptr, end_page);
 
-            //TODO Make parsing in another function for cleaner code
             match String::from_utf8_lossy(&header.signature)
                 .to_string()
                 .as_str()
@@ -90,20 +117,24 @@ impl DescriptorTablesHandler {
             };
         }
         Some(Self {
-            fadt: acpi.unwrap(),
-            madt: madt.unwrap(),
-            hpet: hpet.unwrap(),
-            waet: waet.unwrap(),
-            version,
+            fadt: acpi?, // TODO Try to continue even if one table wasn't found
+            madt: madt?,
+            hpet: hpet?,
+            waet: waet?,
+            description_table: sdt,
         })
     }
 
     pub fn num_core(&self) -> usize {
         self.madt.cores.len()
     }
+    pub fn version(&self) -> AcpiVersion {
+        match self.description_table {
+            SystemDescriptionTable::Root(_) => AcpiVersion::One,
+            SystemDescriptionTable::Extended(_) => AcpiVersion::Two,
+        }
+    }
 }
-// A function because 10 lines upper we use handle_...
-//TODO Maybe remove these calls (10 lines upper)
 
 fn read_sdt(ptr: u64, end_page: u64) -> (&'static ACPISDTHeader, &'static [u8]) {
     let bytes = unsafe { read_phys_memory_and_map(ptr, ACPI_HEAD_SIZE, end_page) };
@@ -112,6 +143,7 @@ fn read_sdt(ptr: u64, end_page: u64) -> (&'static ACPISDTHeader, &'static [u8]) 
     (entry, bytes)
 }
 
+
 #[repr(C, packed)]
 #[derive(Debug, Clone)]
 pub struct GenericAddressStructure {
@@ -119,14 +151,5 @@ pub struct GenericAddressStructure {
     bit_width: u8,
     bit_offset: u8,
     access_size: u8,
-    address: u64,
-}
-#[repr(C, packed)] //TODO Merge GenericAddressStructure and AddressStructure ?
-#[derive(Debug)]
-pub struct AddressStructure {
-    address_space_id: u8,
-    register_bit_width: u8,
-    register_bit_offset: u8,
-    reserved: u8,
     address: u64,
 }

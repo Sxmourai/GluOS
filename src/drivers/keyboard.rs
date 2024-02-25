@@ -6,6 +6,8 @@ use x86_64::{instructions::port::PortReadOnly, structures::idt::InterruptStackFr
 
 use crate::{terminal::writer::WRITER, user::prompt::KbInput, print, interrupts::hardware::InterruptIndex};
 
+//TODO Redo the keyboard driver cuz it's a mess
+
 lazy_static! {
     pub static ref DEFAULT_KEYBOARD: Mutex<KeyboardHandler> = Mutex::new(KeyboardHandler {
         inner: Keyboard::new(
@@ -20,8 +22,6 @@ lazy_static! {
 pub trait KeyboardListener: Sync+Send {
     fn read_scancode(&mut self, scancode: u8);
 }
-//TODO Do we need thread-safety ?
-pub static KEYBOARD_LISTENERS: RwLock<Vec<Box<dyn KeyboardListener>>> = RwLock::new(Vec::new());
 
 pub struct Input {
     pressed: Vec<char>,

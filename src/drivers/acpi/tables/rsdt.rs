@@ -7,7 +7,7 @@ use crate::{
     acpi::tables::{read_sdt, ACPI_HEAD_SIZE}, bit_manipulation::any_as_u8_slice, dbg, memory::handler::MemoryHandler
 };
 
-use super::ACPISDTHeader;
+use super::{ACPISDTHeader, SystemDescriptionPtr, SystemDescriptionTable};
 
 /// This (usually!) contains the base address of the EBDA (Extended Bios Data Area), shifted right by 4
 // const EBDA_START_SEGMENT_PTR: usize = 0x40e; // Base address in in 2 bytes
@@ -37,10 +37,13 @@ pub struct RSDPDescriptor {
     oemid: [u8; 6],
     pub revision: u8,
     pub rsdt_addr: u32,
-    // ! XSDT
-    len: u32,
+}
+#[repr(C, packed)]
+pub struct XSDPDescriptor {
+    pub rsdt: RSDPDescriptor,
+    pub len: u32,
     pub xsdt_addr: u64,
-    ext_chcksum: u8,
+    pub ext_chcksum: u8,
     reserved: [u8; 3],
 }
 
@@ -58,7 +61,6 @@ fn search_rsdp_in_page(page: u64, physical_memory_offset: u64) -> Option<&'stati
     None
 }
 
-//TODO Support ACPI version 2 https://wiki.osdev.org/RSDP
 pub fn search_rsdp(physical_memory_offset: u64) -> &'static RSDPDescriptor {
     // chains aren't const
     let rsdp_addresses = (1003520..1003520+4096).chain(0x80000..0x9ffff).chain(0xe0000..0xfffff);
@@ -70,31 +72,34 @@ pub fn search_rsdp(physical_memory_offset: u64) -> &'static RSDPDescriptor {
     }
     panic!("Didn't find rsdp !");
 }
-
-pub struct RSDT {
-    pub header: &'static ACPISDTHeader,
-    pub pointer_to_other_sdt: Vec<u32>,
+/// 
+fn get_table_ptrs<T: Sized + core::ops::Shl<usize> 
+                + core::ops::BitOr<Output = T> 
+                + core::convert::From<<T as core::ops::Shl<usize>>::Output> 
+                + core::default::Default 
+                + core::convert::From<u8>>(sdt_and_ptrs: &[u8], len: usize) -> Vec<T> {
+    let mut ptrs = Vec::new();
+    for i in (0..len).step_by(core::mem::size_of::<T>()) {
+        ptrs.push(crate::bit_manipulation::ptrlist_to_num(&mut sdt_and_ptrs[i..i + core::mem::size_of::<T>()].iter()));
+    }
+    ptrs
 }
 
-pub fn get_rsdt(rsdt_addr: u64) -> Option<RSDT> {
-    trace!("Getting RSDT at {}", rsdt_addr);
-    let (rsdt_header, raw) = read_sdt(rsdt_addr, rsdt_addr);
+pub fn get_rsdt(sdp: &SystemDescriptionPtr) -> Option<SystemDescriptionTable> {
+    trace!("Getting system description table at {}", sdp.addr());
+    let (sdt_header, raw) = read_sdt(sdp.addr(), sdp.addr());
 
-    let sdts_size = rsdt_header.length as usize - ACPI_HEAD_SIZE; // / core::mem::size_of::<u32>();
+    let sdts_size = sdt_header.length as usize - ACPI_HEAD_SIZE; // / core::mem::size_of::<u32>();
     let sdts_offset = ACPI_HEAD_SIZE;
     let ptr_addr = raw.as_ptr() as usize + sdts_offset;
     let sdts = unsafe { core::slice::from_raw_parts(ptr_addr as *const u8, sdts_size) };
-    let mut pointer_to_other_sdt = Vec::new();
-    for i in (0..sdts.len()).step_by(4) {
-        let addr = crate::bit_manipulation::ptrlist_to_num(&mut sdts[i..i + 4].iter());
-        pointer_to_other_sdt.push(addr);
-    }
-    let rsdt = RSDT {
-        header: rsdt_header,
-        pointer_to_other_sdt,
+    
+    let sdt = match sdp {
+        SystemDescriptionPtr::Root(rsdp) => SystemDescriptionTable::Root((sdt_header, get_table_ptrs(&sdts, sdts.len()))),
+        SystemDescriptionPtr::Extended(xsdp) => SystemDescriptionTable::Extended((sdt_header, get_table_ptrs(&sdts, sdts.len()))),
     };
     // RSDT Checksum
-    let table_bytes = any_as_u8_slice(rsdt_header);
+    let table_bytes = any_as_u8_slice(&sdts);
     let mut sum: u8 = 0;
     for byte in table_bytes {
         sum = sum.wrapping_add(*byte);
@@ -103,5 +108,5 @@ pub fn get_rsdt(rsdt_addr: u64) -> Option<RSDT> {
         log::error!("Failed doing checksum of RSDT");
         return None;
     }
-    Some(rsdt)
+    Some(sdt)
 }

@@ -117,9 +117,18 @@ impl<const N: usize> Display for CharArray<N> {
         for element in &self.0 {
             s.push(*element);
         }
+        write!(f, "{}", s)
+    }
+}
+impl<const N: usize> core::fmt::Debug for CharArray<N> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut s = String::new();
+        for element in &self.0 {
+            s.push(*element);
+        }
         write!(f, "[{}]", s)
     }
-} //TODO implement debugging
+}
 struct CharSlice([char]);
 
 impl Display for CharSlice {
@@ -128,9 +137,18 @@ impl Display for CharSlice {
         for element in &self.0 {
             s.push(*element);
         }
+        write!(f, "{}", s)
+    }
+}
+impl core::fmt::Debug for CharSlice {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut s = String::new();
+        for element in &self.0 {
+            s.push(*element);
+        }
         write!(f, "[{}]", s)
     }
-} //TODO implement debugging
+}
 struct CharSlicePtr<'a>(&'a [char]);
 
 impl Display for CharSlicePtr<'_> {

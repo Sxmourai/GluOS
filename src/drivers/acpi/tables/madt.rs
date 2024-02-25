@@ -48,7 +48,7 @@ impl MADT {
                     // Entry Type 0: Processor Local APIC
                     let proc_local_apic =
                         unsafe { &*(bytes[start_idx..].as_ptr() as *const ProcLocalAPIC) };
-                    cores.push((cores.len(), proc_local_apic.acpi_proc_id)); //TODO replace cores.len() to num_core for performances ?
+                    cores.push((cores.len(), proc_local_apic.acpi_proc_id));
                     ApicRecord::ProcLocalAPIC(proc_local_apic)
                 }
                 1 => {

@@ -43,7 +43,7 @@ pub struct Ps2Controller {
 impl Ps2Controller {
     /// Tries to init Ps2Controller, returns option because we can't do much error handling
     pub fn init() -> Option<Self> {
-        match descriptor_tables!().version {
+        match descriptor_tables!().version() {
             crate::acpi::tables::AcpiVersion::One => {}
             crate::acpi::tables::AcpiVersion::Two => {
                 if descriptor_tables!().fadt.boot_architecture_flags & 2 == 0 {
