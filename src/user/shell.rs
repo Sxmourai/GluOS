@@ -374,8 +374,8 @@ fn lspci(rargs: String) -> Result<(), String> {
 
 #[command("sysinfo", "Gets info about computer")]
 fn sysinfo(args: String) -> Result<(), String> {
-    let mut ram_size = 0; //TODO Update bootloader, maybe we will be able to get mem size (cuz its a BIOS function)
-    println!("RAM: {}", ram_size);
+    // let mut ram_size = 0; Need to get from bootloader
+    // println!("RAM: {}", ram_size);
     let cpuid = CpuId::new();
 
     let vendor = match cpuid.get_vendor_info() {
@@ -423,8 +423,7 @@ impl CommandRunner {
             commands,
         }
     }
-    pub fn print_help(&mut self) {
-        //TODO Make it so we don't need &mut because we have to add to self.previous
+    pub fn print_help(&self) {
         println!("Available commands:");
         for (
             name,
@@ -467,7 +466,7 @@ impl CommandRunner {
         unsafe { *COMMANDS_INDEX.write() += 1 };
 
         let mut args = cmd.split(' ');
-        let program = args.next().unwrap(); //TODO Crash if user types nothing, handle error
+        let program = args.next().unwrap();
         if let Some(Command {
             name: _,
             description: _,

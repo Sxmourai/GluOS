@@ -83,8 +83,6 @@ impl Writer {
     pub fn write_char_at(&mut self, pos: ScreenPos, chr: ScreenChar) {
         self.console.write_char_at(pos.0, pos.1, chr)
     }
-    // If press enter while executed, can do deadlocks ?
-    //TODO Do we really need without_interrupts?
     /// Move every line one up
     pub fn move_up(&mut self) {
         let (width, height) = self.console.size();
@@ -129,8 +127,6 @@ impl Writer {
     pub fn move_down(&mut self) {
         let (width, height) = self.console.size();
         x86_64::instructions::interrupts::without_interrupts(|| {
-            // If press enter while executed, can do deadlocks ?
-            //TODO Do we really need without_interrupts?
             // Move every line one down
             // Iterate in reverse order because it would copy the same line every time
             // It's like write left to write as a left-handed, the ink would be go on the text you are currently writing (I know that, I'm left-handed)

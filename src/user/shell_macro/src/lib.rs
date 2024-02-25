@@ -74,12 +74,6 @@ pub fn command(args: TokenStream, input: TokenStream) -> TokenStream {
     let ident = &mut input_iter.next().unwrap();
     let _ = expect_specific_ident(ident, "fn");
     let run = expect_ident(&mut input_iter).to_string();
-    // match ident {
-    //     TokenTree::Ident(i) => {
-    //         dbg!(i.to_string());
-    //     },
-    //     _ => todo!(),
-    // }
 
     unsafe {
         COMMANDS.push(Command {

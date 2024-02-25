@@ -4,7 +4,7 @@ use crate::serial_println;
 
 use log::{error, Level, LevelFilter, Log, Metadata, Record};
 
-//TODO Have all codes https://chrisyeh96.github.io/2020/03/28/terminal-colors.html
+//TODO use a terminal library for colors and more ?
 enum Color {
     Black = 0,
     Red = 1,
@@ -70,7 +70,6 @@ impl Log for Logger {
             record.args()
         );
     }
-    //TODO
     fn flush(&self) {
         todo!("Flush log");
     }

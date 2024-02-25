@@ -31,7 +31,6 @@ impl Display for Date {
         ))
     }
 }
-// TODO Proper CMOS driver ?
 const CMOS_ADDRESS: Port<u8> = Port::new(0x70);
 const CMOS_DATA: Port<u8> = Port::new(0x71);
 #[allow(const_item_mutation)]
@@ -83,9 +82,6 @@ pub fn init() {
             days = (days & 0x0F) + ((days / 16) * 10);
             months = (months & 0x0F) + ((months / 16) * 10);
             years = (years & 0x0F) + ((years / 16) * 10);
-            //TODO if(century_register != 0) {
-            //         century = (century & 0x0F) + ((century / 16) * 10);
-            // }
         }
         // Convert 12 hour clock to 24 hour clock if necessary
         if register_b & 0x02 == 0 && (hours & 0x80 != 0) {
