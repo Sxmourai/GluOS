@@ -151,7 +151,6 @@ pub static TRACES: RwLock<Vec<String>> = RwLock::new(Vec::new());
 pub fn print_trace(n: usize) {
     let traces = TRACES.read();
     let firsts = traces.len().saturating_sub(n);
-    serial_println!("\tTRACES: ");
     for trace in traces[firsts..].iter() {
         serial_println!("[TRACE] {}", trace);
     }
