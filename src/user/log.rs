@@ -49,26 +49,31 @@ impl Codes {
 struct Logger;
 impl Log for Logger {
     fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= MAX_LEVEL
+        // metadata.level() <= MAX_LEVEL
+        true
     }
+    #[track_caller]
     fn log(&self, record: &Record) {
         let _buffer = [0u8; 128];
+        let args = match record.level() {
+            Level::Trace => {
+                let args = alloc::format!("{}:{}\t - {}",file!(),line!(), record.args());
+                crate::user::log::TRACES.write().push(args.clone());
+                return; // We don't want to print traces
+            },
+            _ => {alloc::format!("{}", record.args())}
+        };
+        let msg = format!(
+            "[\x1b[1;3{}m{}{}] {}",
+            Color::from(record.level() as u8) as u8,
+            record.level(),
+            Codes::reset(),
+            record.args()
+        );
         #[cfg(debug_assertions)]
-        crate::serial_println!(
-            "[\x1b[1;3{}m{}{}] {}",
-            Color::from(record.level() as u8) as u8,
-            record.level(),
-            Codes::reset(),
-            record.args()
-        );
+        crate::serial_println!("{}", msg);
         #[cfg(not(debug_assertions))]
-        crate::println!(
-            "[\x1b[1;3{}m{}{}] {}",
-            Color::from(record.level() as u8) as u8,
-            record.level(),
-            Codes::reset(),
-            record.args()
-        );
+        crate::println!("{}", msg);
     }
     fn flush(&self) {
         todo!("Flush log");
@@ -79,7 +84,7 @@ const MAX_LEVEL: Level = Level::Trace;
 pub fn init() {
     static LOGGER: Logger = Logger;
     log::set_logger(&LOGGER).unwrap();
-    log::set_max_level(LevelFilter::Debug);
+    log::set_max_level(LevelFilter::Trace);
 }
 
 #[macro_export]
@@ -142,19 +147,11 @@ use alloc::vec::Vec;
 use spin::RwLock;
 pub static TRACES: RwLock<Vec<String>> = RwLock::new(Vec::new());
 
-#[macro_export]
-macro_rules! trace {
-    ($($arg:tt)*) => {
-        let args = alloc::format!("{}:{}\t - {}",file!(),line!(), alloc::format!($($arg)*));
-        crate::user::log::TRACES.write().push(args.clone());
-        log::trace!("{}", args)
-    };
-}
-
 // Prints traceback of N last items
 pub fn print_trace(n: usize) {
     let traces = TRACES.read();
     let firsts = traces.len().saturating_sub(n);
+    serial_println!("\tTRACES: ");
     for trace in traces[firsts..].iter() {
         serial_println!("[TRACE] {}", trace);
     }

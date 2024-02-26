@@ -191,6 +191,11 @@ fn exec(raw_args: String) -> Result<(), String> {
     Ok(())
 }
 
+#[command("panic", "Creates a kernel panic for testing")]
+fn panic(raw_args: String) -> Result<(), String> {
+    panic!("{}", raw_args)
+}
+
 // #[cfg(feature="fs")]
 #[command("read", "Reads a file/dir from disk")]
 fn read(raw_args: String) -> Result<(), String> {

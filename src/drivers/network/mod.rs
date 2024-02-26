@@ -13,7 +13,7 @@ pub fn init() {
                     let mut drv = E1000NetworkDriver::new(d);
                     match drv.start() {
                         Ok(_) => {
-                            crate::trace!("Initialised a ethernet driver !");
+                            log::trace!("Initialised a ethernet driver !");
                         }
                         Err(e) => match e {
                             E1000NetworkDriverInitError::CantReadMac => {

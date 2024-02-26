@@ -195,7 +195,7 @@ impl AtaDisk {
         //TODO Waiting ?
     }
     pub fn init(&mut self) -> Result<(), DiskError> {
-        crate::trace!("Initialising disk at {}", self.loc);
+        log::trace!("Initialising disk at {}", self.loc);
         unsafe { u8::write_to_port(self.control_base, 1 << 1) } // Disable interrupts for identify and disk selection
         self.select();
         self.identify()?;

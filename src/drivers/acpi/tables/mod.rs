@@ -75,10 +75,10 @@ impl DescriptorTablesHandler {
         let physical_memory_offset = unsafe { boot_info!() }.physical_memory_offset;
         let rsdp = rsdt::search_rsdp(physical_memory_offset);
         let sys_desc_ptr = if rsdp.revision == 0 {
-            crate::trace!("Found ACPI version 1.0");
+            log::trace!("Found ACPI version 1.0");
             SystemDescriptionPtr::Root(rsdp)
         } else if rsdp.revision == 2 {
-            crate::trace!("Found ACPI version 2.0-6.1");
+            log::trace!("Found ACPI version 2.0-6.1");
             SystemDescriptionPtr::Extended(unsafe{&*(core::ptr::addr_of!(rsdp) as *const _)})
         } else {
             log::error!("Unknown ACPI version: {}", rsdp.revision);

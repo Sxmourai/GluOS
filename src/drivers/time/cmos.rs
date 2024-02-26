@@ -96,7 +96,7 @@ pub fn init() {
             months,
             years,
         };
-        crate::trace!("Current time is {}", date);
+        log::trace!("Current time is {}", date);
     });
 }
 

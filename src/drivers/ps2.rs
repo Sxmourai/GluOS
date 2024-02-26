@@ -1,7 +1,7 @@
 use bit_field::BitField;
 use x86_64::instructions::port::{PortGeneric, PortReadOnly, PortWriteOnly, ReadWriteAccess};
 
-use crate::{bit_manipulation::outb, dbg, descriptor_tables, trace};
+use crate::{bit_manipulation::outb, dbg, descriptor_tables};
 
 pub const DATA_PORT: PortGeneric<u8, ReadWriteAccess> = PortGeneric::new(0x60);
 pub const STATUS_REG: PortReadOnly<u8> = PortReadOnly::new(0x64);
@@ -100,7 +100,7 @@ impl Ps2Controller {
         }
 
         // Perform Interface Tests
-        trace!("Performing interface tests");
+        log::trace!("Performing interface tests");
         Self::send_command(0xAB); // Test first PS/2 Port
         if Self::retrieve_command().unwrap() != 0x0 {
             //TODO 0x01 clock line stuck low 0x02 clock line stuck high 0x03 data line stuck low 0x04 data line stuck high
@@ -120,13 +120,13 @@ impl Ps2Controller {
         }
 
         // Step 9:Enable devices
-        trace!("Enabling ports");
+        log::trace!("Enabling ports");
         Self::send_command(0xAE);
         if available_channels[1] {
             Self::send_command(0xA8); // Second port
         }
         //Enable IRQ
-        trace!("Enabling IRQ's");
+        log::trace!("Enabling IRQ's");
         Self::send_command(0x20);
         let mut config_byte = Self::retrieve_command().unwrap();
         config_byte.set_bit(0, true);
@@ -136,7 +136,7 @@ impl Ps2Controller {
         Self::send_command_next(0x60, config_byte);
 
         // Step 10: Reset devices
-        trace!("Resetting devices");
+        log::trace!("Resetting devices");
         Self::device_send_data_first(0xFF);
         if Self::assert_ack() {
             log::trace!("First port reseted !")
@@ -149,7 +149,7 @@ impl Ps2Controller {
             }
         }
         // Identify devices
-        trace!("Identifying devices");
+        log::trace!("Identifying devices");
         // Doesn't do anything for now, but if remove it the mouse driver doesn't work
         Self::send_command(0xF5); // Disable scanning to not have trash on line
         (Self::assert_ack());
