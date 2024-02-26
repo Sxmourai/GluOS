@@ -1,4 +1,4 @@
-use core::cell::OnceCell;
+use core::{cell::OnceCell, sync::atomic::AtomicU32};
 
 use alloc::vec::Vec;
 use spin::RwLock;
@@ -10,15 +10,11 @@ use x86_64::{
 use crate::dbg;
 
 pub fn irq() {
-    if let Some(controller) = unsafe { PIT_CONTROLLER.as_mut() } {
-        if controller.writer_count()>0 {
-            log::error!("Controller locked, skipping !");
-            return
-        }
-        let mut controller = controller.write();
+    if let Some(controller) = unsafe { PIT_CONTROLLER.get_mut() } {
         for tick in controller.ticks.iter_mut() {
-            *tick += 1;
+            tick.fetch_add(1, core::sync::atomic::Ordering::Release);
         }
+        // We can be sure that we are the only ones modifying this value, because it's only changed when a timer interrupt occurs
         controller.elapsed_ticks+=1;
         #[cfg(debug_assertions)]
         if controller.elapsed_ticks / SELECTED_HZ as u128 == 1*60*60 {
@@ -29,25 +25,20 @@ pub fn irq() {
 
 /// Creates a new entry in ticks and returns it's id
 pub fn register_wait() -> Option<usize> {
-    unsafe{PIT_CONTROLLER.as_mut().and_then(|c| {
-        let mut c = c.write();
-        c.ticks.push(0);
+    unsafe{PIT_CONTROLLER.get_mut().and_then(|c| {
+        c.ticks.push(AtomicU32::new(0));
         Some(c.ticks.len()-1)
     })}
 }
 /// Gets the ticks from the id, if it exists
 pub fn get_ticks(id: usize) -> Option<u32> {
-    unsafe{PIT_CONTROLLER.as_mut().and_then(|c| {
-        if c.writer_count()>0 {
-            log::error!("Controller locked ?");
-        }
-        let mut c = c.write();
-        c.ticks.get(id).copied()
+    unsafe{PIT_CONTROLLER.get_mut().and_then(|c| {
+        Some(c.ticks.get(id)?.load(core::sync::atomic::Ordering::Acquire))
     })}
 }
 
 // TODO Use OnceCell, but doesn't have Sync
-pub static mut PIT_CONTROLLER: Option<RwLock<PIT>> = None;
+pub static mut PIT_CONTROLLER: OnceCell<PIT> = OnceCell::new();
 pub const MIN_FREQUENCY: u32 = 18.222 as u32;
 pub const PIT_FREQUENCY: u32 = 1_193_181;
 // Because 18.222 hz = 1 second, we want 18222 to have interrupts every ms
@@ -70,7 +61,7 @@ pub fn init() {
         ticks: Vec::new(),
         elapsed_ticks: 0,
     };
-    unsafe { PIT_CONTROLLER.replace(RwLock::new(pit)) };
+    unsafe { PIT_CONTROLLER.set(pit) };
 }
 
 #[derive(Debug)]
@@ -112,7 +103,7 @@ impl Regs {
 pub struct PIT {
     /// Stores the different amount of ticks that has elapsed since the registering of a sleep
     /// TODO make ^^ clearer
-    ticks: Vec<u32>,
+    ticks: Vec<core::sync::atomic::AtomicU32>,
     /// Stores the amount of ticks that have elapsed since boot
     elapsed_ticks: u128,
 }
