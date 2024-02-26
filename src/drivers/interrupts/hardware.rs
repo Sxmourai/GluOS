@@ -45,9 +45,16 @@ pub const INTERRUPTS: &[(u8, extern "x86-interrupt" fn(x86_64::structures::idt::
                 .lock()
                 .process_keyevent(scancode);
         }),
-        crate::interrupt_handler!(InterruptIndex::PS2Mouse, |_| unsafe {
+        crate::interrupt_handler!(InterruptIndex::PS2Mouse, |_| {
             // Do nothing for now, but overriden in mouse.rs
         }),
+        crate::interrupt_handler!(InterruptIndex::PrimaryAtaDisk, |_| {
+            crate::disk::ata::irq::primary_bus_irq()
+        }),
+        crate::interrupt_handler!(InterruptIndex::SecondaryAtaDisk, |_| {
+            crate::disk::ata::irq::secondary_bus_irq()
+        }),
+        
     ]
 };
 #[macro_export]

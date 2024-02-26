@@ -1,4 +1,5 @@
 use core::cell::OnceCell;
+use core::sync::atomic::AtomicU8;
 use core::{fmt::Display, panic};
 
 use alloc::string::ToString;
@@ -22,8 +23,10 @@ use super::driver::{Disk, DiskDriver, DiskDriverEnum, DiskDriverType, GenericDis
 use super::{DiskError, DiskLoc};
 
 pub mod driver;
+pub mod irq;
 
 pub static mut ATA_DRIVER: Option<RwLock<driver::AtaDriver>> = None;
+pub static SELECTED_DISK: core::sync::atomic::AtomicU8 = AtomicU8::new(0);
 /// Scans the different ATA disks
 /// The buses are:
 /// Primary Channel:   Slave & Master
@@ -197,7 +200,7 @@ impl AtaDisk {
         self.select();
         self.identify()?;
         //TODO Interrupts & IRQ's
-        // unsafe { u8::write_to_port(self.control_base, 0) } // Enable interrupts
+        unsafe { u8::write_to_port(self.control_base, 0) } // Enable interrupts
 
         self.initialised = true;
         Ok(())

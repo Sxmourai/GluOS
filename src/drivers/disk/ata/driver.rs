@@ -20,6 +20,7 @@ impl super::DiskDriver for AtaDriver {
         start_sector: u64,
         sector_count: u64,
     ) -> Result<Vec<u8>, DiskError> {
+        self.select_disk(loc);
         self.disks[loc.as_index()]
             .as_mut()
             .ok_or(DiskError::NotFound)?
@@ -37,6 +38,11 @@ impl super::DiskDriver for AtaDriver {
         let mut disk = &mut self.disks[loc.as_index()];
         disk.as_mut().unwrap().select();
         self.selected_disk = loc.as_index().try_into().unwrap();
-        
+        SELECTED_DISK.store(self.selected_disk, core::sync::atomic::Ordering::Release)
+    }
+}
+impl AtaDriver {
+    pub fn selected_disk(&self) -> DiskLoc {
+        DiskLoc::from_idx(self.selected_disk).unwrap()
     }
 }
