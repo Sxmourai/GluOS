@@ -161,7 +161,6 @@ impl Ps2Controller {
         Self::device_send_data_first(0xF4); // Re Enable scanning
         (Self::assert_ack());
 
-
         // Self::device_send_data_second(0xF5); // Disable scanning to not have trash on line
         // assert!(Self::assert_ack());
         // Self::device_send_data_second(0xF2); // Send identify
@@ -190,7 +189,9 @@ impl Ps2Controller {
         Self::send_command(0xD4); // Select second port
         Self::poll_bit(STATUS_INPUT_BUFFER).unwrap();
         #[allow(const_item_mutation)]
-        unsafe { DATA_PORT.write(data) }
+        unsafe {
+            DATA_PORT.write(data)
+        }
     }
 
     pub fn send_command(command: u8) {

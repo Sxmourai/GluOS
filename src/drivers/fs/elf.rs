@@ -39,9 +39,9 @@ pub fn execute(content: String) -> Result<(), ElfError> {
         match segment_type {
             ElfSegmentType::LOAD => {
                 if ph
-                .dependant_flags()
-                .ok_or(ElfError::InvalidEntry)?
-                .get_bit(ElfDependantFlags::Executable as usize)
+                    .dependant_flags()
+                    .ok_or(ElfError::InvalidEntry)?
+                    .get_bit(ElfDependantFlags::Executable as usize)
                 {
                     dbg!(ph);
                 }
@@ -58,12 +58,17 @@ pub fn execute(content: String) -> Result<(), ElfError> {
         section_headers.push(section_header);
     }
     let names_entry = &section_headers[elf.end.index_section_header_table_entry as usize];
-    
-    let names = String::from_utf8_lossy(&bytes[names_entry.offset_section_img() as usize..names_entry.offset_section_img() as usize+names_entry.img_size() as usize]);
+
+    let names = String::from_utf8_lossy(
+        &bytes[names_entry.offset_section_img() as usize
+            ..names_entry.offset_section_img() as usize + names_entry.img_size() as usize],
+    );
     for header in section_headers {
         let mut name = String::new();
         for char in names[header.name() as usize..].chars() {
-            if char == '\0' {break}
+            if char == '\0' {
+                break;
+            }
             name.push(char);
         }
     }

@@ -1,10 +1,7 @@
 use alloc::string::String;
 use x86_64::{instructions::hlt, structures::port::PortRead};
 
-use crate::{
-    dbg,
-    time::sdelay,
-};
+use crate::{dbg, time::sdelay};
 
 pub struct QemuIOReader {
     inputted: String,

@@ -68,7 +68,9 @@ pub fn init(ide: &PciDevice) -> Vec<super::driver::Disk> {
     }
     disks.shrink_to_fit();
     unsafe {
-        ATA_DRIVER.replace(RwLock::new(driver::AtaDriver::new(disks.try_into().unwrap())));
+        ATA_DRIVER.replace(RwLock::new(driver::AtaDriver::new(
+            disks.try_into().unwrap(),
+        )));
     };
     gen_disks
 }
@@ -279,9 +281,7 @@ impl AtaDisk {
         unsafe {
             bsy(self.iobase);
         }
-        if self.read_reg::<u8>(Reg::LbaMi) != 0
-            || self.read_reg::<u8>(Reg::LbaHi) != 0
-        {
+        if self.read_reg::<u8>(Reg::LbaMi) != 0 || self.read_reg::<u8>(Reg::LbaHi) != 0 {
             trace!("ATAPI drive detected !");
         } else if unsafe { check_drq_or_err(self.iobase) }.is_err() {
             error!(
@@ -291,7 +291,7 @@ impl AtaDisk {
             );
             return Err(DiskError::DiskNotFound);
         }
-        let identify = read_identify(self.iobase);        
+        let identify = read_identify(self.iobase);
         // core::ffi::CStr
         // info!("Serial number: {:?}\tFirmware revision: {:?}\tModel number: {:?}", &char_identify[20..40], &char_identify[46..52], &char_identify[54..92]);
 

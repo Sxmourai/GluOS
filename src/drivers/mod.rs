@@ -47,7 +47,7 @@ macro_rules! make_driver {
     }};
 }
 
-#[derive(Debug,Clone,Copy, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
 pub enum DriverId {
     Logger,
     Heap,
@@ -83,7 +83,7 @@ impl DriverId {
 pub struct Driver {
     pub name: DriverId,
     pub task: Task,
-    // TODO Requirements in executor 
+    // TODO Requirements in executor
     pub requires: Vec<DriverId>,
 }
 impl Driver {
@@ -96,18 +96,30 @@ impl Driver {
 pub fn get_drivers() -> Vec<Driver> {
     alloc::vec![
         // By default require logger, overwrite that.
-        make_driver!(Logger, async { crate::user::log::init() }, requires=[]),
+        make_driver!(Logger, async { crate::user::log::init() }, requires = []),
         // make_driver!(Heap, crate::drivers::memory::init()), manually called in boot, to have executor
-        make_driver!(Gdt, async{crate::drivers::gdt::init()}),
-        make_driver!(Acpi, crate::drivers::acpi::init(), requires=[Logger, Heap, Mapper]),
+        make_driver!(Gdt, async { crate::drivers::gdt::init() }),
+        make_driver!(
+            Acpi,
+            crate::drivers::acpi::init(),
+            requires = [Logger, Heap, Mapper]
+        ),
         make_driver!(Ps2Controller, crate::drivers::ps2::init()),
-        make_driver!(Interrupts, async{crate::drivers::interrupts::init()}, requires=[Logger, Gdt]),
-        make_driver!(Pci, async{crate::drivers::pci::init()}),
-        make_driver!(Pit, async{crate::drivers::time::init()}),
-        make_driver!(Graphics, async{crate::drivers::video::init()}),
-        make_driver!(Disk, async{crate::drivers::disk::init()}),
+        make_driver!(
+            Interrupts,
+            async { crate::drivers::interrupts::init() },
+            requires = [Logger, Gdt]
+        ),
+        make_driver!(Pci, async { crate::drivers::pci::init() }),
+        make_driver!(Pit, async { crate::drivers::time::init() }),
+        make_driver!(Graphics, async { crate::drivers::video::init() }),
+        make_driver!(Disk, async { crate::drivers::disk::init() }),
         #[cfg(feature = "fs")]
-        make_driver!(Filesystem, crate::drivers::fs::init(), requires=[Logger, Disk]),
+        make_driver!(
+            Filesystem,
+            crate::drivers::fs::init(),
+            requires = [Logger, Disk]
+        ),
         // #[cfg(feature = "apic")]
         // ("APIC", super::interrupts::apic::init),
         // #[cfg(feature = "smp")]

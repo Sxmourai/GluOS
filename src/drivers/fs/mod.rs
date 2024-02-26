@@ -49,8 +49,9 @@ impl FsDriverManager {
         let mut self_partitions = HashMap::new();
         // Collect into vec to drop lock, for instance disk locs are light
         let locs = unsafe { &DISK_MANAGER.lock().as_mut().unwrap().disks }
-        .iter().map(|d| (d.0.clone()))
-        .collect::<Vec<DiskLoc>>();
+            .iter()
+            .map(|d| (d.0.clone()))
+            .collect::<Vec<DiskLoc>>();
         for loc in locs {
             log::trace!("Fetching filesystem on disk {}", loc);
             let header_type = partition::read_header_type(&loc);

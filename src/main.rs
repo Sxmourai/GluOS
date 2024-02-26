@@ -27,8 +27,9 @@ extern crate alloc;
 fn panic(info: &core::panic::PanicInfo) -> ! {
     x86_64::instructions::interrupts::disable();
     use kernel::terminal::serial::SERIAL1;
-    if SERIAL1.is_locked() { // In case panic occurs whilst printing something
-        unsafe {SERIAL1.force_unlock()};
+    if SERIAL1.is_locked() {
+        // In case panic occurs whilst printing something
+        unsafe { SERIAL1.force_unlock() };
         serial_print!("\n"); // If we were printing there's a good chance the line wasn't finished
     }
     use alloc::string::ToString;
@@ -39,16 +40,25 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
         panic_msg.push_str("No message -");
     }
     if let Some(loc) = info.location() {
-        serial_println!("{} {}:{}:{}", panic_msg, loc.file(), loc.line(), loc.column());
+        serial_println!(
+            "{} {}:{}:{}",
+            panic_msg,
+            loc.file(),
+            loc.line(),
+            loc.column()
+        );
         let traces = kernel::log::TRACES.read();
         let firsts = traces.len().saturating_sub(10);
         serial_println!("\tTRACES: ");
         let mut traces_len = 0;
-        for trace in traces[firsts..].iter().filter(|trace| trace.contains(loc.file())) {
+        for trace in traces[firsts..]
+            .iter()
+            .filter(|trace| trace.contains(loc.file()))
+        {
             serial_println!("[TRACE] {}", trace);
-            traces_len+=1;
+            traces_len += 1;
         }
-        if traces_len==0 {
+        if traces_len == 0 {
             serial_println!("None for the specific module, printing without filter:");
             kernel::log::print_trace(10);
         }

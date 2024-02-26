@@ -108,7 +108,6 @@ pub fn init(nvme_pci: &PciDevice) -> Result<Vec<&'static NVMeDisk>, NVMeControll
     //     map(page, PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::NO_CACHE);
     // }
 
-
     // 7.6.1 3) The admin queue should be configured
     controller
         .admin_queue_attrs
@@ -122,8 +121,8 @@ pub fn init(nvme_pci: &PciDevice) -> Result<Vec<&'static NVMeDisk>, NVMeControll
 
     // 3.1.10 The vector for the admin queues is always 0
     // Completion queue address
-    controller.admin_completion_queue_base_addr =
-        admin_submission_queue_base_addr + (queue_count * queue_slots * core::mem::size_of::<NVMeCommand>() as u64);
+    controller.admin_completion_queue_base_addr = admin_submission_queue_base_addr
+        + (queue_count * queue_slots * core::mem::size_of::<NVMeCommand>() as u64);
 
     // 7.6.1 4) The controller settings should be configured
     let mut cc = NVMeControllerConfig(0);
@@ -134,7 +133,6 @@ pub fn init(nvme_pci: &PciDevice) -> Result<Vec<&'static NVMeDisk>, NVMeControll
 
     // Try to enable weighted round robin with urgent if capable
     if controller.controller_caps.ams() == 1 {
-
         cc.set_arbitration_mechanism_selected(1);
     }
     controller.controller_config = cc;
@@ -253,7 +251,6 @@ pub fn init(nvme_pci: &PciDevice) -> Result<Vec<&'static NVMeDisk>, NVMeControll
 
     // // }
     let mut disks = Vec::new();
-
 
     return Ok(disks);
 }
@@ -435,9 +432,7 @@ bitfield::bitfield! {
     /// This bit is set to ’1’ when a fatal controller error occurred that could not be communicated in the appropriate Completion Queue. This bit is cleared to ‘0’ when a fatal controller error has not occurred. Refer to section 9.5. The reset value of this bit is set to '1' when a fatal controller error is detected during controller initialization.
     fatal, _: 1, 1; // Controller Fatal Status (CFS)
 }
-impl NVMeControllerStatus {
-    
-}
+impl NVMeControllerStatus {}
 bitfield::bitfield! {
     pub struct NVMeControllerAdminQueueAttributes(u32);
     impl Debug;

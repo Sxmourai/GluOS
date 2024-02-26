@@ -79,13 +79,13 @@ impl DescriptorTablesHandler {
             SystemDescriptionPtr::Root(rsdp)
         } else if rsdp.revision == 2 {
             log::trace!("Found ACPI version 2.0-6.1");
-            SystemDescriptionPtr::Extended(unsafe{&*(core::ptr::addr_of!(rsdp) as *const _)})
+            SystemDescriptionPtr::Extended(unsafe { &*(core::ptr::addr_of!(rsdp) as *const _) })
         } else {
             log::error!("Unknown ACPI version: {}", rsdp.revision);
-            return None
+            return None;
         };
         let sdt = rsdt::get_rsdt(&sys_desc_ptr)?;
-        
+
         let mut acpi = None;
         let mut madt = None;
         let mut hpet = None;
@@ -98,9 +98,7 @@ impl DescriptorTablesHandler {
                 .to_string()
                 .as_str()
             {
-                "FACP" => {
-                    acpi = {Some(fadt::FADT::new(table_bytes).await)}
-                }
+                "FACP" => acpi = { Some(fadt::FADT::new(table_bytes).await) },
                 "APIC" => madt = unsafe { madt::MADT::new(table_bytes) },
                 "HPET" => hpet = unsafe { hpet::handle_hpet(table_bytes) },
                 "WAET" => waet = unsafe { waet::handle_waet(table_bytes) },
@@ -141,7 +139,7 @@ impl DescriptorTablesHandler {
 //     }
 //     fn init(&mut self) -> crate::task::Task {
 //         Task::new(async {
-            
+
 //         })
 //     }
 //     fn required(&self) -> &str {
@@ -155,7 +153,6 @@ fn read_sdt(ptr: u64, end_page: u64) -> (&'static ACPISDTHeader, &'static [u8]) 
     let bytes = unsafe { core::slice::from_raw_parts(bytes.as_ptr(), entry.length as usize) };
     (entry, bytes)
 }
-
 
 #[repr(C, packed)]
 #[derive(Debug, Clone)]

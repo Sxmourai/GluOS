@@ -77,7 +77,12 @@ impl Fat32Driver {
     }
     pub fn read_file(&self, path: &FilePath) -> Option<String> {
         let sector = self.get_sector(path)?;
-        let raw = Self::read_and_follow_clusters(&self.partition, sector, self.fat_info.get_first_data_sector(), self.fat_info.first_fat_sector() as u64)?;
+        let raw = Self::read_and_follow_clusters(
+            &self.partition,
+            sector,
+            self.fat_info.get_first_data_sector(),
+            self.fat_info.first_fat_sector() as u64,
+        )?;
         let content = String::from_utf8_lossy(&raw).to_string();
         Some(content)
     }

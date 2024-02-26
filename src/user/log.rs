@@ -57,11 +57,13 @@ impl Log for Logger {
         let _buffer = [0u8; 128];
         let args = match record.level() {
             Level::Trace => {
-                let args = alloc::format!("{}:{}\t - {}",file!(),line!(), record.args());
+                let args = alloc::format!("{}:{}\t - {}", file!(), line!(), record.args());
                 crate::user::log::TRACES.write().push(args.clone());
                 return; // We don't want to print traces
-            },
-            _ => {alloc::format!("{}", record.args())}
+            }
+            _ => {
+                alloc::format!("{}", record.args())
+            }
         };
         let msg = format!(
             "[\x1b[1;3{}m{}{}] {}",

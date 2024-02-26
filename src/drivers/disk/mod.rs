@@ -1,5 +1,5 @@
-pub mod driver;
 pub mod ata;
+pub mod driver;
 pub mod nvme;
 
 /// Identifies the different ATA disks (and we are working on NVMe which is hard asf)
@@ -7,7 +7,9 @@ pub mod nvme;
 pub fn init() {
     let mut disks = hashbrown::HashMap::new();
     for (loc, device) in crate::pci_manager!().iter() {
-        if device.class.id() != 0x1 {continue}
+        if device.class.id() != 0x1 {
+            continue;
+        }
         if device.subclass() == 0x1 {
             log::info!("Found IDE controller on bus {loc}");
             for (i, disk) in ata::init(device).into_iter().enumerate() {
@@ -18,21 +20,22 @@ pub fn init() {
             match nvme::init(device) {
                 Ok(nvme_disks) => {
                     for (i, disk) in nvme_disks.into_iter().enumerate() {
-                        disks.insert(DiskLoc::from_idx(i.try_into().unwrap()).unwrap(), driver::Disk {
-                            loc: DiskLoc(Channel::Secondary, Drive::Slave),
-                            drv: driver::DiskDriverEnum::NVMe,
-                        });
+                        disks.insert(
+                            DiskLoc::from_idx(i.try_into().unwrap()).unwrap(),
+                            driver::Disk {
+                                loc: DiskLoc(Channel::Secondary, Drive::Slave),
+                                drv: driver::DiskDriverEnum::NVMe,
+                            },
+                        );
                     }
-                },
+                }
                 Err(err) => {
                     log::error!("Failed initialising NVMe driver: {:?}", err)
-                },
+                }
             }
         }
     }
-    unsafe{DISK_MANAGER.lock().replace(DiskManager {
-        disks,
-    })};
+    unsafe { DISK_MANAGER.lock().replace(DiskManager { disks }) };
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
@@ -45,11 +48,14 @@ pub enum DiskError {
     NoReadModeAvailable,
     DiskNotFound,
     TimeOut,
-    DRQRead, 
+    DRQRead,
     //TODO Handle all errors from the register
     // ErrorRegister {...}
 }
-use crate::disk::{ata::{Channel, Drive}, driver::GenericDisk};
+use crate::disk::{
+    ata::{Channel, Drive},
+    driver::GenericDisk,
+};
 
 use self::driver::{DiskManager, DISK_MANAGER};
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]

@@ -87,10 +87,9 @@ impl MemoryHandler {
         let frame = self.frame_allocator.allocate_frame()?;
         let virt_addr = VirtAddr::new(frame.start_address().as_u64());
         let page = Page::from_start_address(virt_addr).ok()?;
-        unsafe{self.map_frame(page, frame, flags)}.ok()?;
+        unsafe { self.map_frame(page, frame, flags) }.ok()?;
         Some(virt_addr)
     }
-
 }
 /// Unsafe not set for ease of use... Maybe change that
 /// TODO Do we want to keep this function not unsafe even though it is ?

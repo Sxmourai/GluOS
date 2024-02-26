@@ -96,8 +96,7 @@ impl ExtDriver {
         let inode_size = self.extsuperblock().size_inode_struct as usize;
         let inode_table_start_sector =
             inode_table_start_sector + ((inode_number as u64 - 1) / (512 / inode_size as u64));
-        let tables =
-            get_inode_table(&self.partition, inode_table_start_sector, inode_size)?;
+        let tables = get_inode_table(&self.partition, inode_table_start_sector, inode_size)?;
         let inode = tables.get((inode_number as usize - 1) % (512 / inode_size))?;
         Some(inode.clone())
     }

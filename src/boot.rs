@@ -3,7 +3,10 @@ use log::info;
 use spin::Mutex;
 
 use crate::{
-    get_drivers, task::{executor::Executor, Task}, user::shell::Shell, DriverId
+    get_drivers,
+    task::{executor::Executor, Task},
+    user::shell::Shell,
+    DriverId,
 };
 
 pub fn boot(boot_info: &'static bootloader::BootInfo) -> Executor {
@@ -13,7 +16,9 @@ pub fn boot(boot_info: &'static bootloader::BootInfo) -> Executor {
     for drv in get_drivers() {
         executor.spawn(drv.task);
     }
-    executor.spawn(Task::new(Shell::default().run_with_command("exec 10/userland.o".to_string())));
+    executor.spawn(Task::new(
+        Shell::default().run_with_command("exec 10/userland.o".to_string()),
+    ));
     executor
 }
 

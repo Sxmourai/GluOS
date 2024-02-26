@@ -5,7 +5,10 @@ use pic8259::ChainedPics;
 use spin::Mutex;
 use x86_64::{
     instructions::port::PortReadOnly,
-    structures::{idt::{InterruptDescriptorTable, InterruptStackFrame}, port::PortRead},
+    structures::{
+        idt::{InterruptDescriptorTable, InterruptStackFrame},
+        port::PortRead,
+    },
 };
 
 use super::idt::IDT;
@@ -26,18 +29,28 @@ pub fn setup_hardware_interrupts(idt: &mut InterruptDescriptorTable) {
 #[macro_export]
 macro_rules! register_interrupt {
     ($num: expr, $func: expr) => {
-        $crate::interrupts::hardware::register_interrupt($num, $crate::interrupt_handler!($num, $func).1)
+        $crate::interrupts::hardware::register_interrupt(
+            $num,
+            $crate::interrupt_handler!($num, $func).1,
+        )
     };
 }
 
-pub fn register_interrupt(int_num: InterruptIndex, int: extern "x86-interrupt" fn(x86_64::structures::idt::InterruptStackFrame)) {
-    unsafe{IDT.as_mut().unwrap().write()[int_num as usize+PIC_1_OFFSET as usize].set_handler_fn(int)};
+pub fn register_interrupt(
+    int_num: InterruptIndex,
+    int: extern "x86-interrupt" fn(x86_64::structures::idt::InterruptStackFrame),
+) {
+    unsafe {
+        IDT.as_mut().unwrap().write()[int_num as usize + PIC_1_OFFSET as usize].set_handler_fn(int)
+    };
 }
 
-pub const INTERRUPTS: &[(u8, extern "x86-interrupt" fn(x86_64::structures::idt::InterruptStackFrame,))] = {
+pub const INTERRUPTS: &[(
+    u8,
+    extern "x86-interrupt" fn(x86_64::structures::idt::InterruptStackFrame),
+)] = {
     &[
-        crate::interrupt_handler!(InterruptIndex::Timer, |_stack_frame| {
-        }),
+        crate::interrupt_handler!(InterruptIndex::Timer, |_stack_frame| {}),
         crate::interrupt_handler!(InterruptIndex::Keyboard, |_stack_frame| {
             #[allow(const_item_mutation)]
             let scancode: u8 = unsafe { ps2::DATA_PORT.read() };
@@ -54,13 +67,12 @@ pub const INTERRUPTS: &[(u8, extern "x86-interrupt" fn(x86_64::structures::idt::
         crate::interrupt_handler!(InterruptIndex::SecondaryAtaDisk, |_| {
             crate::disk::ata::irq::secondary_bus_irq()
         }),
-        
     ]
 };
 #[macro_export]
 macro_rules! interrupt_handler {
     ($idx: expr, $f: expr) => {{
-        let interrupt_num = 32+$idx as u8;
+        let interrupt_num = 32 + $idx as u8;
         pub extern "x86-interrupt" fn _int(
             stack_frame: x86_64::structures::idt::InterruptStackFrame,
         ) {
@@ -69,7 +81,7 @@ macro_rules! interrupt_handler {
             $crate::interrupts::hardware::notify_end_of_interrupt($idx);
         }
         (interrupt_num, _int)
-    }}
+    }};
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -88,9 +100,9 @@ pub enum InterruptIndex {
     FreeSCSINic = 10,
     FreeSCSINic1 = 11,
     PS2Mouse = 12,
-    FPUCoprocessorInterProcessor=13,
-    PrimaryAtaDisk=14,
-    SecondaryAtaDisk=15,
+    FPUCoprocessorInterProcessor = 13,
+    PrimaryAtaDisk = 14,
+    SecondaryAtaDisk = 15,
 }
 impl InterruptIndex {
     pub fn from_num_pic(num: u8) -> Option<Self> {
@@ -110,17 +122,14 @@ impl InterruptIndex {
             13 => Self::FPUCoprocessorInterProcessor,
             14 => Self::PrimaryAtaDisk,
             15 => Self::SecondaryAtaDisk,
-            _ => {
-                return None
-            }
+            _ => return None,
         })
     }
 }
 
-
 // Safe wrapper because the interrupt index should always be valid (if InterruptIndex enum is right...)
 pub fn notify_end_of_interrupt(interrupt: InterruptIndex) {
     unsafe {
-        PICS.lock().notify_end_of_interrupt(interrupt as u8+32);
+        PICS.lock().notify_end_of_interrupt(interrupt as u8 + 32);
     }
 }

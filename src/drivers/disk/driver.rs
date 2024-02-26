@@ -4,7 +4,10 @@ use alloc::{boxed::Box, vec::Vec};
 use hashbrown::HashMap;
 use spin::Mutex;
 
-use super::{ata::{AtaDisk, ATA_DRIVER}, DiskError, DiskLoc};
+use super::{
+    ata::{AtaDisk, ATA_DRIVER},
+    DiskError, DiskLoc,
+};
 
 pub static mut DISK_MANAGER: Mutex<Option<DiskManager>> = Mutex::new(None); // Uninitialised
 pub const SECTOR_SIZE: u16 = 512;
@@ -51,12 +54,12 @@ impl DiskManager {
     ) -> Result<Vec<u8>, DiskError> {
         match self.disks.get(loc).ok_or(DiskError::NotFound)?.drv {
             DiskDriverEnum::Ata => {
-                let mut ata_drv = unsafe{ATA_DRIVER.as_mut().unwrap().write()};
+                let mut ata_drv = unsafe { ATA_DRIVER.as_mut().unwrap().write() };
                 ata_drv.read(loc, start_sector, sector_count)
-            },
+            }
             DiskDriverEnum::NVMe => {
                 todo!()
-            },
+            }
         }
     }
     pub fn write_disk(
@@ -67,12 +70,12 @@ impl DiskManager {
     ) -> Result<(), DiskError> {
         match self.disks.get(loc).ok_or(DiskError::NotFound)?.drv {
             DiskDriverEnum::Ata => {
-                let mut ata_drv = unsafe{ATA_DRIVER.as_mut().unwrap().write()};
+                let mut ata_drv = unsafe { ATA_DRIVER.as_mut().unwrap().write() };
                 ata_drv.write(loc, start_sector, content)
-            },
+            }
             DiskDriverEnum::NVMe => {
                 todo!()
-            },
+            }
         }
     }
 }

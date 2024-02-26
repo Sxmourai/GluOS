@@ -62,8 +62,8 @@ impl Console {
     pub fn get_str_at(&self, pos: &ScreenPos, len: u16) -> &'static [ScreenChar] {
         let (width, _height) = self.size();
         let mut first_char = core::ptr::addr_of!(self.buffer) as *const ScreenChar;
-        first_char = unsafe{first_char.add(width as usize*pos.1 as usize+pos.0 as usize)};
-        unsafe{core::slice::from_raw_parts(first_char, len as usize)}
+        first_char = unsafe { first_char.add(width as usize * pos.1 as usize + pos.0 as usize) };
+        unsafe { core::slice::from_raw_parts(first_char, len as usize) }
     }
     pub fn size(&self) -> (u8, u8) {
         (super::buffer::BUFFER_WIDTH, super::buffer::BUFFER_HEIGHT)

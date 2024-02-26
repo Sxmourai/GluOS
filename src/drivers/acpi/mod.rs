@@ -8,5 +8,7 @@ pub mod tables;
 /// They are required for multiprocessing, checking if there is a ps2 controller (see src/drivers/ps2.rs)
 /// And many more (like computer shutdown which isn't implemented rn)
 pub async fn init() {
-    unsafe { crate::state::DESCRIPTOR_TABLES.replace(DescriptorTablesHandler::new().await.unwrap()) };
+    unsafe {
+        crate::state::DESCRIPTOR_TABLES.replace(DescriptorTablesHandler::new().await.unwrap())
+    };
 }

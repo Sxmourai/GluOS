@@ -30,6 +30,7 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
 }
 
 extern crate alloc; // Lib which stores some useful structs on the heap / smart pointers from stdlib like Vec, String, Box...
+extern crate bitfield;
 extern crate bootloader; // The bootloader crate, usefull for boot_info, paging and other stuff
 extern crate hashbrown;
 extern crate lazy_static; // Useful to declare some static without using only 'const fn ...'
@@ -38,4 +39,3 @@ extern crate pic8259; //TODO: Switch from PIC (Programmable interupt controller)
 extern crate spin; // Mutex and lock
 extern crate uart_16550; // Helps us to talk to QEMU (serial print and shutdown)
 extern crate x86_64; // A lot of asm macros, and useful for paging... Everything far and near CPU related // Reimplementation of HashMap and HashSet from stdlib
-extern crate bitfield;

@@ -171,7 +171,8 @@ fn exec(raw_args: String) -> Result<(), String> {
     if true {
         use crate::fs::fs_driver::Entry;
         let mut args = raw_args.split(' ');
-        let path = parse_path(args.next().ok_or("Please specify path !".to_string())?).ok_or("Not found !".to_string())?;
+        let path = parse_path(args.next().ok_or("Please specify path !".to_string())?)
+            .ok_or("Not found !".to_string())?;
         let fs_driver = crate::fs_driver!();
         if let Ok(entry) = fs_driver.read(&path) {
             match entry {
