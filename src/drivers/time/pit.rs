@@ -1,54 +1,158 @@
-use x86_64::structures::port::{PortRead, PortWrite};
+use core::cell::OnceCell;
+
+use alloc::vec::Vec;
+use spin::RwLock;
+use x86_64::{
+    instructions::interrupts::without_interrupts,
+    structures::port::{PortRead, PortWrite},
+};
 
 use crate::dbg;
+
+pub fn irq() {
+    if let Some(controller) = unsafe { PIT_CONTROLLER.as_mut() } {
+        if controller.writer_count()>0 {
+            log::error!("Controller locked, skipping !");
+            return
+        }
+        let mut controller = controller.write();
+        for tick in controller.ticks.iter_mut() {
+            *tick += 1;
+        }
+        controller.elapsed_ticks+=1;
+        #[cfg(debug_assertions)]
+        if controller.elapsed_ticks / SELECTED_HZ as u128 == 1*60*60 {
+            log::info!("Kernel has been running for 1 hour, wow");
+        }
+    }
+}
+
+/// Creates a new entry in ticks and returns it's id
+pub fn register_wait() -> Option<usize> {
+    unsafe{PIT_CONTROLLER.as_mut().and_then(|c| {
+        let mut c = c.write();
+        c.ticks.push(0);
+        Some(c.ticks.len()-1)
+    })}
+}
+/// Gets the ticks from the id, if it exists
+pub fn get_ticks(id: usize) -> Option<u32> {
+    unsafe{PIT_CONTROLLER.as_mut().and_then(|c| {
+        if c.writer_count()>0 {
+            log::error!("Controller locked ?");
+        }
+        let mut c = c.write();
+        c.ticks.get(id).copied()
+    })}
+}
+
+// TODO Use OnceCell, but doesn't have Sync
+pub static mut PIT_CONTROLLER: Option<RwLock<PIT>> = None;
+pub const MIN_FREQUENCY: u32 = 18.222 as u32;
+pub const PIT_FREQUENCY: u32 = 1_193_181;
+// Because 18.222 hz = 1 second, we want 18222 to have interrupts every ms
+pub const SELECTED_HZ: u32 = 1000;
+pub fn init() {
+    if SELECTED_HZ <= MIN_FREQUENCY {
+        return;
+    }
+    let divisor = PIT_FREQUENCY / SELECTED_HZ;
+    let mut mode = Mode(0);
+    mode.set_access_mode(AccessMode::AccessModeLoHiByte as u8);
+    mode.set_operating_mode(OperatingMode::SquareWaveGenerator as u8);
+    mode.set_bcd_format(false);
+    mode.set_channel(Channel::Channel0 as u8);
+    mode.write();
+    PIT::write_reg(Regs::Channel0, divisor as u8 & 0xFF);
+    PIT::write_reg(Regs::Channel0, ((divisor & 0xFF00) >> 8) as u8);
+
+    let mut pit = PIT {
+        ticks: Vec::new(),
+        elapsed_ticks: 0,
+    };
+    unsafe { PIT_CONTROLLER.replace(RwLock::new(pit)) };
+}
+
+#[derive(Debug)]
+#[repr(u8)]
+pub enum Channel {
+    Channel0,
+    Channel1,
+    Channel2,
+    /// 8254 only
+    ReadBackCommand,
+}
+#[derive(Debug)]
+pub enum AccessMode {
+    LatchCountValueCommand,
+    AccessModeLoByteOnly,
+    AccessModeHiByteOnly,
+    AccessModeLoHiByte,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Regs {
+    Channel0 = 0x40,
+    Channel1 = 0x41,
+    Channel2 = 0x42,
+    ModeCommand = 0x43,
+    Control = 0x61,
+}
+impl Regs {
+    pub fn from_channel(channel: Channel) -> Self {
+        match channel {
+            Channel::Channel0 => Regs::Channel0,
+            Channel::Channel1 => Regs::Channel1,
+            Channel::Channel2 => Regs::Channel2,
+            Channel::ReadBackCommand => todo!(),
+        }
+    }
+}
+
+pub struct PIT {
+    /// Stores the different amount of ticks that has elapsed since the registering of a sleep
+    /// TODO make ^^ clearer
+    ticks: Vec<u32>,
+    /// Stores the amount of ticks that have elapsed since boot
+    elapsed_ticks: u128,
+}
+impl PIT {
+    pub fn write_reg(reg: Regs, value: u8) {
+        unsafe { PortWrite::write_to_port(reg as u16, value) }
+    }
+    pub fn read_reg(reg: Regs) -> u8 {
+        unsafe { PortRead::read_from_port(reg as u16) }
+    }
+    pub fn read_pit_count(channel: Channel) -> u16 {
+        without_interrupts(|| {
+            let channel_reg = Regs::from_channel(channel);
+            Self::write_reg(Regs::ModeCommand, 0);
+            ((Self::read_reg(channel_reg) as u16) | (Self::read_reg(channel_reg) as u16) << 8)
+        })
+    }
+    //TODO Handle LoByte Only and Hi
+    pub fn write_pit_count(&self, channel: Channel, value: u16) {
+        without_interrupts(|| {
+            let channel_reg = Regs::from_channel(channel);
+            Self::write_reg(channel_reg, value as u8 & 0xFF);
+            Self::write_reg(channel_reg, ((value & 0xFF00) >> 8) as u8);
+        })
+    }
+}
 
 const BASE_FREQUENCY: u64 = 1_193_182;
 #[derive(Debug)]
 pub enum TimerError {
     OutOfRange,
     NotActive,
-}
-// Inline it because we call it a million times to wait for 1 second
-#[inline(always)]
-pub fn try_udelay(micros: u16) -> Result<(), TimerError> {
-    set(micros)?;
-    wait_for_timeout()
-}
-pub fn try_mdelay(millis: u16) -> Result<(), TimerError> {
-    let micros = millis as u64 * 1_000;
-    let times = micros / MAX_COUNTER_VALUE_INPUT as u64;
-    let rest = (micros % MAX_COUNTER_VALUE_INPUT as u64) as u16;
-    for i in 0..times {
-        try_udelay(MAX_COUNTER_VALUE_INPUT)?
-    }
-    try_udelay(rest)?;
-    Ok(())
-}
-pub fn try_sdelay(seconds: u16) -> Result<(), TimerError> {
-    let micros = seconds as u64 * 1_000_000;
-    let times = micros / MAX_COUNTER_VALUE_INPUT as u64;
-    let rest = (micros % MAX_COUNTER_VALUE_INPUT as u64) as u16;
-    for i in 0..times {
-        try_udelay(MAX_COUNTER_VALUE_INPUT)?
-    }
-    try_udelay(rest)?;
-    Ok(())
-}
-pub fn udelay(micros: u16) {
-    try_udelay(micros).unwrap()
-}
-pub fn mdelay(millis: u16) {
-    try_mdelay(millis).unwrap()
-}
-//TODO Make real async
-pub async fn sdelay(seconds: u16) {
-    try_sdelay(seconds).unwrap()
+    NoTicksAvailable,
 }
 
 pub fn wait_for_timeout() -> Result<(), TimerError> {
     loop {
-        let c = Control(unsafe { PortRead::read_from_port(0x61_u16) });
+        let c = Control::read();
         if !c.enable_timer_counter2() {
+            log::error!("Timer not active");
             return Err(TimerError::NotActive);
         } else if c.status_timer_counter2() {
             return Ok(());
@@ -56,37 +160,29 @@ pub fn wait_for_timeout() -> Result<(), TimerError> {
         core::hint::spin_loop();
     }
 }
-pub const MAX_COUNTER_VALUE: u16 = 0xffff;
+pub const MAX_COUNTER_VALUE: u16 = u16::MAX;
 pub const MAX_COUNTER_VALUE_INPUT: u16 =
-    ((MAX_COUNTER_VALUE as u64 * 1_000_000u64) / BASE_FREQUENCY) as u16; //We could use .div_floor to be more explicit, but it's unstable ~= 54924.5630591142
+    ((MAX_COUNTER_VALUE as u64 * 1_000_000u64) / BASE_FREQUENCY) as u16; // ~= 54924.5630591142
 pub fn set(micros: u16) -> Result<(), TimerError> {
     let counter = (BASE_FREQUENCY * micros as u64) / 1_000_000;
     if counter > MAX_COUNTER_VALUE as u64 {
         return Err(TimerError::OutOfRange);
     }
-    let mut c = Control(unsafe { PortRead::read_from_port(0x61_u16) });
-    c.set_enable_speaker_data(false);
-    c.set_enable_timer_counter2(true);
-    unsafe { PortWrite::write_to_port(0x61, c.0) }
+    let mut control = Control::read();
+    control.set_enable_speaker_data(false);
+    control.set_enable_timer_counter2(true);
+    control.write();
 
     let mut m = Mode(0);
     m.set_bcd_format(false);
-    m.set_access_mode(AccessMode::LowAndHighByte as u8);
+    m.set_access_mode(AccessMode::AccessModeLoHiByte as u8);
     m.set_operating_mode(OperatingMode::InterruptOnTerminalCount as u8);
     m.set_channel(2);
-    unsafe { PortWrite::write_to_port(0x43, m.0) }
+    m.write();
 
-    set_data(2, (counter & 0xff) as u8);
-    set_data(2, ((counter >> 8) & 0xff) as u8);
+    PIT::write_reg(Regs::Channel2, (counter & 0xff) as u8);
+    PIT::write_reg(Regs::Channel2, ((counter >> 8) & 0xff) as u8);
     Ok(())
-}
-
-fn set_data(channel: u8, value: u8) {
-    unsafe { PortWrite::write_to_port(0x40 + channel as u16, value) }
-}
-#[allow(unused)]
-fn get_data(channel: u8) -> u8 {
-    unsafe { PortRead::read_from_port(0x40 + channel as u16) }
 }
 
 bitfield::bitfield! {
@@ -97,6 +193,14 @@ bitfield::bitfield! {
     _, set_operating_mode   : 3, 1;
     _, set_access_mode      : 5, 4;
     _, set_channel          : 7, 6;
+}
+impl Mode {
+    pub fn read() -> Self {
+        Self(PIT::read_reg(Regs::ModeCommand))
+    }
+    pub fn write(&self) {
+        PIT::write_reg(Regs::ModeCommand, self.0)
+    }
 }
 bitfield::bitfield! {
     #[derive(Clone, Copy)]
@@ -111,13 +215,13 @@ bitfield::bitfield! {
     status_iochk_nmi_source, _ : 6;
     status_serr_nmi_source , _ : 7;
 }
-
-#[repr(u8)]
-pub enum AccessMode {
-    LatchCountValue = 0,
-    LowByteOnly = 1,
-    HighByteOnly = 2,
-    LowAndHighByte = 3,
+impl Control {
+    pub fn read() -> Self {
+        Self(PIT::read_reg(Regs::Control))
+    }
+    pub fn write(&self) {
+        PIT::write_reg(Regs::Control, self.0)
+    }
 }
 
 #[repr(u8)]

@@ -50,7 +50,9 @@ pub const INTERRUPTS: &[(
     extern "x86-interrupt" fn(x86_64::structures::idt::InterruptStackFrame),
 )] = {
     &[
-        crate::interrupt_handler!(InterruptIndex::Timer, |_stack_frame| {}),
+        crate::interrupt_handler!(InterruptIndex::Timer, |_stack_frame| {
+            crate::drivers::time::pit::irq()
+        }),
         crate::interrupt_handler!(InterruptIndex::Keyboard, |_stack_frame| {
             #[allow(const_item_mutation)]
             let scancode: u8 = unsafe { ps2::DATA_PORT.read() };

@@ -53,7 +53,7 @@ pub enum DriverId {
     Ps2Controller,
     Interrupts,
     Pci,
-    Pit,
+    Time,
     Graphics,
     Disk,
     Filesystem,
@@ -69,7 +69,7 @@ impl DriverId {
             Self::Ps2Controller => "Ps2Controller",
             Self::Interrupts => "Interrupts",
             Self::Pci => "Pci",
-            Self::Pit => "Pit",
+            Self::Time => "Time",
             Self::Graphics => "Graphics",
             Self::Disk => "Disk",
             Self::Filesystem => "Filesystem",
@@ -107,7 +107,7 @@ pub fn get_drivers() -> Vec<Driver> {
             requires = [Logger, Gdt]
         ),
         make_driver!(Pci, async { crate::drivers::pci::init() }),
-        make_driver!(Pit, async { crate::drivers::time::init() }),
+        make_driver!(Time, async { crate::drivers::time::init() }),
         make_driver!(Graphics, async { crate::drivers::video::init() }),
         make_driver!(Disk, async { crate::drivers::disk::init() }),
         #[cfg(feature = "fs")]
