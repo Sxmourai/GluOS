@@ -128,6 +128,9 @@ macro_rules! malloc {
     ($flags: expr) => {
         $crate::mem_handler!().malloc($flags)
     };
+    () => {
+        $crate::mem_handler!().malloc(PageTableFlags::WRITABLE | PageTableFlags::PRESENT)
+    };
 }
 
 #[derive(Debug)]

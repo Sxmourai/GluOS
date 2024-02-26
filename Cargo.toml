@@ -24,7 +24,7 @@ crossbeam-queue = { version = "0.3.10", default-features = false, features = [
 futures-util = { version = "0.3.4", default-features = false, features = [
     "alloc",
 ] } # Utils for asyncs, Stream, Futures, async...
-pasts = {version="0.14.3", default-features = false}
+pasts = { version = "0.14.3", default-features = false }
 
 
 # Usefull for parsing hardware infos
@@ -63,10 +63,10 @@ run-args = [
     "-drive",
     "file=build/ntfs-gpt.img,format=raw",
     # ENDDISKFLAG
-    # "-drive",
-    # "file=build/ext2-gpt.img,format=raw,if=none,id=nvm",
-    # "-device",
-    # "nvme,serial=deadbeef,drive=nvm",
+    "-drive",
+    "file=build/ext2-gpt.img,format=raw,if=none,id=nvm",
+    "-device",
+    "nvme,serial=deadbeef,drive=nvm",
     # "-net",
     # "nic,macaddr=00:11:22:33:44:55,model=e1000",
     # "-net","user",
