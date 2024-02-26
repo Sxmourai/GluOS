@@ -51,7 +51,8 @@ impl FsDriverManager {
         let locs = unsafe { &DISK_MANAGER.lock().as_mut().unwrap().disks }
         .iter().map(|d| (d.0.clone()))
         .collect::<Vec<DiskLoc>>();
-        for loc in locs{
+        for loc in locs {
+            crate::trace!("Fetching filesystem on disk {}", loc);
             let header_type = partition::read_header_type(&loc);
             if header_type.is_none() {
                 continue;

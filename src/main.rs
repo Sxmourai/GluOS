@@ -20,12 +20,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
     serial_println!("\x1b[31;1m[PANIC]\x1b[0;0m: {}", info);
-    // Prints traceback of 10 last items
-    let traces = kernel::user::log::TRACES.read();
-    let firsts = traces.len().saturating_sub(10);
-    for trace in traces[firsts..].iter() {
-        serial_println!("[TRACE] {}", trace);
-    }
+    kernel::log::print_trace(10);
     kernel::test::end()
 }
 

@@ -21,6 +21,7 @@ pub mod test;
 pub mod user;
 
 pub use drivers::*;
+pub use user::*;
 
 #[cfg(test)]
 #[panic_handler]

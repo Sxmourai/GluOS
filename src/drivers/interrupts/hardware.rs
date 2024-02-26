@@ -26,7 +26,7 @@ pub fn setup_hardware_interrupts(idt: &mut InterruptDescriptorTable) {
 #[macro_export]
 macro_rules! register_interrupt {
     ($num: expr, $func: expr) => {
-        register_interrupt($num, $crate::interrupt_handler!($num, $func).1)
+        $crate::interrupts::hardware::register_interrupt($num, $crate::interrupt_handler!($num, $func).1)
     };
 }
 

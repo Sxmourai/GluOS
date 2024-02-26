@@ -83,6 +83,7 @@ pub extern "x86-interrupt" fn segment_not_present(
         "EXCEPTION: segment_not_present\n{:#?}\nError code: {}",
         stack_frame, error_code
     );
+    crate::log::print_trace(2);
 }
 pub extern "x86-interrupt" fn stack_segment_fault(
     stack_frame: InterruptStackFrame,

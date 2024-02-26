@@ -21,7 +21,9 @@ use crate::{dbg, disk_manager};
 use super::driver::{Disk, DiskDriver, DiskDriverEnum, DiskDriverType, GenericDisk, SECTOR_SIZE};
 use super::{DiskError, DiskLoc};
 
-pub static mut ATA_DRIVER: Option<RwLock<AtaDriver>> = None;
+pub mod driver;
+
+pub static mut ATA_DRIVER: Option<RwLock<driver::AtaDriver>> = None;
 /// Scans the different ATA disks
 /// The buses are:
 /// Primary Channel:   Slave & Master
@@ -63,10 +65,7 @@ pub fn init(ide: &PciDevice) -> Vec<super::driver::Disk> {
     }
     disks.shrink_to_fit();
     unsafe {
-        ATA_DRIVER.replace(RwLock::new(AtaDriver {
-            selected_disk: 0,
-            disks: disks.try_into().unwrap(),
-        }))
+        ATA_DRIVER.replace(RwLock::new(driver::AtaDriver::new(disks.try_into().unwrap())));
     };
     gen_disks
 }
@@ -190,19 +189,15 @@ impl AtaDisk {
     // Tells the channel to select this drive
     pub fn select(&self) {
         unsafe { u8::write_to_port(self.iobase + 6, self.loc.drive_select_addr()) };
+        //TODO Waiting ?
     }
     pub fn init(&mut self) -> Result<(), DiskError> {
+        crate::trace!("Initialising disk at {}", self.loc);
         unsafe { u8::write_to_port(self.control_base, 1 << 1) } // Disable interrupts for identify and disk selection
         self.select();
-        self.identify();
+        self.identify()?;
         //TODO Interrupts & IRQ's
         // unsafe { u8::write_to_port(self.control_base, 0) } // Enable interrupts
-        
-        // crate::register_interrupt!(
-        //     crate::interrupts::hardware::InterruptIndex::PrimaryAtaDisk,
-        //     |_stack_frame| unsafe {
-        //     }
-        // );
 
         self.initialised = true;
         Ok(())
@@ -561,6 +556,17 @@ impl AtaDisk {
     }
 }
 
+impl Display for AtaDisk {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(&format!("Disk: {}Ko on {:?}", self.size() / 1024, self.loc))?;
+        Ok(())
+    }
+}
+impl GenericDisk for AtaDisk {
+    fn loc(&self) -> &DiskLoc {
+        &self.loc
+    }
+}
 /// Detects a disk at specified channel and drive
 /// Reads identify data & sets it up correctly
 fn detect(loc: &DiskLoc) -> Option<AtaDisk> {
@@ -581,44 +587,6 @@ fn read_identify(command_port_addr: u16) -> [u16; SECTOR_SIZE as usize / 2] {
         *ele = unsafe { u16::read_from_port(command_port_addr) };
     }
     data
-}
-#[derive(Debug)]
-pub struct AtaDriver {
-    selected_disk: u8,
-    disks: [Option<AtaDisk>; 4],
-}
-impl DiskDriver for AtaDriver {
-    fn read(
-        &mut self,
-        loc: &DiskLoc,
-        start_sector: u64,
-        sector_count: u64,
-    ) -> Result<Vec<u8>, DiskError> {
-        self.disks[loc.as_index()]
-            .as_mut()
-            .ok_or(DiskError::NotFound)?
-            .read_sectors(start_sector, sector_count.try_into().unwrap())
-    }
-
-    fn write(&mut self, loc: &DiskLoc, start_sector: u64, content: &[u8]) -> Result<(), DiskError> {
-        todo!()
-    }
-
-    fn select_disk(&mut self, loc: &DiskLoc) {
-        if loc.as_index() == self.selected_disk as usize {
-            return;
-        }
-        let disk = &self.disks[loc.as_index()];
-        self.selected_disk = loc.as_index().try_into().unwrap();
-        let base = loc.channel_addr();
-        let drive = loc.drive_select_addr();
-        unsafe { bsy(base) };
-        unsafe { u8::write_to_port(base + 6, drive) }; // Select drive of channel
-        for _i in 0..14 {
-            unsafe { u8::read_from_port(loc.base() + 7) };
-        }
-        unsafe { bsy(loc.base()) };
-    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Ord, Eq, Hash)]
@@ -647,121 +615,6 @@ pub struct AddressingModes {
     lba28: u32, // total number of 28 bit LBA addressable sectors on the drive. (If non-zero, the drive supports LBA28.)
     lba48: u64,
 }
-
-impl Display for AtaDisk {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str(&format!("Disk: {}Ko on {:?}", self.size() / 1024, self.loc))?;
-        Ok(())
-    }
-}
-
-impl GenericDisk for AtaDisk {
-    fn loc(&self) -> &DiskLoc {
-        &self.loc
-    }
-}
-
-// pub fn read_sectors(sector_address: u64, sector_count: u16) -> Result<Vec<[u16; SSECTOR_SIZE]>, DiskError> {
-//     DISKS.lock().get(0).unwrap().read_sectors(sector_address, sector_count)
-// }
-
-// for device in kernel::pci::pci_device_iter() {
-//     if device.class == 1 && device.subclass == 1 {
-//         let pi_reg = device.pci_read_32(9) as u8;
-//             // Check the primary channel (bit 0) of the programming interface.
-//         let primary_channel_supported = pi_reg & 0x01 == 0;
-
-//         // Check the secondary channel (bit 1) of the programming interface.
-//         let secondary_channel_supported = pi_reg & 0x02 == 0;
-
-//         // Check bit 7 to determine if ATAPI is supported.
-//         let atapi_supported = pi_reg & 0x80 != 0;
-//         let r = device.prog_if;
-//         serial_println!("{:?} {:b} {:b}", (primary_channel_supported, secondary_channel_supported, atapi_supported), r, pi_reg);
-//         serial_println!("AA{:?}", device.pci_read_32(0x20));
-//         let mode = if is_bit_set(r, 7) { "NATIVE" } else { "COMPATIBILITY" };
-//         let can_modify_bit_0 = is_bit_set(r, 6);
-//         let second_chan_mode = if is_bit_set(r, 5) { "NATIVE" } else { "COMPATIBILITY" };
-//         let can_modify_bit_2 = is_bit_set(r, 4);
-//         let dma_support = is_bit_set(r, 0); //When set, this is a bus master IDE controller
-//         serial_println!("Mode: {}\tCan modify prim chan mode: {}\tSecond channel mode: {}\tCan modify second chan mode: {}\tDMA Supported: {}", mode, can_modify_bit_0, second_chan_mode, can_modify_bit_2, dma_support);
-//         serial_println!("{:?}", device.bars);
-//         // Assuming bar4_value contains the non-zero value from BAR4
-//         let primary_port = (device.bars[4] & 0xFFFC) as u16; // Extract the primary I/O port address
-//         let secondary_port = ((device.bars[4] >> 16) & 0xFFFC) as u16; // Extract the secondary I/O port address
-
-//         println!("Primary Port: 0x{:X}", primary_port);
-
-//         unsafe { u8::write_to_port(primary_port, 0xEC) };
-
-//         println!("Secondary Port: 0x{:X}", secondary_port);
-
-//         for (i,bar) in device.bars.iter().enumerate() {
-//             if *bar != 0 {
-//                 // Check if the BAR represents a memory-mapped address
-//                 if bar & 0x1 == 0 {
-//                     // Memory-mapped address
-//                     let memory_address = bar & !0x3; // Mask out the two least significant bits
-//                     // Read the size of the memory region from the device-specific register
-//                     // For example, if it's a 32-bit BAR, the size will be 4 bytes (1 << 2).
-//                     let memory_size = 1 << bar; // Replace `2` with the actual size of the BAR (depends on the device).
-
-//                     // Use `memory_address` and `memory_size` to access the memory-mapped registers of the IDE controller.
-//                     let p = device.determine_mem_base(i);
-//                     let q = device.determine_mem_size(i);
-//                     serial_println!("Memory: {:?}", (memory_address, memory_size));
-//                     serial_println!("Memory lib: {:?}", (p,q));
-//                 } else {
-//                     // I/O port address
-//                     // unsafe { u8::write_to_port((*bar).try_into().unwrap(), u8::MAX) };
-//                     // hlt();
-//                     let bar_size = unsafe { u8::read_from_port((*bar).try_into().unwrap()) }; // Send all ones
-//                     let io_port_address = bar & !0x1; // Mask out the least significant bit
-//                     // Read the size of the I/O port region from the device-specific register
-//                     // For example, if it's a 16-bit BAR, the size will be 2 bytes (1 << 1).
-//                     let io_port_size = 1 << bar_size; // Replace `1` with the actual size of the BAR (depends on the device).
-//                     // Use `io_port_address` and `io_port_size` to access the I/O ports of the IDE controller.
-
-//                     serial_println!("Size: {:b}\tAddress: {:b}\tPort size: {}", bar_size, io_port_address, io_port_size);
-//                 }
-//             }
-//         }
-//     }
-// }
-
-/*
-pub fn initialize_sata_controller() {
-    unsafe {
-        // Wait for the controller to be ready
-        while (u8::read_from_port(0x1F7) & 0xC0) != 0x40 {}
-
-        // Select the master drive
-        u8::write_to_port(0x1F6, 0xA0);
-        // Delay to wait for the controller to switch to the master drive
-        // You may need to adjust the delay based on your hardware
-        for _ in 0..1000000 {
-            x86_64::instructions::interrupts::without_interrupts(|| {});
-        }
-
-        // Send ATA Identify command (0xEC) to the controller
-        u8::write_to_port(0x1F7, 0xEC);
-
-        return;
-        // Wait for the controller to respond
-        while (u8::read_from_port(0x1F7) & 0x80) == 0x80 {}
-
-        // Read IDENTIFY data from the data ports (0x1F0 - 0x1F7)
-        let mut identify_data = [0u16; 256];
-        for i in 0..256 {
-            let lower = inw(0x1F0);
-            let upper = inw(0x1F0);
-            identify_data[i] = (upper << 8) | lower;
-        }
-
-
-    }
-}
-*/
 /// wait for BSY flag to be unset
 unsafe fn bsy(base: u16) {
     trace!("Waiting BSY flag to unset at base: {:X}", base);

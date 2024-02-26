@@ -1,5 +1,5 @@
-pub mod ata;
 pub mod driver;
+pub mod ata;
 pub mod nvme;
 
 /// Identifies the different ATA disks (and we are working on NVMe which is hard asf)
@@ -125,5 +125,10 @@ impl DiskLoc {
             3 => Self(Channel::Secondary, Drive::Slave),
             _ => return None,
         })
+    }
+}
+impl core::fmt::Display for DiskLoc {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_fmt(format_args!("Drive: {:?} Channel: {:?}", self.1, self.0))
     }
 }

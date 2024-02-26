@@ -150,3 +150,12 @@ macro_rules! trace {
         log::trace!("{}", args)
     };
 }
+
+// Prints traceback of N last items
+pub fn print_trace(n: usize) {
+    let traces = TRACES.read();
+    let firsts = traces.len().saturating_sub(n);
+    for trace in traces[firsts..].iter() {
+        serial_println!("[TRACE] {}", trace);
+    }
+}

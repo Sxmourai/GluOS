@@ -91,10 +91,10 @@ impl Driver {
         self.name.name()
     }
 }
-//TODO Remove the need to increment the len manually
-// The best would be a vec/slice, but no vec because we don't have heap allocation and no slice because we can't use static because impl Future isn't sized !
-pub fn get_drivers() -> [Driver; 10] {
-    [
+////////// TODO Remove the need to increment the len manually
+////////// The best would be a vec/slice, but no vec because we don't have heap allocation and no slice because we can't use static because impl Future isn't sized !
+pub fn get_drivers() -> Vec<Driver> {
+    alloc::vec![
         // By default require logger, overwrite that.
         make_driver!(Logger, async { crate::user::log::init() }, requires=[]),
         // make_driver!(Heap, crate::drivers::memory::init()), manually called in boot, to have executor

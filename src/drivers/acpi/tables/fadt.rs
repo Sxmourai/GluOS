@@ -80,7 +80,7 @@ impl FADT {
         unsafe {
             PortWrite::write_to_port(self.smi_command_port.try_into().unwrap(), self.acpi_enable)
         };
-        //TODO Do smth whilst waiting
+        #[cfg(not(debug_assertions))] // On QEMU, we don't need to wait for much time to go to acpi mode
         crate::time::sdelay(1).await;
         // Polling port
         while unsafe {
