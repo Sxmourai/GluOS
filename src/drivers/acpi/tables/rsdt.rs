@@ -110,10 +110,10 @@ pub fn get_rsdt(sdp: &SystemDescriptionPtr) -> Option<SystemDescriptionTable> {
 
     let sdt = match sdp {
         SystemDescriptionPtr::Root(rsdp) => {
-            SystemDescriptionTable::Root((sdt_header, get_table_ptrs(&sdts, sdts.len())))
+            SystemDescriptionTable::Root((sdt_header, get_table_ptrs(sdts, sdts.len())))
         }
         SystemDescriptionPtr::Extended(xsdp) => {
-            SystemDescriptionTable::Extended((sdt_header, get_table_ptrs(&sdts, sdts.len())))
+            SystemDescriptionTable::Extended((sdt_header, get_table_ptrs(sdts, sdts.len())))
         }
     };
     // RSDT Checksum

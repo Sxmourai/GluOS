@@ -6,7 +6,7 @@ use x86_64::{
 };
 
 use crate::{dbg, mem_handler, mem_map};
-const ELF_MAGIC: [u8; 4] = [0x7F, 'E' as u8, 'L' as u8, 'F' as u8];
+const ELF_MAGIC: [u8; 4] = [0x7F, b'E', b'L', b'F'];
 
 ///TODO Take a file descriptor, not full content
 pub fn execute(content: String) -> Result<(), ElfError> {
@@ -46,6 +46,7 @@ pub fn execute(content: String) -> Result<(), ElfError> {
                     dbg!(ph);
                 }
             }
+            ElfSegmentType::DYNAMIC => {todo!()}
             _ => {}
         }
     }
@@ -114,7 +115,7 @@ pub enum ElfSectionHeader<'a> {
     _64(&'a ElfSectionHeader64),
 }
 impl ElfSectionHeader<'_> {
-    pub fn new<'a>(bytes: &'a [u8], format: ElfFormat) -> Option<Self> {
+    pub fn new(bytes: &[u8], format: ElfFormat) -> Option<Self> {
         Some(match format {
             ElfFormat::_32Bit => {
                 Self::_32(unsafe { &*(bytes.as_ptr() as *const ElfSectionHeader32) })
@@ -219,6 +220,7 @@ impl ElfSectionHeader64 {
     }
 }
 #[derive(Debug)]
+#[allow(clippy::enum_clike_unportable_variant)]
 pub enum ElfSectionHeaderFlags {
     WRITE = 0x1,             //	Writable
     ALLOC = 0x2,             //	Occupies memory during execution
@@ -334,7 +336,7 @@ impl ElfProgramHeader<'_> {
             ElfProgramHeader::_64(ph) => ph.offset,
         }
     }
-    pub fn new<'a>(bytes: &'a [u8], format: ElfFormat) -> Option<Self> {
+    pub fn new(bytes: &[u8], format: ElfFormat) -> Option<Self> {
         Some(match format {
             ElfFormat::_32Bit => {
                 Self::_32(unsafe { &*(bytes.as_ptr() as *const ElfProgramHeader32) })

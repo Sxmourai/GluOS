@@ -1,7 +1,7 @@
 use crate::{boot::hlt_loop, interrupts::msr, println};
 
 extern "C" fn test_user() {
-    loop {}
+    panic!("Testing user");
     // unsafe{core::arch::asm!("cli")}
 }
 

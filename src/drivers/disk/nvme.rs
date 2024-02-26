@@ -140,7 +140,7 @@ pub fn init(nvme_pci: &PciDevice) -> Result<Vec<&'static NVMeDisk>, NVMeControll
     controller.controller_config.set_enable(1);
 
     // 7.6.1 4) Wait for ready
-    let mut ctrl_status = loop {
+    loop {
         if controller.controller_status.ready() != 0 {
             break;
         } else if controller.controller_status.fatal() != 0 {
@@ -252,7 +252,7 @@ pub fn init(nvme_pci: &PciDevice) -> Result<Vec<&'static NVMeDisk>, NVMeControll
     // // }
     let mut disks = Vec::new();
 
-    return Ok(disks);
+    Ok(disks)
 }
 fn bit_log2(n: u64) -> u64 {
     // if n == 0 {
@@ -281,32 +281,32 @@ pub struct NVMeQueue {
     pub submission_queue_size: u16,
 }
 impl NVMeQueue {
-    fn identify(&mut self) {
-        let id = malloc!(PageTableFlags::PRESENT | PageTableFlags::WRITABLE).unwrap();
-        // TODO Proper command creation
-        let command = NVMeSubmission {
-            opcode: 0x6,
-            fuse_and_psdt: 0,
-            command_id: 0,
-            ns_id: 0,
-            _reserved: 0,
-            metadata_ptr: 0,
-            prp1: 0,
-            prp2: 0,
-            command: NVMeCommand {
-                raw: [1, 0, 0, 0, 0, 0],
-                header: todo!(),
-            },
-        }; //TODOOOOOOOOOOOOOOOOOOOOOO
-        let subs = unsafe {
-            core::slice::from_raw_parts_mut(self.submission_base.as_u64() as *mut NVMeSubmission, 4)
-        };
-        subs[0] = command;
-        dbg!((unsafe { *(self.submission_db as *mut u32) }));
-        unsafe {
-            *(self.submission_db as *mut u32) = 1;
-        }
-    }
+    // fn identify(&mut self) {
+    //     let id = malloc!(PageTableFlags::PRESENT | PageTableFlags::WRITABLE).unwrap();
+    //     // TODO Proper command creation
+    //     let command = NVMeSubmission {
+    //         opcode: 0x6,
+    //         fuse_and_psdt: 0,
+    //         command_id: 0,
+    //         ns_id: 0,
+    //         _reserved: 0,
+    //         metadata_ptr: 0,
+    //         prp1: 0,
+    //         prp2: 0,
+    //         command: NVMeCommand {
+    //             raw: [1, 0, 0, 0, 0, 0],
+    //             header: todo!(),
+    //         },
+    //     }; //TODOOOOOOOOOOOOOOOOOOOOOO
+    //     let subs = unsafe {
+    //         core::slice::from_raw_parts_mut(self.submission_base.as_u64() as *mut NVMeSubmission, 4)
+    //     };
+    //     subs[0] = command;
+    //     dbg!((unsafe { *(self.submission_db as *mut u32) }));
+    //     unsafe {
+    //         *(self.submission_db as *mut u32) = 1;
+    //     }
+    // }
 }
 #[repr(C, packed)]
 pub struct NVMeCommand {
@@ -498,10 +498,10 @@ impl NVMeRegisters {
 
     fn get_max_queue_entries(&self) -> u16 {
         let max = (self.controller_caps.0 & 0xffff) as u16;
-        if (max <= 0) {
-            return u16::MAX;
+        if max == 0 {
+            u16::MAX
         } else {
-            return max + 1;
+            max + 1
         }
     }
     // fn set_command_set(&mut self, set: u8) {
@@ -741,7 +741,7 @@ const NVME_CSTS_NSSRO: u8 = (1 << 4); // NVM Subsystem reset occurred
 
 const NVME_AQA_AQS_MASK: u64 = 0xfff; // Admin queue size mask
 const NVME_AQA_ACQS: fn(u64) -> u64 = |x| (((x) & NVME_AQA_AQS_MASK) << 16); // Admin completion queue size
-const NVME_AQA_ASQS: fn(u64) -> u64 = |x| (((x) & NVME_AQA_AQS_MASK) << 0); // Admin submission queue size
+const NVME_AQA_ASQS: fn(u64) -> u64 = |x| ((x) & NVME_AQA_AQS_MASK); // Admin submission queue size
 
 // "NVME", initiates a reset
 const NVME_NSSR_RESET_VALUE: u64 = 0x4E564D65;

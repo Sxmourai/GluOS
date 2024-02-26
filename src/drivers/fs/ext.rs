@@ -80,7 +80,7 @@ impl ExtDriver {
         let data_blk = read_from_partition(
             &self.partition,
             (inode.direct_blk_ptr_0 * block_size) as u64,
-            block_size.try_into().unwrap(),
+            block_size.into(),
         )
         .ok()?;
         let inode_entry = ExtEntryDescriptor::new(&data_blk, self.dir_entries_contain_type());
@@ -108,9 +108,8 @@ impl ExtDriver {
         let data_blk = read_from_partition(
             self.partition(),
             (inode.direct_blk_ptr_0 * self.block_size())
-                .try_into()
-                .unwrap(),
-            self.block_size().try_into().unwrap(),
+                .into(),
+            self.block_size().into(),
         )
         .or(Err(FsReadError::ReadingDiskError))?;
         if inode.type_n_perms & 0x4000 == 0x4000 {

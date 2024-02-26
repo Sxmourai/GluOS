@@ -172,7 +172,7 @@ impl AtaDisk {
     pub fn size(&self) -> u64 {
         if let Some(addressing_modes) = self.addressing_modes {
             if addressing_modes.2 != 0 {
-                addressing_modes.2 as u64
+                addressing_modes.2
             } else if addressing_modes.1 != 0 {
                 addressing_modes.1 as u64
             } else {
@@ -185,11 +185,11 @@ impl AtaDisk {
     /// A duplicate of the Status Register which does not affect interrupts
     /// You can use DiskRawStatusEnum with .get_bit
     pub fn alternate_status(&self) -> u8 {
-        unsafe { u8::read_from_port(self.control_base + 0) }
+        unsafe { u8::read_from_port(self.control_base) }
     }
     /// Used to reset the bus or enable/disable interrupts
     pub fn device_control(&self, command: u8) {
-        unsafe { u8::write_to_port(self.control_base + 0, command) }
+        unsafe { u8::write_to_port(self.control_base, command) }
     }
     // Tells the channel to select this drive
     pub fn select(&self) {
@@ -578,7 +578,7 @@ fn detect(loc: &DiskLoc) -> Option<AtaDisk> {
         Channel::Primary => 0x3F6,
         Channel::Secondary => 0x376,
     };
-    let mut disk = AtaDisk::new(loc.clone(), loc.base(), control_base);
+    let mut disk = AtaDisk::new(*loc, loc.base(), control_base);
     disk.init().ok()?;
     Some(disk)
 }

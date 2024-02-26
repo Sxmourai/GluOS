@@ -50,7 +50,7 @@ impl FsDriverManager {
         // Collect into vec to drop lock, for instance disk locs are light
         let locs = unsafe { &DISK_MANAGER.lock().as_mut().unwrap().disks }
             .iter()
-            .map(|d| (d.0.clone()))
+            .map(|d| *d.0)
             .collect::<Vec<DiskLoc>>();
         for loc in locs {
             log::trace!("Fetching filesystem on disk {}", loc);
@@ -63,7 +63,7 @@ impl FsDriverManager {
                 HeaderType::GPT(gpt) => gpt,
                 HeaderType::MBR(mbr) => mbr,
             };
-            self_partitions.insert(loc.clone(), partitions);
+            self_partitions.insert(loc, partitions);
         }
         for (disk, parts) in &self_partitions {
             for part in parts {

@@ -29,11 +29,7 @@ fn display_driver(driver: Driver) -> alloc::string::String {
     alloc::format!(
         "Driver {{ name: {} requires: {:?} }}",
         driver.name(),
-        driver
-            .requires
-            .iter()
-            .map(|req_drv| format!("{}, ", req_drv.name()))
-            .collect::<alloc::string::String>()
+        driver.requires
     )
 }
 

@@ -90,7 +90,7 @@ impl Ps2Controller {
             Self::send_command(0xA8); // Enable second ps/2 controller
             Self::send_command(0x20); // Read config byte
             let config_byte = Self::retrieve_command().unwrap(); // Read controller config byte
-            if config_byte.get_bit(5) == true {
+            if config_byte.get_bit(5) {
                 // Not dual channel... We had hope tho
                 available_channels[1] = false;
             } else {
@@ -105,7 +105,7 @@ impl Ps2Controller {
         if Self::retrieve_command().unwrap() != 0x0 {
             //TODO 0x01 clock line stuck low 0x02 clock line stuck high 0x03 data line stuck low 0x04 data line stuck high
             log::error!("Failed testing first PS/2 port !");
-            if available_channels[1] == false {
+            if !available_channels[1] {
                 // No port available
                 return None;
             }

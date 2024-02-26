@@ -22,7 +22,7 @@ pub static PICS: Mutex<ChainedPics> =
 /// TODO Make a handler for all interrupts and setup a Vec for all interrupts, then we can bind at runtime some functions to be called when this interrupt occurs
 /// i.e. when a keyboard interrupt occurs, 3 functions are called, one for the kernel, one that will be passed to userland
 pub fn setup_hardware_interrupts(idt: &mut InterruptDescriptorTable) {
-    for (i, interrupt) in INTERRUPTS.into_iter() {
+    for (i, interrupt) in INTERRUPTS.iter() {
         idt[(*i as usize)].set_handler_fn(*interrupt);
     }
 }

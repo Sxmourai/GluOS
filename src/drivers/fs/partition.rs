@@ -72,7 +72,7 @@ pub fn read_header_type(disk: &DiskLoc) -> Option<HeaderType> {
                     let start_lba = partition.start_lba;
                     let end_lba = partition.end_lba;
                     partitions.push(Partition(
-                        disk.clone(),
+                        *disk,
                         partition.start_lba,
                         partition.end_lba,
                     ));
@@ -99,7 +99,7 @@ pub fn read_header_type(disk: &DiskLoc) -> Option<HeaderType> {
                 let lba_start = mbr_part.lba_start;
                 let sector_count = mbr_part.sector_count;
                 partitions.push(Partition(
-                    disk.clone(),
+                    *disk,
                     mbr_part.lba_start as u64,
                     mbr_part.sector_count as u64,
                 ));
