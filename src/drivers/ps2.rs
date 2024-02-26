@@ -33,7 +33,7 @@ const ACK_LOGGING: bool = false;
 /// Ps2 controller is used for keyboard input and mouse.
 /// Currently we don't have a great driver, but it works under QEMU
 /// TODO Indentify the different devices on the ps2 controller
-pub fn init() {
+pub async fn init() {
     Ps2Controller::init().unwrap();
 }
 

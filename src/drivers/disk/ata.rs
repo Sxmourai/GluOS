@@ -14,6 +14,7 @@ use crate::bit_manipulation::{bytes, ptrlist_to_num, u16_to_u8};
 use crate::fs::partition::Partition;
 #[cfg(feature = "fs")]
 use crate::fs::path::FilePath;
+use crate::pci::PciDevice;
 use crate::x86_64::instructions::port::{PortRead, PortWrite};
 use crate::{dbg, disk_manager};
 
@@ -26,9 +27,11 @@ pub static mut ATA_DRIVER: Option<RwLock<AtaDriver>> = None;
 /// Primary Channel:   Slave & Master
 /// Secondary Channel: Slave & Master
 /// So the IDE controller only has a max of 4 drives
-pub fn init() -> Vec<super::driver::Disk> {
-    unsafe { u8::write_to_port(0x3f6, (1 << 1) | (1 << 2)) }
-    unsafe { u8::write_to_port(0x376, (1 << 1) | (1 << 2)) }
+pub fn init(ide: &PciDevice) -> Vec<super::driver::Disk> {
+    // // set bit 1 to disable interrupts
+    // unsafe { u8::write_to_port(0x376, 1 << 2) }
+    // unsafe { u8::write_to_port(0x3f6, 0) }
+    // unsafe { u8::write_to_port(0x376, 0) }
     let raw_disks = [
         (
             detect(&DiskLoc(Channel::Primary, Drive::Master)),
@@ -164,11 +167,16 @@ impl AtaDisk {
     }
     pub fn size(&self) -> u64 {
         if let Some(addressing_modes) = self.addressing_modes {
-            if addressing_modes.2 != 0 {addressing_modes.2 as u64}
-            else if addressing_modes.1 != 0 {addressing_modes.1 as u64}
-            else {1}
-        } else {0}
-        
+            if addressing_modes.2 != 0 {
+                addressing_modes.2 as u64
+            } else if addressing_modes.1 != 0 {
+                addressing_modes.1 as u64
+            } else {
+                1
+            }
+        } else {
+            0
+        }
     }
     /// A duplicate of the Status Register which does not affect interrupts
     /// You can use DiskRawStatusEnum with .get_bit
@@ -184,8 +192,17 @@ impl AtaDisk {
         unsafe { u8::write_to_port(self.iobase + 6, self.loc.drive_select_addr()) };
     }
     pub fn init(&mut self) -> Result<(), DiskError> {
+        unsafe { u8::write_to_port(self.control_base, 1 << 1) } // Disable interrupts for identify and disk selection
         self.select();
         self.identify();
+        //TODO Interrupts & IRQ's
+        // unsafe { u8::write_to_port(self.control_base, 0) } // Enable interrupts
+        
+        // crate::register_interrupt!(
+        //     crate::interrupts::hardware::InterruptIndex::PrimaryAtaDisk,
+        //     |_stack_frame| unsafe {
+        //     }
+        // );
 
         self.initialised = true;
         Ok(())
@@ -243,30 +260,29 @@ impl AtaDisk {
         let identify_command = if drive_type == DriveType::PATAPI {
             0xA1
         } else {
-            0xEC
+            0xECu8
         };
-        unsafe { u8::write_to_port(self.iobase + 2, 0) }; //Clear sector count
-        unsafe { u8::write_to_port(self.iobase + 3, 0) }; //Clear lba's
-        unsafe { u8::write_to_port(self.iobase + 4, 0) };
-        unsafe { u8::write_to_port(self.iobase + 5, 0) };
+        self.write_reg(Reg::SectorCount, 0u8);
+        self.write_reg(Reg::LbaLo, 0u8);
+        self.write_reg(Reg::LbaMi, 0u8);
+        self.write_reg(Reg::LbaHi, 0u8);
 
         unsafe {
             u8::write_to_port(self.iobase + 7, 0xE7);
             bsy(self.iobase);
         } //Clear cache
-
-        unsafe { u8::write_to_port(self.iobase + 7, identify_command) }; // Send IDENTIFY to selected drive
+        self.write_reg(Reg::Command, identify_command);
 
         trace!("Reading drive status");
-        if unsafe { u8::read_from_port(self.iobase + 7) } == 0 {
+        if self.read_reg::<u8>(Reg::Status) == 0 {
             trace!("Drive does not exist !");
             return Err(DiskError::DiskNotFound);
         }
         unsafe {
             bsy(self.iobase);
         }
-        if unsafe { u8::read_from_port(self.iobase + 4) } != 0
-            || unsafe { u8::read_from_port(self.iobase + 5) } != 0
+        if self.read_reg::<u8>(Reg::LbaMi) != 0
+            || self.read_reg::<u8>(Reg::LbaHi) != 0
         {
             trace!("ATAPI drive detected !");
         } else if unsafe { check_drq_or_err(self.iobase) }.is_err() {
@@ -277,19 +293,10 @@ impl AtaDisk {
             );
             return Err(DiskError::DiskNotFound);
         }
-        let identify = read_identify(self.iobase);
-        let mut u8_identify = [0u8; 512];
-        let mut char_identify = ['\0'; 512];
-        for (i, item) in identify.iter().enumerate() {
-            let j = i * 2;
-            (u8_identify[j], u8_identify[j + 1]) = u16_to_u8(identify[i]);
-            let (byte0, byte1) = u16_to_u8(identify[i]);
-            char_identify[j] = byte0 as char;
-            char_identify[j + 1] = byte1 as char;
-        }
-        // debug!("Serial number: {}\tFirmware revision: {}\tModel number: {}", CharSlicePtr(&char_identify[20..40]), CharSlicePtr(&char_identify[46..52]), CharSlicePtr(&char_identify[54..92]));
+        let identify = read_identify(self.iobase);        
+        // core::ffi::CStr
+        // info!("Serial number: {:?}\tFirmware revision: {:?}\tModel number: {:?}", &char_identify[20..40], &char_identify[46..52], &char_identify[54..92]);
 
-        // let rev = identify[60..61].iter().rev().collect::<Vec<u16>>();
         let lba28 = ptrlist_to_num(&mut identify[60..61].iter());
         let lba48: u64 = ptrlist_to_num(&mut identify[100..103].iter());
         let is_hardisk = true;
@@ -317,6 +324,7 @@ impl AtaDisk {
     //28Bit Lba PIO mode
     pub fn read28(&self, _lba: u32, sector_count: u8) -> Result<Vec<u8>, DiskError> {
         log::debug!("Reading 28, will it work ?");
+        todo!();
         let drive_addr = self.loc.drive_lba28_addr() as u32;
         let base = self.loc.channel_addr();
         let lba28 = self.addressing_modes.ok_or(DiskError::Unitialised)?.1;
@@ -348,8 +356,11 @@ impl AtaDisk {
     //48Bit Lba PIO mode
     // 0 for sector_count is equals to u16::MAX
     pub fn read48(&self, lba: u64, sector_count: u16) -> Result<Vec<u8>, DiskError> {
-        if lba+sector_count as u64 >= unsafe{self.addressing_modes.unwrap_unchecked().2} {
-            log::error!("Trying to read sector outside of disk ! {lba}-{}", lba+sector_count as u64);
+        if lba + sector_count as u64 >= unsafe { self.addressing_modes.unwrap_unchecked().2 } {
+            log::error!(
+                "Trying to read sector outside of disk ! {lba}-{}",
+                lba + sector_count as u64
+            );
             return Err(DiskError::SectorTooBig);
         }
         self.write_reg(Reg::DriveHead, self.loc.drive_lba48_addr());
@@ -389,7 +400,8 @@ impl AtaDisk {
     }
 
     pub fn write48(&self, start_sector: u64, content: &[u8]) -> Result<(), DiskError> {
-        todo!()}
+        todo!()
+    }
     //     let mut sector_count = content.len().div_ceil(512);
     //     debug!("{} {:?}", start_sector, content);
     //     self.write_reg(Reg::DriveHead, self.loc.drive_lba48_addr());
@@ -493,9 +505,7 @@ impl AtaDisk {
         let status = self.read_reg(Reg::Status);
 
         if status & 0x01 != 0 {
-            log::error!("IDE error: {:#x}", unsafe {
-                self.error()
-            });
+            log::error!("IDE error: {:#x}", unsafe { self.error() });
             return Err(DiskError::DRQRead);
         }
 

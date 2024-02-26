@@ -14,12 +14,15 @@ pub mod allocator;
 pub mod frame_allocator;
 pub mod handler;
 
+pub use handler::init;
+
 use crate::mem_handler;
 
 use self::handler::MemoryHandler;
 
 /// https://github.com/rust-lang/rust/issues/51540
 #[alloc_error_handler]
+#[track_caller]
 pub fn alloc_error(layout: core::alloc::Layout) -> ! {
     panic!(
         "Allocation error !\nTried to allocate {} bytes with an alignment: {}",

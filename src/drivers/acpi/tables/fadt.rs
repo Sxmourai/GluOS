@@ -59,7 +59,7 @@ pub struct FADT {
     pub x_gpe1_block: GenericAddressStructure,
 }
 impl FADT {
-    pub fn new(bytes: &'static [u8]) -> &'static Self {
+    pub async fn new(bytes: &'static [u8]) -> &'static Self {
         let _self = unsafe { &*(bytes.as_ptr() as *const Self) };
         let boot_architecture_flags = _self.boot_architecture_flags;
         if _self.smi_command_port == 0
@@ -68,7 +68,7 @@ impl FADT {
             && _self.pm1a_control_block & 0x1 == 1
         {
             log::info!("ACPI is already enabled")
-        } else if _self.enable_acpi().is_err() {
+        } else if _self.enable_acpi().await.is_err() {
             log::error!("Error whilst enabling ACPI mode !")
         }
         _self
@@ -76,12 +76,12 @@ impl FADT {
     pub fn get_dsdt(&self) -> &'static super::dsdt::DSDT {
         unsafe { &*(self.dsdt as *const super::dsdt::DSDT) }
     }
-    fn enable_acpi(&self) -> Result<(), AcpiEnablingError> {
+    async fn enable_acpi(&self) -> Result<(), AcpiEnablingError> {
         unsafe {
             PortWrite::write_to_port(self.smi_command_port.try_into().unwrap(), self.acpi_enable)
         };
         //TODO Do smth whilst waiting
-        crate::time::sdelay(1);
+        crate::time::sdelay(1).await;
         // Polling port
         while unsafe {
             <u16 as PortRead>::read_from_port(self.pm1a_control_block.try_into().unwrap())

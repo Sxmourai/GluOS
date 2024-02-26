@@ -31,11 +31,6 @@ pub struct FsDriverManager {
     pub drivers: HashMap<Partition, Box<dyn FsDriver>>,
     pub partitions: HashMap<DiskLoc, Vec<Partition>>,
 }
-impl Default for FsDriverManager {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 impl FsDriverManager {
     pub fn read(&self, path: &FilePath) -> Result<Entry, FsReadError> {
@@ -49,7 +44,7 @@ impl FsDriverManager {
     pub fn get_partition_from_id(&self, loc: &DiskLoc, part_id: u8) -> Option<&Partition> {
         self.partitions.get(loc)?.get(part_id as usize)
     }
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         let mut self_drivers = HashMap::new();
         let mut self_partitions = HashMap::new();
         // Collect into vec to drop lock, for instance disk locs are light
@@ -97,6 +92,6 @@ pub fn get_fs_driver(loc: &Partition) -> Option<&Box<dyn FsDriver>> {
 /// - NTFS
 /// - Fat32
 /// - Ext2/3/4
-pub fn init() {
-    unsafe { FS_DRIVER.replace(FsDriverManager::new()) };
+pub async fn init() {
+    unsafe { FS_DRIVER.replace(FsDriverManager::new().await) };
 }

@@ -9,7 +9,7 @@ pub mod drawer;
 pub mod frame_buffer;
 pub type Color = u8;
 /// Draws some shapes on screen, but isn't used because we have a text vga buffer, and this is used for pixels.
-pub fn init_graphics() {
+pub fn init() {
     let shapes: [(Box<dyn Shape>, Color); 3] = [
         (
             Box::new(Rect {

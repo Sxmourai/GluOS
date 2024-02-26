@@ -10,7 +10,7 @@ pub fn init() {
         if device.class.id() != 0x1 {continue}
         if device.subclass() == 0x1 {
             crate::trace!("Found IDE controller on bus {loc}");
-            for (i, disk) in ata::init().into_iter().enumerate() {
+            for (i, disk) in ata::init(device).into_iter().enumerate() {
                 disks.insert(DiskLoc::from_idx(i.try_into().unwrap()).unwrap(), disk);
             }
         } else if device.subclass() == 0x8 {

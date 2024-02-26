@@ -245,6 +245,7 @@ dependencies = [
  "linked_list_allocator",
  "log",
  "ntfs",
+ "pasts",
  "pc-keyboard",
  "pci-ids",
  "pic8259",
@@ -354,6 +355,12 @@ name = "once_cell"
 version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
+
+[[package]]
+name = "pasts"
+version = "0.14.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "efcd36303871fb977a47dabc9af736c75c492bb32a92fa26262b2741531e97ce"
 
 [[package]]
 name = "pc-keyboard"

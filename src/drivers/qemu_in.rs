@@ -3,7 +3,7 @@ use x86_64::{instructions::hlt, structures::port::PortRead};
 
 use crate::{
     dbg,
-    time::{async_sdelay, sdelay},
+    time::sdelay,
 };
 
 pub struct QemuIOReader {

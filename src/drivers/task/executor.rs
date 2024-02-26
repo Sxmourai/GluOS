@@ -53,6 +53,7 @@ impl Executor {
     }
     fn run_ready_tasks(&mut self) {
         while let Some(task_id) = self.task_queue.pop() {
+            dbg!(task_id);
             let task = match self.tasks.get_mut(&task_id) {
                 Some(task) => task,
                 None => continue, // task no longer exists

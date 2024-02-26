@@ -6,24 +6,25 @@ authors = ["Sxmourai"]
 autotests = true
 
 [dependencies]
-x86_64 = "0.14.10" # Usefull asm functions (inb outb, enable interrupts & all)
+x86_64 = "0.14.10" # Usefull asm functions, structs (inb outb, enable interrupts & all)
 bootloader = { version = "0.9.23", features = [
     "map_physical_memory",
 ] } #"map_physical_memory"
-# Some utils data types (std::collections, asyncs, hashmaps...)
-spin = "0.9.8" # We have our allocator, so we can use std::spin
-hashbrown = "0.14.3" # A hashmap/hashset & all implementation
-crossbeam-queue = { version = "0.3.10", default-features = false, features = [
-    "alloc",
-] }
-futures-util = { version = "0.3.4", default-features = false, features = [
-    "alloc",
-] }
+# Some utils data types (mutex's, pointers...)
+spin = "0.9.8"
+hashbrown = "0.14.3" # A hashmap/hashset/hashset implementation using Swisstable
 lazy_static = { version = "1.4.0", features = [
     "spin_no_std",
 ] } # Helps us with static mut's & all
-# Random numbers
-rand = { version = "0.8.5", features = ["small_rng"], default-features = false }
+
+# Async
+crossbeam-queue = { version = "0.3.10", default-features = false, features = [
+    "alloc",
+] } # Some useful atomic queues and arrays
+futures-util = { version = "0.3.4", default-features = false, features = [
+    "alloc",
+] } # Utils for asyncs, Stream, Futures, async...
+pasts = {version="0.14.3", default-features = false}
 
 
 # Usefull for parsing hardware infos
@@ -34,6 +35,9 @@ linked_list_allocator = "0.10.5"                                          # A li
 raw-cpuid = "11.0.1"                                                      # Gets some cpuid infos
 ntfs = { version = "0.4.0", default-features = false, optional = true }   # A filesystem implementation of ntfs
 binrw = { version = "0.11.2", default-features = false, optional = true } # Needed by ntfs
+
+# Random numbers
+rand = { version = "0.8.5", features = ["small_rng"], default-features = false }
 
 # Simple features
 log = { version = "0.4.20", default-features = false } # Logging facility (not that useful)
@@ -54,8 +58,10 @@ run-args = [
     "-serial",
     "stdio",
     # DISKFLAG for build script (see build/disk_create.py)
-"-drive", "file=build/fat32-gpt.img,format=raw",
-"-drive", "file=build/ntfs-gpt.img,format=raw",
+    "-drive",
+    "file=build/fat32-gpt.img,format=raw",
+    "-drive",
+    "file=build/ntfs-gpt.img,format=raw",
     # ENDDISKFLAG
     # "-drive",
     # "file=build/ext2-gpt.img,format=raw,if=none,id=nvm",
@@ -66,8 +72,12 @@ run-args = [
     # "-net","user",
     # "-net",
     # "dump,file=out.pcap",
-    "-netdev", "user,id=u1", "-device", "e1000,netdev=u1",
-    "-object", "filter-dump,id=f1,netdev=u1,file=dump.pcap",
+    "-netdev",
+    "user,id=u1",
+    "-device",
+    "e1000,netdev=u1",
+    "-object",
+    "filter-dump,id=f1,netdev=u1,file=dump.pcap",
     # "-netdev", "tap,id=mynet0,ifname=tap0,script=no,downscript=no", "-device", "e1000,netdev=mynet0",
     # If working on APIC and IPI/SMP: (sets amount of cores to 4)
     #TODO When APIC feature automatically set -smp 4

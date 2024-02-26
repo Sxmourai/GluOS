@@ -71,7 +71,7 @@ pub struct DescriptorTablesHandler {
     pub description_table: SystemDescriptionTable,
 }
 impl DescriptorTablesHandler {
-    pub fn new() -> Option<Self> {
+    pub async fn new() -> Option<Self> {
         let physical_memory_offset = unsafe { boot_info!() }.physical_memory_offset;
         let rsdp = rsdt::search_rsdp(physical_memory_offset);
         let sys_desc_ptr = if rsdp.revision == 0 {
@@ -99,7 +99,7 @@ impl DescriptorTablesHandler {
                 .as_str()
             {
                 "FACP" => {
-                    acpi = {Some(fadt::FADT::new(table_bytes))}
+                    acpi = {Some(fadt::FADT::new(table_bytes).await)}
                 }
                 "APIC" => madt = unsafe { madt::MADT::new(table_bytes) },
                 "HPET" => hpet = unsafe { hpet::handle_hpet(table_bytes) },
@@ -135,6 +135,19 @@ impl DescriptorTablesHandler {
         }
     }
 }
+// impl crate::Driver for DescriptorTablesHandler {
+//     fn name(&self) -> &'static str {
+//         "ACPI"
+//     }
+//     fn init(&mut self) -> crate::task::Task {
+//         Task::new(async {
+            
+//         })
+//     }
+//     fn required(&self) -> &str {
+//         "memory"
+//     }
+// }
 
 fn read_sdt(ptr: u64, end_page: u64) -> (&'static ACPISDTHeader, &'static [u8]) {
     let bytes = unsafe { read_phys_memory_and_map(ptr, ACPI_HEAD_SIZE, end_page) };
