@@ -59,9 +59,11 @@ pub enum DriverId {
     Filesystem,
     Random,
     APIC,
+    Userland,
 }
 impl DriverId {
-    #[must_use] pub fn name(&self) -> &'static str {
+    #[must_use]
+    pub fn name(&self) -> &'static str {
         match self {
             Self::Logger => "Logger",
             Self::Heap => "Heap",
@@ -77,6 +79,7 @@ impl DriverId {
             Self::Filesystem => "Filesystem",
             Self::Random => "Random",
             Self::APIC => "APIC",
+            Self::Userland => "Userland, ring 3",
         }
     }
 }
@@ -87,13 +90,15 @@ pub struct Driver {
     pub requires: Vec<DriverId>,
 }
 impl Driver {
-    #[must_use] pub fn name(&self) -> &'static str {
+    #[must_use]
+    pub fn name(&self) -> &'static str {
         self.name.name()
     }
 }
 ////////// TODO Remove the need to increment the len manually
 ////////// The best would be a vec/slice, but no vec because we don't have heap allocation and no slice because we can't use static because impl Future isn't sized !
-#[must_use] pub fn get_drivers() -> Vec<Driver> {
+#[must_use]
+pub fn get_drivers() -> Vec<Driver> {
     alloc::vec![
         // By default require logger, overwrite that.
         make_driver!(Logger, async { crate::user::log::init() }, requires = []),
@@ -121,10 +126,10 @@ impl Driver {
             requires = [Logger, Disk]
         ),
         #[cfg(feature = "apic")]
-        make_driver!(APIC, async{super::interrupts::apic::init()}),
+        make_driver!(APIC, async { super::interrupts::apic::init() }),
         // #[cfg(feature = "smp")]
         // ("multiprocessing (SMP)", super::smp::init),
-        // ("Userland (Ring 3)", super::userland::go_ring3),
+        make_driver!(Userland, async { super::userland::go_ring3() }),
         // make_driver!(Random, async{super::rand::init()}),
         // ("Network", super::network::init),
         // Don't need to init mouse driver cuz we don't have a use for it currently

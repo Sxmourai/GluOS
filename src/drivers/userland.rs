@@ -6,6 +6,7 @@ extern "C" fn test_user() {
 }
 
 pub fn go_ring3() {
+    crate::gdt::GDT.0;
     // GDT setup, Barebone TSS and stack start is already done
     //TODO Set up IDT for syscalls
     //TODO IRQ handling

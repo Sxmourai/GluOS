@@ -198,6 +198,7 @@ pub fn init() {
     interrupts::without_interrupts(|| {
         get().init();
     });
+    super::multiprocessor::init_other_units();
     // let io_apics = descriptor_tables!()
     //     .madt
     //     .fields
@@ -262,10 +263,13 @@ impl IOApic {
         IoIrq(irq_lo as u64 | (irq_hi as u64) << 32)
     }
     pub fn write_irq(&mut self, irq_number: u8, irq: IoIrq) {
-        self.write(IoOffset::RegisterLo(irq_number), (irq.0 & u32::MAX as u64) as u32);
+        self.write(
+            IoOffset::RegisterLo(irq_number),
+            (irq.0 & u32::MAX as u64) as u32,
+        );
         self.write(
             IoOffset::RegisterHi(irq_number),
-            ((irq.0 & ((u32::MAX as u64)<<32)) >> 32) as u32,
+            ((irq.0 & ((u32::MAX as u64) << 32)) >> 32) as u32,
         );
     }
     pub fn select(&self, offset: IoOffset) {

@@ -118,7 +118,6 @@ pub extern "x86-interrupt" fn page_fault_handler(
     error_code: PageFaultErrorCode,
 ) {
     use x86_64::registers::control::Cr2;
-    let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
     error!(
         "EXCEPTION: PAGE FAULT
         Accessed Address: {:?}
@@ -128,7 +127,35 @@ pub extern "x86-interrupt" fn page_fault_handler(
         error_code,
         stack_frame
     );
-    map(Page::containing_address(Cr2::read()), flags);
+    let page = Page::containing_address(Cr2::read());
+    if error_code.contains(PageFaultErrorCode::PROTECTION_VIOLATION) {
+        // Frame is already mapped, we have to change the flags
+        let flags = if error_code.contains(PageFaultErrorCode::INSTRUCTION_FETCH) {
+            // Was in NO_EXECUTE
+            PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::USER_ACCESSIBLE
+        } else if error_code.contains(PageFaultErrorCode::CAUSED_BY_WRITE) {
+            PageTableFlags::PRESENT | PageTableFlags::WRITABLE
+        } else {
+            log::error!(
+                "We should change the flags !, consider making an issue to support this page fault"
+            );
+            PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::USER_ACCESSIBLE
+        };
+        log::debug!("Changing flags to {:?}", flags);
+        unsafe {
+            x86_64::structures::paging::Mapper::update_flags(
+                &mut mem_handler!().mapper,
+                page,
+                flags,
+            )
+        }
+        .unwrap();
+    } else {
+        // Don't know what to do, so try to allocate a frame...
+        log::debug!("Allocating a frame !");
+        let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
+        map(page, flags);
+    }
 }
 
 // pub fn map_phys_memory(location: u64, size: usize, end_page:u64) -> &'static [u8] {

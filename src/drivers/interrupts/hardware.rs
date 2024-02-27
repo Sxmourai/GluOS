@@ -52,7 +52,6 @@ pub const INTERRUPTS: &[(
     &[
         crate::interrupt_handler!(InterruptIndex::Timer, |_stack_frame| {
             crate::drivers::time::pit::irq();
-            serial_print!(".");
         }),
         crate::interrupt_handler!(InterruptIndex::Keyboard, |_stack_frame| {
             #[allow(const_item_mutation)]
