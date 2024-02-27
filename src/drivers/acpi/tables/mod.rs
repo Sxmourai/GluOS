@@ -24,7 +24,7 @@ pub enum AcpiVersion {
     Two,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 #[repr(C, packed)]
 pub struct ACPISDTHeader {
     signature: [u8; 4],
@@ -37,6 +37,26 @@ pub struct ACPISDTHeader {
     creator_id: u32,
     creator_revision: u32,
 }
+impl core::fmt::Debug for ACPISDTHeader {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let length = self.length;
+        let oem_revision = self.oem_revision;
+        let creator_id = self.creator_id;
+        let creator_revision = self.creator_revision;
+        f.debug_struct("ACPISDTHeader")
+            .field("signature", &self.signature.map(|c| c as char))
+            .field("length", &length)
+            .field("revision", &self.revision)
+            .field("checksum", &self.checksum)
+            .field("oemid", &self.oemid.map(|c| c as char))
+            .field("oem_table_id", &self.oem_table_id.map(|c| c as char))
+            .field("oem_revision", &oem_revision)
+            .field("creator_id", &creator_id)
+            .field("creator_revision", &creator_revision)
+            .finish()
+    }
+}
+
 pub enum SystemDescriptionPtr {
     Root(&'static RSDPDescriptor),
     Extended(&'static XSDPDescriptor),

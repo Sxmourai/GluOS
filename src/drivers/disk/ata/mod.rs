@@ -15,7 +15,7 @@ use crate::bit_manipulation::{bytes, ptrlist_to_num, u16_to_u8};
 use crate::fs::partition::Partition;
 #[cfg(feature = "fs")]
 use crate::fs::path::FilePath;
-use crate::pci::PciDevice;
+use crate::pci::{PciDevice, PciMemoryBase};
 use crate::x86_64::instructions::port::{PortRead, PortWrite};
 use crate::{dbg, disk_manager};
 

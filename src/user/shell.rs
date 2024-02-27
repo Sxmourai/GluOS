@@ -25,21 +25,20 @@ fn lsdisk(_args: String) -> Result<(), String> {
     #[cfg(feature = "fs")]
     for (loc, disk) in disk_manager!().disks.iter() {
         println!("- {:?} {:?}", disk.loc, disk.drv);
-        if let Some(partitions) = drvs.partitions.get(loc) {
-            // If the partition start is 1 we know it's MBR because on GPT the first 33 sectors are reserved !
-            let start_lba = partitions.first().map(|x| x.1).unwrap_or(0);
-            if start_lba == 1 {
-                println!("--MBR--");
-            }
-            for part in partitions {
-                print!("|-> {}Kb ({} - {})", (part.2 - part.1) / 2, part.1, part.2);
-                if let Some(drv) = drvs.drivers.get(part) {
-                    print!(" {}", drv.as_enum());
-                }
-                println!();
+        let partitions = drvs.partitions.get(loc).ok_or("Partition not found".to_string())?;
+        // If the partition start is 1 we know it's MBR because on GPT the first 33 sectors are reserved !
+        let start_lba = partitions.first().map(|x| x.1).unwrap_or(0);
+        if start_lba == 1 {
+            println!("--MBR--");
+        }
+        for part in partitions {
+            print!("|-> {}Kb ({} - {})", (part.2 - part.1) / 2, part.1, part.2);
+            if let Some(drv) = drvs.drivers.get(part) {
+                print!(" {}", drv.as_enum());
             }
             println!();
         }
+        println!();
     }
     Ok(())
 }
@@ -168,19 +167,16 @@ fn exec(raw_args: String) -> Result<(), String> {
         let path = parse_path(args.next().ok_or("Please specify path !".to_string())?)
             .ok_or("Not found !".to_string())?;
         let fs_driver = crate::fs_driver!();
-        if let Ok(entry) = fs_driver.read(&path) {
-            match entry {
-                Entry::File(mut f) => {
-                    if crate::fs::elf::execute(f.content).is_err() {
-                        return Err("Failed executing file".to_string());
-                    }
-                }
-                Entry::Dir(mut d) => {
-                    return Err("Entry is a dir !".to_string());
+        let entry = fs_driver.read(&path).or(Err("Error reading file ! Maybe specified path couldn't be found".to_string()))?;
+        match entry {
+            Entry::File(mut f) => {
+                if crate::fs::elf::execute(f.content).is_err() {
+                    return Err("Failed executing file".to_string());
                 }
             }
-        } else {
-            println!("Error reading file ! Maybe specified path couldn't be found")
+            Entry::Dir(mut d) => {
+                return Err("Entry is a dir !".to_string());
+            }
         }
     }
     Ok(())

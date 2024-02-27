@@ -17,7 +17,7 @@ pub fn irq() {
         // We can be sure that we are the only ones modifying this value, because it's only changed when a timer interrupt occurs
         controller.elapsed_ticks+=1;
         #[cfg(debug_assertions)]
-        if controller.elapsed_ticks / SELECTED_HZ as u128 == 1*60*60 {
+        if controller.elapsed_ticks / SELECTED_HZ as u128 == 60*60 {
             log::info!("Kernel has been running for 1 hour, wow");
         }
     }
@@ -25,9 +25,9 @@ pub fn irq() {
 
 /// Creates a new entry in ticks and returns it's id
 pub fn register_wait() -> Option<usize> {
-    unsafe{PIT_CONTROLLER.get_mut().and_then(|c| {
+    unsafe{PIT_CONTROLLER.get_mut().map(|c| {
         c.ticks.push(AtomicU32::new(0));
-        Some(c.ticks.len()-1)
+        c.ticks.len()-1
     })}
 }
 /// Gets the ticks from the id, if it exists
@@ -54,7 +54,7 @@ pub fn init() {
     mode.set_bcd_format(false);
     mode.set_channel(Channel::Channel0 as u8);
     mode.write();
-    PIT::write_reg(Regs::Channel0, divisor as u8 & 0xFF);
+    PIT::write_reg(Regs::Channel0, divisor as u8);
     PIT::write_reg(Regs::Channel0, ((divisor & 0xFF00) >> 8) as u8);
 
     let mut pit = PIT {
@@ -125,7 +125,7 @@ impl PIT {
     pub fn write_pit_count(&self, channel: Channel, value: u16) {
         without_interrupts(|| {
             let channel_reg = Regs::from_channel(channel);
-            Self::write_reg(channel_reg, value as u8 & 0xFF);
+            Self::write_reg(channel_reg, value as u8);
             Self::write_reg(channel_reg, ((value & 0xFF00) >> 8) as u8);
         })
     }
