@@ -26,6 +26,7 @@ This is a minimal, modular and lightweight kernel in rust
 - bootimage (`cargo install bootimage`)
 - LLD
 - run and code ^^ (`cargo run`)
+- Btw `cargo build` doesn't work but it's normal !
 
 ### Caution with WSL !
 If you have your compile on wsl but the code is on your local drive (so wsl path is: /mnt/c/.../GluOS) the compile times will be horrible (30s instead of ~2s)

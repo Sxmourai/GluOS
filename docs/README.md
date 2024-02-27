@@ -12,6 +12,9 @@ The boot order goes this way: (this might change A LOT)
 - Initialises drivers in src/drivers/mod.rs
 - Starts the executor and makes it run (for async & all)
 
+## Disclaimer
+Their is some design considerations that you should look into: [General](general.md)
+
 ### Drivers
 All paths are relative to "src/drivers"
 - [ACPI](acpi.md): Usefull for PS/2 & other stuff
