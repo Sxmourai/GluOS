@@ -58,6 +58,7 @@ pub enum DriverId {
     Disk,
     Filesystem,
     Random,
+    APIC,
 }
 impl DriverId {
     #[must_use] pub fn name(&self) -> &'static str {
@@ -75,6 +76,7 @@ impl DriverId {
             Self::Disk => "Disk",
             Self::Filesystem => "Filesystem",
             Self::Random => "Random",
+            Self::APIC => "APIC",
         }
     }
 }
@@ -118,8 +120,8 @@ impl Driver {
             crate::drivers::fs::init(),
             requires = [Logger, Disk]
         ),
-        // #[cfg(feature = "apic")]
-        // ("APIC", super::interrupts::apic::init),
+        #[cfg(feature = "apic")]
+        make_driver!(APIC, async{super::interrupts::apic::init()}),
         // #[cfg(feature = "smp")]
         // ("multiprocessing (SMP)", super::smp::init),
         // ("Userland (Ring 3)", super::userland::go_ring3),

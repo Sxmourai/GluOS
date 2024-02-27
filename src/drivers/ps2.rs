@@ -209,7 +209,9 @@ impl Ps2Controller {
     /// Sends a 2 bytes command to Ps2 controller
     pub fn send_command_next(fst_command: u8, next_byte: u8) {
         Self::send_command(fst_command);
-        Self::poll_bit(STATUS_OUTPUT_BUFFER).unwrap();
+        if let Err(e) = Self::poll_bit(STATUS_OUTPUT_BUFFER) {
+            log::error!("Error whilst polling status output buffer: {:?}", e);
+        }
         #[allow(const_item_mutation)]
         unsafe {
             DATA_PORT.write(next_byte);

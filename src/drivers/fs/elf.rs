@@ -42,7 +42,6 @@ pub fn execute(content: &[u8]) -> Result<(), ElfError> {
                 {
                     //TODO Loop to map if size > 4096 - Map all pages
                     if ph.size_img()>0x1000 {todo!()}
-                    dbg!(ph.virt_addr(), ph.phys_addr());
                     let page = Page::containing_address(VirtAddr::new(ph.virt_addr()));
                     let frame = PhysFrame::containing_address(PhysAddr::new(ph.phys_addr()));
                     crate::memory::handler::map_frame(
