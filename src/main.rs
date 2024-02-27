@@ -5,6 +5,9 @@
 #![feature(panic_info_message)]
 #![test_runner(kernel::test::runner)]
 #![reexport_test_harness_main = "test_main"]
+#![warn(clippy::all)]
+#![deny(clippy::perf)]
+#![deny(clippy::correctness)]
 
 use core::fmt::Write;
 

@@ -15,7 +15,7 @@ pub static mut DESCRIPTOR_TABLES: Option<DescriptorTablesHandler> = None;
 #[macro_export]
 macro_rules! boot_info {
     () => {
-        &mut $crate::state::BOOT_INFO.as_mut().unwrap()
+        $crate::state::BOOT_INFO.as_mut().unwrap()
     };
 }
 

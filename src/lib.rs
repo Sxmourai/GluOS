@@ -11,15 +11,21 @@
 #![cfg_attr(debug_assertions, allow(unused))]
 #![allow(dead_code)]
 #![deny(unsafe_op_in_unsafe_fn)]
-#![allow(clippy::borrow_interior_mutable_const)]
+// Clippy config
+// #![deny(clippy::all)]
+#![deny(clippy::correctness)]
+#![deny(clippy::suspicious)]
+#![deny(clippy::perf)]
+#![warn(clippy::pedantic)]
+#![warn(clippy::complexity)]
 
 pub mod bit_manipulation;
 pub mod boot;
 pub mod drivers;
 pub mod state;
+pub mod sync;
 pub mod test;
 pub mod user;
-pub mod sync;
 
 pub use drivers::*;
 pub use user::*;

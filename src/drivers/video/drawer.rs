@@ -8,26 +8,26 @@ pub struct Pos {
     pub y: u8,
 }
 impl Pos {
-    pub fn new(x: u16, y: u8) -> Self {
-        return Self { x, y }
+    #[must_use] pub fn new(x: u16, y: u8) -> Self {
+        Self { x, y }
     }
-    pub fn center() -> Self {
-        return Self::new(160, 100)
+    #[must_use] pub fn center() -> Self {
+        Self::new(160, 100)
     }
-    pub fn origin() -> Self {
-        return Self::new(0, 0)
+    #[must_use] pub fn origin() -> Self {
+        Self::new(0, 0)
     }
-    pub fn top_left() -> Self {
-        return Self::origin()
+    #[must_use] pub fn top_left() -> Self {
+        Self::origin()
     }
-    pub fn top_right() -> Self {
-        return Self::new(320, 0)
+    #[must_use] pub fn top_right() -> Self {
+        Self::new(320, 0)
     }
-    pub fn bottom_left() -> Self {
-        return Self::new(0, 200)
+    #[must_use] pub fn bottom_left() -> Self {
+        Self::new(0, 200)
     }
-    pub fn bottom_right() -> Self {
-        return Self::new(320, 200)
+    #[must_use] pub fn bottom_right() -> Self {
+        Self::new(320, 200)
     }
 }
 pub trait Shape {

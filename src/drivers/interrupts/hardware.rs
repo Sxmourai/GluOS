@@ -22,7 +22,7 @@ pub static PICS: Mutex<ChainedPics> =
 /// TODO Make a handler for all interrupts and setup a Vec for all interrupts, then we can bind at runtime some functions to be called when this interrupt occurs
 /// i.e. when a keyboard interrupt occurs, 3 functions are called, one for the kernel, one that will be passed to userland
 pub fn setup_hardware_interrupts(idt: &mut InterruptDescriptorTable) {
-    for (i, interrupt) in INTERRUPTS.iter() {
+    for (i, interrupt) in INTERRUPTS {
         idt[(*i as usize)].set_handler_fn(*interrupt);
     }
 }
@@ -51,7 +51,7 @@ pub const INTERRUPTS: &[(
 )] = {
     &[
         crate::interrupt_handler!(InterruptIndex::Timer, |_stack_frame| {
-            crate::drivers::time::pit::irq()
+            crate::drivers::time::pit::irq();
         }),
         crate::interrupt_handler!(InterruptIndex::Keyboard, |_stack_frame| {
             #[allow(const_item_mutation)]
@@ -64,10 +64,10 @@ pub const INTERRUPTS: &[(
             // Do nothing for now, but overriden in mouse.rs
         }),
         crate::interrupt_handler!(InterruptIndex::PrimaryAtaDisk, |_| {
-            crate::disk::ata::irq::primary_bus_irq()
+            crate::disk::ata::irq::primary_bus_irq();
         }),
         crate::interrupt_handler!(InterruptIndex::SecondaryAtaDisk, |_| {
-            crate::disk::ata::irq::secondary_bus_irq()
+            crate::disk::ata::irq::secondary_bus_irq();
         }),
     ]
 };
@@ -107,8 +107,8 @@ pub enum InterruptIndex {
     SecondaryAtaDisk = 15,
 }
 impl InterruptIndex {
-    pub fn from_num_pic(num: u8) -> Option<Self> {
-        return Some(match num {
+    #[must_use] pub fn from_num_pic(num: u8) -> Option<Self> {
+        Some(match num {
             0 => Self::Timer,
             1 => Self::Keyboard,
             3 => Self::COM2,

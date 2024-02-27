@@ -35,13 +35,13 @@ pub struct FsDriverManager {
 impl FsDriverManager {
     pub fn read(&self, path: &FilePath) -> Result<Entry, FsReadError> {
         if let Some(driver) = self.drivers.get(&path.partition) {
-            return driver.read(path)
+            driver.read(path)
         } else {
             dbg!(self.drivers);
-            return Err(FsReadError::EntryNotFound)
+            Err(FsReadError::EntryNotFound)
         }
     }
-    pub fn get_partition_from_id(&self, loc: &DiskLoc, part_id: u8) -> Option<&Partition> {
+    #[must_use] pub fn get_partition_from_id(&self, loc: &DiskLoc, part_id: u8) -> Option<&Partition> {
         return self.partitions.get(loc)?.get(part_id as usize)
     }
     pub async fn new() -> Self {
@@ -50,7 +50,7 @@ impl FsDriverManager {
         // Collect into vec to drop lock, for instance disk locs are light
         let locs = unsafe { &DISK_MANAGER.lock().as_mut().unwrap().disks }
             .iter()
-            .map(|d| return *d.0)
+            .map(|d| *d.0)
             .collect::<Vec<DiskLoc>>();
         for loc in locs {
             log::trace!("Fetching filesystem on disk {}", loc);
@@ -77,7 +77,7 @@ impl FsDriverManager {
             }
         }
 
-        return Self {
+        Self {
             drivers: self_drivers,
             partitions: self_partitions,
         }
@@ -85,7 +85,7 @@ impl FsDriverManager {
 }
 
 #[allow(clippy::borrowed_box)]
-pub fn get_fs_driver(loc: &Partition) -> Option<&Box<dyn FsDriver>> {
+#[must_use] pub fn get_fs_driver(loc: &Partition) -> Option<&Box<dyn FsDriver>> {
     return fs_driver!().drivers.get(loc)
 }
 

@@ -64,46 +64,46 @@ pub struct PciDevice {
     pub class: &'static pci_ids::Class,
 }
 impl PciDevice {
-    pub fn location(&self) -> PciLocation {
-        return self.raw.location
+    #[must_use] pub fn location(&self) -> PciLocation {
+        self.raw.location
     }
-    pub fn subclass(&self) -> u8 {
-        return self.raw.subclass
+    #[must_use] pub fn subclass(&self) -> u8 {
+        self.raw.subclass
     }
-    pub fn vendor_id(&self) -> u16 {
-        return self.raw.vendor_id
+    #[must_use] pub fn vendor_id(&self) -> u16 {
+        self.raw.vendor_id
     }
-    pub fn device_id(&self) -> u16 {
-        return self.raw.device_id
+    #[must_use] pub fn device_id(&self) -> u16 {
+        self.raw.device_id
     }
-    pub fn command(&self) -> u16 {
-        return self.raw.command
+    #[must_use] pub fn command(&self) -> u16 {
+        self.raw.command
     }
-    pub fn status(&self) -> u16 {
-        return self.raw.status
+    #[must_use] pub fn status(&self) -> u16 {
+        self.raw.status
     }
-    pub fn vendor(&self) -> &pci_ids::Vendor {
-        return self.identified.vendor()
+    #[must_use] pub fn vendor(&self) -> &pci_ids::Vendor {
+        self.identified.vendor()
     }
-    pub fn name(&self) -> &'static str {
-        return self.identified.name()
+    #[must_use] pub fn name(&self) -> &'static str {
+        self.identified.name()
     }
     pub fn subsystems(&self) -> impl Iterator<Item = &'static pci_ids::SubSystem> {
-        return self.identified.subsystems()
+        self.identified.subsystems()
     }
-    pub fn class(&self) -> &'static pci_ids::Class {
-        return self.class
+    #[must_use] pub fn class(&self) -> &'static pci_ids::Class {
+        self.class
     }
-    pub fn display_classes(&self) -> String {
+    #[must_use] pub fn display_classes(&self) -> String {
         let mut classes = alloc::format!("Class: {}", self.class().name());
         if let Some(subclass) = self
             .class()
             .subclasses()
-            .find(|sub| return sub.id() == self.raw.subclass)
+            .find(|sub| sub.id() == self.raw.subclass)
         {
             classes.push_str(alloc::format!(" - Subclass: {}", subclass.name()).as_str());
         }
-        return classes
+        classes
     }
 }
 impl core::fmt::Display for PciDevice {
@@ -127,7 +127,7 @@ pub fn init() {
         if let Some(device) =
             pci_ids::Device::from_vid_pid(pci_device.vendor_id, pci_device.device_id)
         {
-            let class = Classes::iter().find(|class| return pci_device.class == class.id());
+            let class = Classes::iter().find(|class| pci_device.class == class.id());
             if class.is_none() {
                 continue;
             }
@@ -207,7 +207,7 @@ fn get_pci_device_bsf(bus: u8, slot: u8, func: u8) -> Option<&'static RawPciDevi
             }
         }
     }
-    return None
+    None
 }
 
 /// A PCI bus, which contains a list of PCI devices on that bus.
@@ -290,7 +290,7 @@ fn scan_pci() -> Vec<PciBus> {
         }
     }
 
-    return buses
+    buses
 }
 
 /// The bus, slot, and function number of a given PCI device.
@@ -303,24 +303,24 @@ pub struct PciLocation {
 }
 
 impl PciLocation {
-    pub fn bus(&self) -> u8 {
-        return self.bus
+    #[must_use] pub fn bus(&self) -> u8 {
+        self.bus
     }
-    pub fn slot(&self) -> u8 {
-        return self.slot
+    #[must_use] pub fn slot(&self) -> u8 {
+        self.slot
     }
-    pub fn function(&self) -> u8 {
-        return self.func
+    #[must_use] pub fn function(&self) -> u8 {
+        self.func
     }
 
     /// Computes a PCI address from bus, slot, func, and offset.
     /// The least two significant bits of offset are masked, so it's 4-byte aligned addressing,
     /// which makes sense since we read PCI data (from the configuration space) in 32-bit chunks.
     fn pci_address(self, offset: u8) -> u32 {
-        return ((self.bus as u32) << 16)
-            | ((self.slot as u32) << 11)
-            | ((self.func as u32) << 8)
-            | ((offset as u32) & (PCI_CONFIG_ADDRESS_OFFSET_MASK as u32))
+        (u32::from(self.bus) << 16)
+            | (u32::from(self.slot) << 11)
+            | (u32::from(self.func) << 8)
+            | (u32::from(offset) & u32::from(PCI_CONFIG_ADDRESS_OFFSET_MASK))
             | 0x8000_0000
     }
 
@@ -329,19 +329,19 @@ impl PciLocation {
         unsafe {
             PCI_CONFIG_ADDRESS_PORT
                 .lock()
-                .write(self.pci_address(offset))
+                .write(self.pci_address(offset));
         };
-        return Self::read_data_port() >> ((offset & (!PCI_CONFIG_ADDRESS_OFFSET_MASK)) * 8)
+        Self::read_data_port() >> ((offset & (!PCI_CONFIG_ADDRESS_OFFSET_MASK)) * 8)
     }
 
     /// Read 16-bit data at the specified `offset` from this PCI device.
-    pub fn pci_read_16(&self, offset: u8) -> u16 {
-        return self.pci_read_32(offset) as u16
+    #[must_use] pub fn pci_read_16(&self, offset: u8) -> u16 {
+        self.pci_read_32(offset) as u16
     }
 
     /// Read 8-bit data at the specified `offset` from the PCI device.
-    pub fn pci_read_8(&self, offset: u8) -> u8 {
-        return self.pci_read_32(offset) as u8
+    #[must_use] pub fn pci_read_8(&self, offset: u8) -> u8 {
+        self.pci_read_32(offset) as u8
     }
 
     /// Write 32-bit data to the specified `offset` for the PCI device.
@@ -369,7 +369,7 @@ impl PciLocation {
         unsafe {
             PCI_CONFIG_ADDRESS_PORT
                 .lock()
-                .write(self.pci_address(PCI_COMMAND))
+                .write(self.pci_address(PCI_COMMAND));
         };
         let inval = Self::read_data_port();
         serial_println!(
@@ -390,7 +390,7 @@ impl PciLocation {
         unsafe {
             PCI_CONFIG_ADDRESS_PORT
                 .lock()
-                .write(self.pci_address(PCI_COMMAND))
+                .write(self.pci_address(PCI_COMMAND));
         };
         let command = Self::read_data_port();
         serial_println!(
@@ -446,19 +446,19 @@ impl PciLocation {
                 cap_addr = ((cap_header >> 8) & 0xFF) as u8;
             }
         }
-        return None
+        None
     }
 }
 
 impl fmt::Display for PciLocation {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        return write!(f, "b{}.s{}.f{}", self.bus, self.slot, self.func)
+        write!(f, "b{}.s{}.f{}", self.bus, self.slot, self.func)
     }
 }
 
 impl fmt::Debug for PciLocation {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        return write!(f, "{self}")
+        write!(f, "{self}")
     }
 }
 
@@ -512,7 +512,7 @@ impl RawPciDevice {
         };
         if bar.get_bit(0) {
             let base = bar.get_bits(2..);
-            return Ok(PciMemoryBase::IOSpace(base))
+            Ok(PciMemoryBase::IOSpace(base))
         } else {
             // Check bits [2:1] of the bar to determine address length (64-bit or 32-bit)
             let base = if bar.get_bits(1..=2) == BAR_ADDRESS_IS_64_BIT {
@@ -535,7 +535,7 @@ impl RawPciDevice {
             }
             .try_into()
             .unwrap();
-            return Ok(PciMemoryBase::MemorySpace(PhysAddr::new(base)))
+            Ok(PciMemoryBase::MemorySpace(PhysAddr::new(base)))
         }
     }
 
@@ -546,7 +546,7 @@ impl RawPciDevice {
     /// * `bar_index` must be between `0` and `5` inclusively, as each PCI device
     /// can only have 6 BARs at the most.
     ///
-    pub fn determine_mem_size(&self, bar_index: usize) -> u32 {
+    #[must_use] pub fn determine_mem_size(&self, bar_index: usize) -> u32 {
         assert!(bar_index < 6);
         // Here's what we do:
         // (1) Write all `1`s to the specified BAR
@@ -564,7 +564,7 @@ impl RawPciDevice {
         mem_size = !(mem_size); // Step 4
         mem_size += 1; // Step 4
         self.pci_write(bar_offset, original_value); // Step 5
-        return mem_size
+        mem_size
     }
 
     /// Enable MSI interrupts for a PCI device.
@@ -588,7 +588,7 @@ impl RawPciDevice {
         const MEMORY_REGION: u32 = 0x0FEE << 20;
         // the core id tells which cpu the interrupt will be routed to
         // it should be written to bit 12 of the message address register
-        let core = (core_id as u32) << 12;
+        let core = u32::from(core_id) << 12;
         // set the core the MSI will be sent to in the Message Address Register (Intel Arch SDM, vol3, 10.11)
         self.pci_write(
             cap_addr + MESSAGE_ADDRESS_REGISTER_OFFSET,
@@ -598,20 +598,20 @@ impl RawPciDevice {
         // offset in the capability space where the message data register is located
         const MESSAGE_DATA_REGISTER_OFFSET: u8 = 12;
         // Set the interrupt number for the MSI in the Message Data Register
-        self.pci_write(cap_addr + MESSAGE_DATA_REGISTER_OFFSET, int_num as u32);
+        self.pci_write(cap_addr + MESSAGE_DATA_REGISTER_OFFSET, u32::from(int_num));
 
         // offset in the capability space where the message control register is located
         const MESSAGE_CONTROL_REGISTER_OFFSET: u8 = 2;
         // to enable the MSI capability, we need to set it bit 0 of the message control register
         const MSI_ENABLE: u32 = 1;
-        let ctrl = self.pci_read_16(cap_addr + MESSAGE_CONTROL_REGISTER_OFFSET) as u32;
+        let ctrl = u32::from(self.pci_read_16(cap_addr + MESSAGE_CONTROL_REGISTER_OFFSET));
         // enable MSI in the Message Control Register
         self.pci_write(
             cap_addr + MESSAGE_CONTROL_REGISTER_OFFSET,
             ctrl | MSI_ENABLE,
         );
 
-        return Ok(())
+        Ok(())
     }
 
     /// Enable MSI-X interrupts for a PCI device.
@@ -625,7 +625,7 @@ impl RawPciDevice {
 
         // offset in the capability space where the message control register is located
         const MESSAGE_CONTROL_REGISTER_OFFSET: u8 = 2;
-        let ctrl = self.pci_read_16(cap_addr + MESSAGE_CONTROL_REGISTER_OFFSET) as u32;
+        let ctrl = u32::from(self.pci_read_16(cap_addr + MESSAGE_CONTROL_REGISTER_OFFSET));
 
         // write to bit 15 of Message Control Register to enable MSI-X
         const MSIX_ENABLE: u32 = 1 << 15;
@@ -637,7 +637,7 @@ impl RawPciDevice {
         // let ctrl = pci_read_32(dev.bus, dev.slot, dev.func, cap_addr);
         // debug!("MSIX HEADER AFTER ENABLE: {:#X}", ctrl);
 
-        return Ok(())
+        Ok(())
     }
 
     /// Returns the memory mapped msix vector table
@@ -696,7 +696,7 @@ impl RawPciDevice {
             _ => return Err("pci_get_interrupt_info: Invalid Register Value for Interrupt Pin"),
         };
 
-        return Ok((int_line, int_pin))
+        Ok((int_line, int_pin))
     }
 }
 
@@ -706,10 +706,10 @@ pub enum PciMemoryBase {
     IOSpace(u32),
 }
 impl PciMemoryBase {
-    pub fn as_u64(&self) -> u64 {
+    #[must_use] pub fn as_u64(&self) -> u64 {
         match self {
-            PciMemoryBase::MemorySpace(m) => return m.as_u64(),
-            PciMemoryBase::IOSpace(io) => return *io as u64,
+            PciMemoryBase::MemorySpace(m) => m.as_u64(),
+            PciMemoryBase::IOSpace(io) => u64::from(*io),
         }
     }
 }
@@ -717,12 +717,12 @@ impl PciMemoryBase {
 impl Deref for RawPciDevice {
     type Target = PciLocation;
     fn deref(&self) -> &PciLocation {
-        return &self.location
+        &self.location
     }
 }
 impl DerefMut for RawPciDevice {
     fn deref_mut(&mut self) -> &mut PciLocation {
-        return &mut self.location
+        &mut self.location
     }
 }
 
@@ -815,7 +815,7 @@ pub struct Device {
 }
 
 impl Device {
-    pub fn at_bus(bus: u8) -> Vec<Self> {
+    #[must_use] pub fn at_bus(bus: u8) -> Vec<Self> {
         let mut devices: Vec<Self> = Vec::new();
         for slot in 0..MAX_SLOTS_PER_BUS {
             let loc_zero = PciLocation { bus, slot, func: 0 };
@@ -877,24 +877,24 @@ impl Device {
                 devices.push(device);
             }
         }
-        return devices
+        devices
     }
-    pub fn product_name(&self) -> &str {
-        return self.device.name()
+    #[must_use] pub fn product_name(&self) -> &str {
+        self.device.name()
     }
-    pub fn product_id(&self) -> u16 {
-        return self.device.id()
+    #[must_use] pub fn product_id(&self) -> u16 {
+        self.device.id()
     }
-    pub fn vendor_name(&self) -> &str {
-        return self.device.vendor().name()
+    #[must_use] pub fn vendor_name(&self) -> &str {
+        self.device.vendor().name()
     }
-    pub fn vendor_id(&self) -> u16 {
-        return self.device.vendor().id()
+    #[must_use] pub fn vendor_id(&self) -> u16 {
+        self.device.vendor().id()
     }
-    pub fn class_id(&self) -> u8 {
-        return self.class.id()
+    #[must_use] pub fn class_id(&self) -> u8 {
+        self.class.id()
     }
-    pub fn class_name(&self) -> &str {
-        return self.class.name()
+    #[must_use] pub fn class_name(&self) -> &str {
+        self.class.name()
     }
 }

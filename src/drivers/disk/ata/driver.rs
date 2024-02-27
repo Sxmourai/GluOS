@@ -1,4 +1,4 @@
-use super::*;
+use super::{AtaDisk, DiskDriver, DiskError, DiskLoc, SELECTED_DISK, Vec};
 
 #[derive(Debug)]
 pub struct AtaDriver {
@@ -6,8 +6,8 @@ pub struct AtaDriver {
     disks: [Option<AtaDisk>; 4],
 }
 impl AtaDriver {
-    pub fn new(disks: [Option<AtaDisk>; 4]) -> Self {
-        return Self {
+    #[must_use] pub fn new(disks: [Option<AtaDisk>; 4]) -> Self {
+        Self {
             selected_disk: 0,
             disks,
         }
@@ -21,7 +21,7 @@ impl super::DiskDriver for AtaDriver {
         sector_count: u64,
     ) -> Result<Vec<u8>, DiskError> {
         self.select_disk(loc);
-        return self.disks[loc.as_index()]
+        self.disks[loc.as_index()]
             .as_mut()
             .ok_or(DiskError::NotFound)?
             .read_sectors(start_sector, sector_count.try_into().unwrap())
@@ -38,11 +38,11 @@ impl super::DiskDriver for AtaDriver {
         let mut disk = &mut self.disks[loc.as_index()];
         disk.as_mut().unwrap().select();
         self.selected_disk = loc.as_index().try_into().unwrap();
-        SELECTED_DISK.store(self.selected_disk, core::sync::atomic::Ordering::Release)
+        SELECTED_DISK.store(self.selected_disk, core::sync::atomic::Ordering::Release);
     }
 }
 impl AtaDriver {
-    pub fn selected_disk(&self) -> DiskLoc {
-        return DiskLoc::from_idx(self.selected_disk).unwrap()
+    #[must_use] pub fn selected_disk(&self) -> DiskLoc {
+        DiskLoc::from_idx(self.selected_disk).unwrap()
     }
 }

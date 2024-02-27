@@ -23,11 +23,11 @@ fn lsdisk(_args: String) -> Result<(), String> {
     #[cfg(feature = "fs")]
     let drvs = crate::fs_driver!();
     #[cfg(feature = "fs")]
-    for (loc, disk) in disk_manager!().disks.iter() {
+    for (loc, disk) in &disk_manager!().disks {
         println!("- {:?} {:?}", disk.loc, disk.drv);
         let partitions = drvs.partitions.get(loc).ok_or("Partition not found".to_string())?;
         // If the partition start is 1 we know it's MBR because on GPT the first 33 sectors are reserved !
-        let start_lba = partitions.first().map(|x| return x.1).unwrap_or(0);
+        let start_lba = partitions.first().map_or(0, |x| x.1);
         if start_lba == 1 {
             println!("--MBR--");
         }
@@ -40,7 +40,7 @@ fn lsdisk(_args: String) -> Result<(), String> {
         }
         println!();
     }
-    return Ok(())
+    Ok(())
 }
 
 #[command("read_raw", "Reads a raw sector from disk")]
@@ -74,17 +74,17 @@ fn read_sector(raw_args: String) -> Result<(), String> {
         .ok_or("Invalid argument: missing end address (u64)")?;
     let start = start
         .parse()
-        .map_err(|e| format!("Failed to parse start: {}", e))?;
+        .map_err(|e| format!("Failed to parse start: {e}"))?;
     let end = end
         .parse()
-        .map_err(|e| format!("Failed to parse end: {}", e))?;
+        .map_err(|e| format!("Failed to parse end: {e}"))?;
 
     let sectors = read_from_disk(&DiskLoc(channel, drive), start, end)
         .or(Err("The sector migth be too big !".to_string()))?;
     let sectors = if raw_args.contains("num") {
         let mut nums = String::new();
         for n in sectors {
-            nums.push_str(&format!("{}, ", n));
+            nums.push_str(&format!("{n}, "));
         }
         nums
     } else {
@@ -98,7 +98,7 @@ fn read_sector(raw_args: String) -> Result<(), String> {
     } else {
         println!("{}", sectors);
     }
-    return Ok(())
+    Ok(())
 }
 
 #[command("write_sector", "Writes a raw sector to disk")]
@@ -130,19 +130,19 @@ fn write_sector(raw_args: String) -> Result<(), String> {
     let content: Vec<&str> = args.collect();
     let start = start
         .parse()
-        .map_err(|e| format!("Failed to parse start: {}", e))?;
+        .map_err(|e| format!("Failed to parse start: {e}"))?;
     let mut bytes = Vec::new();
-    for word in content.iter() {
+    for word in &content {
         for c in word.chars() {
             bytes.push(c as u8);
         }
     }
     write_to_disk(&DiskLoc(channel, drive), start, &bytes).unwrap();
     println!("Done");
-    return Ok(())
+    Ok(())
 }
 
-/// n = DriveLoc
+/// n = `DriveLoc`
 /// p = Partition id
 /// [n][p]/[path]
 #[cfg(feature = "fs")]
@@ -152,7 +152,7 @@ fn parse_path(path: &str) -> Option<crate::fs::path::FilePath> {
     let loc = DiskLoc::from_idx(loc_idx)?;
     let part_idx = chars.next()?.to_string().parse::<u8>().ok()?;
     let part = crate::fs::partition::Partition::from_idx(&loc, part_idx)?;
-    return Some(crate::fs::path::FilePath::new(
+    Some(crate::fs::path::FilePath::new(
         path[2..].to_string(),
         part.clone(),
     ))
@@ -179,7 +179,7 @@ fn exec(raw_args: String) -> Result<(), String> {
             }
         }
     }
-    return Ok(())
+    Ok(())
 }
 
 #[command("panic", "Creates a kernel panic for testing")]
@@ -218,9 +218,9 @@ fn read(raw_args: String) -> Result<(), String> {
             }
         }
     } else {
-        println!("Error reading file ! Maybe specified path couldn't be found")
+        println!("Error reading file ! Maybe specified path couldn't be found");
     }
-    return Ok(())
+    Ok(())
 }
 
 // #[command("write", "Writes a file to disk")]
@@ -287,7 +287,7 @@ fn dump_disk(args: String) -> Result<(), String> {
             break;
         }
         let sectors = sectors.unwrap();
-        if sectors.iter().all(|x| return *x == 0) {
+        if sectors.iter().all(|x| *x == 0) {
             if i % 1000 == 0 {
                 serial_println!("-----------{}----------", i);
             }
@@ -298,7 +298,7 @@ fn dump_disk(args: String) -> Result<(), String> {
         i += 1;
     }
 
-    return Ok(())
+    Ok(())
 }
 
 // #[command("test_disk", "Reads multiple times some sectors to see if same content is returned")]
@@ -343,15 +343,15 @@ fn lspci(rargs: String) -> Result<(), String> {
         let mut args = rargs.split(' ');
         let bus = args
             .next()
-            .and_then(|s| return s.parse().ok())
+            .and_then(|s| s.parse().ok())
             .ok_or("Please specify bus location")?;
         let slot = args
             .next()
-            .and_then(|s| return s.parse().ok())
+            .and_then(|s| s.parse().ok())
             .ok_or("Please specify slot location")?;
         let func = args
             .next()
-            .and_then(|s| return s.parse().ok())
+            .and_then(|s| s.parse().ok())
             .ok_or("Please specify func location")?;
         let user_loc = PciLocation { bus, slot, func };
         let device = manager.get(&user_loc).ok_or("No device on this bus !")?;
@@ -361,13 +361,13 @@ fn lspci(rargs: String) -> Result<(), String> {
         println!("{:?}", device.raw.determine_mem_base(0));
         return Ok(());
     }
-    for (loc, device) in manager.iter() {
+    for (loc, device) in *manager {
         println!("{}", device);
         if rargs.contains("--class") {
             println!("{}", device.display_classes());
         }
     }
-    return Ok(())
+    Ok(())
 }
 
 #[command("sysinfo", "Gets info about computer")]
@@ -403,9 +403,9 @@ fn sysinfo(args: String) -> Result<(), String> {
             println!("- L{}-Cache size: {}", cache.level(), size);
         }
     } else {
-        println!("- No cache parameter information available")
+        println!("- No cache parameter information available");
     }
-    return Ok(())
+    Ok(())
 }
 
 pub struct CommandRunner {
@@ -414,8 +414,8 @@ pub struct CommandRunner {
     commands: HashMap<String, Command>,
 }
 impl CommandRunner {
-    pub fn new(prefix: &str, commands: HashMap<String, Command>) -> Self {
-        return Self {
+    #[must_use] pub fn new(prefix: &str, commands: HashMap<String, Command>) -> Self {
+        Self {
             previous: Vec::new(),
             prefix: String::from(prefix),
             commands,
@@ -430,7 +430,7 @@ impl CommandRunner {
                 description,
                 run: _,
             },
-        ) in self.commands.iter()
+        ) in &self.commands
         {
             println!("- {} -> {}", name, description);
         }
@@ -438,7 +438,7 @@ impl CommandRunner {
     pub fn run(mut self) {
         loop {
             let cmd = input(&self.prefix); // Binding for longer lived value
-            self.run_command(cmd)
+            self.run_command(cmd);
         }
     }
     pub fn run_command(&mut self, cmd: String) {
@@ -472,7 +472,7 @@ impl CommandRunner {
         }) = self.commands.get(program)
         {
             let args = args
-                .map(|s| return alloc::string::ToString::to_string(&s))
+                .map(|s| alloc::string::ToString::to_string(&s))
                 .collect::<Vec<String>>()
                 .join(" ");
             if let Err(error_message) = fun(args) {
@@ -480,7 +480,7 @@ impl CommandRunner {
             }
         } else {
             print!("\nUnsupported command, mispelled ? These are the ");
-            self.print_help()
+            self.print_help();
         }
         self.previous.push(cmd);
     }
@@ -497,11 +497,11 @@ pub struct Command {
 
 impl Shell {
     pub async fn run(self) {
-        self.inner.run()
+        self.inner.run();
     }
     pub async fn run_with_command(mut self, cmd: String) {
         self.inner.run_command(cmd);
-        self.inner.run()
+        self.inner.run();
     }
 }
 impl Default for Shell {
@@ -514,7 +514,7 @@ impl Default for Shell {
             }
             res
         };
-        return Self {
+        Self {
             inner: CommandRunner::new("> ", commands),
         }
     }

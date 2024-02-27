@@ -35,7 +35,7 @@ impl core::fmt::Debug for HPET {
 
 /// # Safety
 /// Must ensure bytes is proper HPET
-pub unsafe fn handle_hpet(bytes: &[u8]) -> Option<&'static HPET> {
-    let hpet = unsafe { &*(bytes.as_ptr() as *const HPET) };
-    return Some(hpet)
+#[must_use] pub unsafe fn handle_hpet(bytes: &[u8]) -> Option<&'static HPET> {
+    let hpet = unsafe { &*bytes.as_ptr().cast::<HPET>() };
+    Some(hpet)
 }

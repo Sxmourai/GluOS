@@ -9,13 +9,14 @@ pub struct QemuIOReader {
 
 impl Default for QemuIOReader {
     fn default() -> Self {
-        return Self::new()
+        Self::new()
     }
 }
 
 impl QemuIOReader {
+    #[must_use]
     pub fn new() -> Self {
-        return Self {
+        Self {
             inputted: String::new(),
         }
     }
@@ -27,7 +28,7 @@ impl QemuIOReader {
                 return;
             }
             if k != 0 {
-                dbg!(k)
+                dbg!(k);
             }
         }
     }

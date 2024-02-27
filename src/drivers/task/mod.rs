@@ -12,7 +12,7 @@ struct TaskId(u64);
 impl TaskId {
     fn new() -> Self {
         static NEXT_ID: AtomicU64 = AtomicU64::new(0);
-        return TaskId(NEXT_ID.fetch_add(1, Ordering::Relaxed))
+        TaskId(NEXT_ID.fetch_add(1, Ordering::Relaxed))
     }
 }
 
@@ -22,7 +22,7 @@ pub struct Task {
 }
 impl Task {
     pub fn new(future: impl Future<Output = ()> + 'static) -> Task {
-        return Task {
+        Task {
             id: TaskId::new(),
             future: Box::pin(future),
         }

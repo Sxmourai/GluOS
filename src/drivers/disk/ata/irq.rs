@@ -1,10 +1,10 @@
-use super::*;
+use super::{DiskLoc, SELECTED_DISK};
 
 pub fn primary_bus_irq() {
-    common()
+    common();
 }
 pub fn secondary_bus_irq() {
-    common()
+    common();
 }
 
 pub fn common() {

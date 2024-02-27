@@ -24,7 +24,7 @@ use crate::{
 use super::{driver::GenericDisk, DiskLoc};
 impl GenericDisk for NVMeDisk {
     fn loc(&self) -> &super::DiskLoc {
-        return &self.loc
+        &self.loc
     }
 }
 impl core::fmt::Display for NVMeDisk {
@@ -56,7 +56,7 @@ pub fn init(nvme_pci: &PciDevice) -> Result<Vec<&'static NVMeDisk>, NVMeControll
     nvme_pci
         .raw
         .location
-        .pci_write(crate::pci::PCI_COMMAND, command as u32);
+        .pci_write(crate::pci::PCI_COMMAND, u32::from(command));
     for i in 0..64 {
         mem_map!(
             frame_addr = bar0 + (0x1000 * i),
@@ -90,7 +90,7 @@ pub fn init(nvme_pci: &PciDevice) -> Result<Vec<&'static NVMeDisk>, NVMeControll
     let max_queue_slots = controller.controller_caps.mqes() + 1;
 
     if queue_slots > max_queue_slots {
-        queue_slots = max_queue_slots
+        queue_slots = max_queue_slots;
     }
 
     // Size of one queue, in bytes
@@ -252,7 +252,7 @@ pub fn init(nvme_pci: &PciDevice) -> Result<Vec<&'static NVMeDisk>, NVMeControll
     // // }
     let mut disks = Vec::new();
 
-    return Ok(disks)
+    Ok(disks)
 }
 fn bit_log2(n: u64) -> u64 {
     // if n == 0 {
@@ -267,7 +267,7 @@ fn bit_log2(n: u64) -> u64 {
         result += 1;
     }
 
-    return result
+    result
 }
 
 #[derive(Debug)]
@@ -445,7 +445,7 @@ bitfield::bitfield! {
 struct NVMeControllerSubsystemReset(u32);
 impl NVMeControllerSubsystemReset {
     pub fn reset(&mut self) {
-        self.0 = 0x4E564D65;
+        self.0 = 0x4E56_4D65;
     }
 }
 #[repr(C)]
@@ -499,9 +499,9 @@ impl NVMeRegisters {
     fn get_max_queue_entries(&self) -> u16 {
         let max = (self.controller_caps.0 & 0xffff) as u16;
         if max == 0 {
-            return u16::MAX
+            u16::MAX
         } else {
-            return max + 1
+            max + 1
         }
     }
     // fn set_command_set(&mut self, set: u8) {
@@ -523,9 +523,9 @@ impl NVMeRegisters {
     // }
 
     /// # Safety
-    /// Ensure that bar0 address is the proper base for the NVMe registers
+    /// Ensure that bar0 address is the proper base for the `NVMe` registers
     pub unsafe fn new(bar0: usize) -> &'static mut Self {
-        unsafe { return &mut *(bar0 as *mut Self) }
+        unsafe { &mut *(bar0 as *mut Self) }
     }
     ///This bit is set to '1' when the controller is ready to process submission
     ///queue entries after CC.EN is set to '1'. This bit shall be cleared to '0' when CC.EN is
@@ -542,7 +542,7 @@ impl NVMeRegisters {
     //     1 << (((self.controller_caps) >> 32) & 0xf)
     // }
     pub fn base(&self) -> usize {
-        return core::ptr::addr_of!(self.controller_caps) as usize
+        core::ptr::addr_of!(self.controller_caps) as usize
     }
     // pub fn submission_queue(&self) -> Vec<SubmissionEntry> {
     //     // Can we know the size of the vec ? If so with_capacity()
@@ -558,7 +558,7 @@ impl NVMeRegisters {
     //     }
     //     queue
     // }
-    ///((self.base() as u64+0x1000)+(2*0+1)*self.db_stride())
+    ///((`self.base()` as u64+0x1000)+(2*0+1)*`self.db_stride()`)
     pub fn add_submission_entry(&mut self, entry: SubmissionEntry) {
         unsafe { *(self.admin_submission_queue_base_addr as *mut SubmissionEntry) = entry }
     }
@@ -574,7 +574,7 @@ impl NVMeRegisters {
             }
             queue.push(v);
         }
-        return queue
+        queue
     }
     // CAP.DSTRD
     // pub fn capas_doorbell_stride(&self) -> u8 {
@@ -611,7 +611,7 @@ impl SubmissionEntry {
             IdentifyType::Controller => (0, 1),
             IdentifyType::NamespaceList => (0, 2),
         };
-        return Self {
+        Self {
             command: CommandDword0::new(0x6, 0, 0, 1),
             namespace_id,
             reserved: [0; 2],
@@ -659,12 +659,12 @@ impl CommandDword0 {
     /// 0 indicates normal operation
     /// This is 2 bits
     pub fn fused_operation(self) -> u8 {
-        return self.raw.get_bits(0..2)
+        self.raw.get_bits(0..2)
     }
     /// 0 indicates PRPs.
     /// This is 2 bits
     pub fn prp_or_sgl_selection(self) -> u8 {
-        return self.raw.get_bits(6..8)
+        self.raw.get_bits(6..8)
     }
 }
 
@@ -680,12 +680,12 @@ struct CompletionEntry {
 impl CompletionEntry {
     /// Toggled when entry written
     pub fn phase_bit(&self) -> bool {
-        return self._status.get_bit(0)
+        self._status.get_bit(0)
     }
     /// 0 on success
     /// 14bits
     pub fn status(&self) -> u16 {
-        return self._status.get_bits(1..)
+        self._status.get_bits(1..)
     }
 }
 
@@ -717,19 +717,19 @@ const NVME_CAP_NSSRS: u64 = (1 << 36); // NVM subsystem reset supported
 const NVME_CAP_CQR: u32 = (1 << 16); // Contiguous Queues Required
 
 const NVME_CAP_MPS_MASK: u8 = 0xf;
-const NVME_CAP_MPSMAX: fn(u64) -> u64 = |x| return ((x >> 52) & NVME_CAP_MPS_MASK as u64); // Max supported memory page size (2 ^ (12 + MPSMAX))
-const NVME_CAP_MPSMIN: fn(u64) -> u64 = |x| return ((x >> 48) & NVME_CAP_MPS_MASK as u64); // Min supported memory page size (2 ^ (12 + MPSMIN))
+const NVME_CAP_MPSMAX: fn(u64) -> u64 = |x| ((x >> 52) & u64::from(NVME_CAP_MPS_MASK)); // Max supported memory page size (2 ^ (12 + MPSMAX))
+const NVME_CAP_MPSMIN: fn(u64) -> u64 = |x| ((x >> 48) & u64::from(NVME_CAP_MPS_MASK)); // Min supported memory page size (2 ^ (12 + MPSMIN))
 
 const NVME_CAP_DSTRD_MASK: u64 = 0xf;
-const NVME_CAP_DSTRD: fn(u64) -> u64 = |x| return (((x) >> 32) & NVME_CAP_DSTRD_MASK); // Doorbell stride (2 ^ (2 + DSTRD)) bytes
+const NVME_CAP_DSTRD: fn(u64) -> u64 = |x| (((x) >> 32) & NVME_CAP_DSTRD_MASK); // Doorbell stride (2 ^ (2 + DSTRD)) bytes
 
 const NVME_CAP_MQES_MASK: u64 = 0xffff;
-const NVME_CAP_MQES: fn(u64) -> u64 = |x| return ((x) & NVME_CAP_MQES_MASK); // Maximum queue entries supported
+const NVME_CAP_MQES: fn(u64) -> u64 = |x| ((x) & NVME_CAP_MQES_MASK); // Maximum queue entries supported
 
 const NVME_CFG_MPS_MASK: u8 = 0xf;
-const NVME_CFG_MPS: fn(u32) -> u32 = |x| return (((x) & NVME_CFG_MPS_MASK as u32) << 7); // Host memory page size (2 ^ (12 + MPSMIN))
+const NVME_CFG_MPS: fn(u32) -> u32 = |x| (((x) & u32::from(NVME_CFG_MPS_MASK)) << 7); // Host memory page size (2 ^ (12 + MPSMIN))
 const NVME_CFG_CSS_MASK: u8 = 0b111; // Command set selected
-const NVME_CFG_CSS: fn(u8) -> u8 = |x| return (((x) & NVME_CFG_CSS_MASK) << 4);
+const NVME_CFG_CSS: fn(u8) -> u8 = |x| (((x) & NVME_CFG_CSS_MASK) << 4);
 const NVME_CFG_ENABLE: u32 = (1 << 0);
 const NVME_CONFIG_CMDSET_NVM: u8 = 0;
 const NVME_CFG_DEFAULT_IOCQES: u32 = (4 << 20); // 16 bytes so log2(16) = 4
@@ -740,8 +740,8 @@ const NVME_CSTS_READY: u8 = (1 << 0); // Set to 1 when the controller is ready t
 const NVME_CSTS_NSSRO: u8 = (1 << 4); // NVM Subsystem reset occurred
 
 const NVME_AQA_AQS_MASK: u64 = 0xfff; // Admin queue size mask
-const NVME_AQA_ACQS: fn(u64) -> u64 = |x| return (((x) & NVME_AQA_AQS_MASK) << 16); // Admin completion queue size
-const NVME_AQA_ASQS: fn(u64) -> u64 = |x| return ((x) & NVME_AQA_AQS_MASK); // Admin submission queue size
+const NVME_AQA_ACQS: fn(u64) -> u64 = |x| (((x) & NVME_AQA_AQS_MASK) << 16); // Admin completion queue size
+const NVME_AQA_ASQS: fn(u64) -> u64 = |x| ((x) & NVME_AQA_AQS_MASK); // Admin submission queue size
 
 // "NVME", initiates a reset
-const NVME_NSSR_RESET_VALUE: u64 = 0x4E564D65;
+const NVME_NSSR_RESET_VALUE: u64 = 0x4E56_4D65;

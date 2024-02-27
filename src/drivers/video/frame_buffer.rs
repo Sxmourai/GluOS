@@ -13,8 +13,8 @@ pub struct FrameBuffer {
     pub buffer: &'static mut VgaLinearBuffer,
 }
 impl FrameBuffer {
-    pub const fn new() -> Self {
-        return Self {
+    #[must_use] pub const fn new() -> Self {
+        Self {
             buffer: unsafe { &mut *(0xA0000 as *mut VgaLinearBuffer) },
         }
     }
@@ -28,7 +28,7 @@ pub type ScreenLock = RwLockWriteGuard<'static, FrameBuffer>;
 
 pub fn fill_rect(_x: usize, _y: usize, _w: usize, _h: usize, _color: Color) {}
 pub fn put_pixel(x: usize, y: usize, color: Color) {
-    put_pixel_lock(x, y, color, &mut SCREEN.write_with_timeout())
+    put_pixel_lock(x, y, color, &mut SCREEN.write_with_timeout());
 }
 pub fn put_pixel_lock(x: usize, y: usize, color: Color, screen: &mut ScreenLock) {
     unsafe { write_volatile(&mut screen.buffer.inner[y][x], color) }

@@ -29,7 +29,7 @@ unsafe fn jump_usermode_iret() {
         push {test_user_function}
         iretq
         ", test_user_function = sym test_user,
-        )
+        );
     }
 }
 

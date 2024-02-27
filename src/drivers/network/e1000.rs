@@ -145,7 +145,7 @@ pub struct E1000NetworkDriver {
     int_line: u8,
 }
 impl E1000NetworkDriver {
-    pub fn new(pci_device: &PciDevice) -> Self {
+    #[must_use] pub fn new(pci_device: &PciDevice) -> Self {
         let base = pci_device.raw.determine_mem_base(0).unwrap();
         // Enable bus mastering
         pci_device.raw.location.pci_read_16(crate::pci::PCI_COMMAND);
@@ -154,8 +154,8 @@ impl E1000NetworkDriver {
         pci_device
             .raw
             .location
-            .pci_write(crate::pci::PCI_COMMAND, command as u32);
-        return Self {
+            .pci_write(crate::pci::PCI_COMMAND, u32::from(command));
+        Self {
             base,
             eerprom_exists: false,
             int_line: pci_device.raw.int_line,
@@ -207,12 +207,12 @@ impl E1000NetworkDriver {
         self.rx_init();
         self.tx_init();
         self.send_packet(&[10; 4096]);
-        return Ok(())
+        Ok(())
     }
     pub fn fire(&self) {
         todo!()
     }
-    /// p_data.len() < u16::MAX
+    /// `p_data.len()` < `u16::MAX`
     pub fn send_packet(&mut self, p_data: &[u8]) -> Result<(), PacketSendError> {
         log::info!("Sending packet of {} bytes", p_data.len());
         self.tx_descs[self.tx_cur as usize].addr = p_data.as_ptr() as u64;
@@ -221,26 +221,26 @@ impl E1000NetworkDriver {
         self.tx_descs[self.tx_cur as usize].status = 0;
         let old_cur = self.tx_cur;
         self.tx_cur = (self.tx_cur + 1) % E1000_NUM_TX_DESC;
-        self.write_command(REG_TXDESCTAIL, self.tx_cur as u32);
+        self.write_command(REG_TXDESCTAIL, u32::from(self.tx_cur));
         for i in 0..100_000 {
             if (self.tx_descs[old_cur as usize].status != 0) {
                 return Ok(());
             }
         }
         log::error!("Timed out sending packet");
-        return Err(PacketSendError::StatusTimeOut)
+        Err(PacketSendError::StatusTimeOut)
     }
     /// Send Commands and read results From NICs either using MMIO or IO Ports
     fn write_command(&self, p_addr: u16, p_value: u32) {
         // dbg!("Writing register", p_addr, "to", p_value);
         match self.base {
             PciMemoryBase::MemorySpace(mem) => unsafe {
-                write_at::<u32>(mem.as_u64() as usize + p_addr as usize, p_value)
+                write_at::<u32>(mem.as_u64() as usize + p_addr as usize, p_value);
             },
             PciMemoryBase::IOSpace(io) => {
                 dbg!(io);
                 unsafe {
-                    PortWrite::write_to_port(io.try_into().unwrap(), p_addr as u32);
+                    PortWrite::write_to_port(io.try_into().unwrap(), u32::from(p_addr));
                     PortWrite::write_to_port(io as u16 + 4, p_value); // Can use as because it would crash up there when we do try_into
                 }
             }
@@ -250,19 +250,19 @@ impl E1000NetworkDriver {
         // dbg!("Read",r,"from", p_addr);
         match self.base {
             PciMemoryBase::MemorySpace(mem) => unsafe {
-                return read_at::<u32>(mem.as_u64() as usize + p_addr as usize)
+                read_at::<u32>(mem.as_u64() as usize + p_addr as usize)
             },
             PciMemoryBase::IOSpace(io) => {
                 let io = io.try_into().unwrap();
                 unsafe {
-                    PortWrite::write_to_port(io, p_addr as u32);
-                    return PortRead::read_from_port(io + 4)
+                    PortWrite::write_to_port(io, u32::from(p_addr));
+                    PortRead::read_from_port(io + 4)
                 }
             }
         }
     }
 
-    /// Return true if EEProm exist, else it returns false and set the eerprom_existsdata member
+    /// Return true if `EEProm` exist, else it returns false and set the `eerprom_existsdata` member
     fn detect_ee_prom(&self) -> bool {
         let mut val = 0;
         self.write_command(REG_EEPROM, 0x1);
@@ -272,13 +272,13 @@ impl E1000NetworkDriver {
                 return true;
             }
         }
-        return false
+        false
     }
-    /// Read 2 bytes from a specific EEProm Address
+    /// Read 2 bytes from a specific `EEProm` Address
     fn ee_prom_read(&self, addr: u8) -> u32 {
         let mut tmp = 0;
         if self.eerprom_exists {
-            self.write_command(REG_EEPROM, (1) | ((addr as u32) << 8));
+            self.write_command(REG_EEPROM, (1) | (u32::from(addr) << 8));
             for i in 0..1_000 {
                 let _tmp = self.read_command(REG_EEPROM);
                 if _tmp != tmp && _tmp.get_bit(4) {
@@ -287,7 +287,7 @@ impl E1000NetworkDriver {
                 }
             }
         } else {
-            self.write_command(REG_EEPROM, (1) | ((addr as u32) << 2));
+            self.write_command(REG_EEPROM, (1) | (u32::from(addr) << 2));
             loop {
                 tmp = self.read_command(REG_EEPROM);
                 if tmp & (1 << 1) != 0 {
@@ -295,7 +295,7 @@ impl E1000NetworkDriver {
                 }
             }
         }
-        return ((tmp >> 16) & 0xFFFF)
+        ((tmp >> 16) & 0xFFFF)
     }
     /// Read MAC Address and returns true if success
     fn read_mac_addr(&mut self) -> Result<(), E1000ReadMac> {
@@ -326,11 +326,11 @@ impl E1000NetworkDriver {
                 return Err(E1000ReadMac::NoMemoryBase);
             }
         }
-        return Ok(())
+        Ok(())
     }
     fn mem_base(&self) -> u64 {
         match self.base {
-            PciMemoryBase::MemorySpace(mem) => return mem.as_u64(),
+            PciMemoryBase::MemorySpace(mem) => mem.as_u64(),
             PciMemoryBase::IOSpace(io) => todo!(),
         }
     }
@@ -349,20 +349,19 @@ impl E1000NetworkDriver {
         }
         let ptr = addr_of!(self.rx_descs);
         self.write_command(REG_TXDESCLO, ((ptr as u64) >> 32) as u32);
-        self.write_command(REG_TXDESCHI, ((ptr as u64) & 0xFFFFFFFF) as u32);
+        self.write_command(REG_TXDESCHI, ((ptr as u64) & 0xFFFF_FFFF) as u32);
 
         self.write_command(REG_RXDESCLO, ptr as u32);
         self.write_command(REG_RXDESCHI, 0);
 
-        self.write_command(REG_RXDESCLEN, E1000_NUM_RX_DESC as u32 * 16);
+        self.write_command(REG_RXDESCLEN, u32::from(E1000_NUM_RX_DESC) * 16);
 
         self.write_command(REG_RXDESCHEAD, 0);
-        self.write_command(REG_RXDESCTAIL, E1000_NUM_RX_DESC as u32 - 1);
+        self.write_command(REG_RXDESCTAIL, u32::from(E1000_NUM_RX_DESC) - 1);
         self.rx_cur = 0;
         self.write_command(
             REG_RCTRL,
-            (RCTL_EN | RCTL_SBP | RCTL_UPE | RCTL_MPE | RCTL_LBM_NONE | RTCL_RDMTS_HALF | RCTL_BAM)
-                as u32
+            u32::from(RCTL_EN | RCTL_SBP | RCTL_UPE | RCTL_MPE | RCTL_LBM_NONE | RTCL_RDMTS_HALF | RCTL_BAM)
                 | RCTL_SECRC
                 | RCTL_BSIZE_8192,
         );
@@ -376,16 +375,16 @@ impl E1000NetworkDriver {
         }
         let ptr = addr_of!(self.tx_descs);
         self.write_command(REG_TXDESCHI, ((ptr as u64) >> 32) as u32);
-        self.write_command(REG_TXDESCLO, ((ptr as u64) & 0xFFFFFFFF) as u32);
+        self.write_command(REG_TXDESCLO, ((ptr as u64) & 0xFFFF_FFFF) as u32);
         //now setup total length of descriptors
-        self.write_command(REG_TXDESCLEN, E1000_NUM_TX_DESC as u32 * 16);
+        self.write_command(REG_TXDESCLEN, u32::from(E1000_NUM_TX_DESC) * 16);
         //setup numbers
         self.write_command(REG_TXDESCHEAD, 0);
         self.write_command(REG_TXDESCTAIL, 0);
         self.tx_cur = 0;
         self.write_command(
             REG_TCTRL,
-            (TCTL_EN | TCTL_PSP) as u32
+            u32::from(TCTL_EN | TCTL_PSP)
                 | (15 << TCTL_CT_SHIFT)
                 | (64 << TCTL_COLD_SHIFT)
                 | TCTL_RTLC,
@@ -393,8 +392,8 @@ impl E1000NetworkDriver {
         // This line of code overrides the one before it but I left both to highlight that the previous one works with e1000 cards, but for the e1000e cards
         // you should set the TCTRL register as follows. For detailed description of each bit, please refer to the Intel Manual.
         // In the case of I217 and 82577LM packets will not be sent if the TCTRL is not configured using the following bits.
-        self.write_command(REG_TCTRL, 0b0110000000000111111000011111010);
-        self.write_command(REG_TIPG, 0x0060200A);
+        self.write_command(REG_TCTRL, 0b011_0000_0000_0011_1111_0000_1111_1010);
+        self.write_command(REG_TIPG, 0x0060_200A);
     }
 
     fn enable_interrupts(&mut self) {
@@ -420,7 +419,7 @@ impl E1000NetworkDriver {
             self.rx_descs[self.rx_cur as usize].status = 0;
             old_cur = self.rx_cur;
             self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC;
-            self.write_command(REG_RXDESCTAIL, old_cur as u32);
+            self.write_command(REG_RXDESCTAIL, u32::from(old_cur));
         }
     }
 }

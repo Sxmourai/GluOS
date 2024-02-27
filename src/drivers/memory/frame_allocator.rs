@@ -7,7 +7,7 @@ use x86_64::{
 
 use crate::mem_handler;
 
-/// A FrameAllocator that returns usable frames from the bootloader's memory map.
+/// A `FrameAllocator` that returns usable frames from the bootloader's memory map.
 #[derive(Debug, Clone)]
 pub struct BootInfoFrameAllocator {
     memory_map: &'static MemoryMap,
@@ -15,14 +15,14 @@ pub struct BootInfoFrameAllocator {
 }
 
 impl BootInfoFrameAllocator {
-    /// Create a FrameAllocator from the passed memory map.
+    /// Create a `FrameAllocator` from the passed memory map.
     ///
     /// # Safety
     /// This function is unsafe because the caller must guarantee that the passed
     /// memory map is valid. The main requirement is that all frames that are marked
     /// as `USABLE` in it are really unused.
-    pub unsafe fn init(memory_map: &'static MemoryMap) -> Self {
-        return BootInfoFrameAllocator {
+    #[must_use] pub unsafe fn init(memory_map: &'static MemoryMap) -> Self {
+        BootInfoFrameAllocator {
             memory_map,
             next: 0,
         }
@@ -31,13 +31,13 @@ impl BootInfoFrameAllocator {
     fn usable_frames(&self) -> impl Iterator<Item = PhysFrame> {
         // get usable regions from memory map
         let regions = self.memory_map.iter();
-        let usable_regions = regions.filter(|r| return r.region_type == MemoryRegionType::Usable);
+        let usable_regions = regions.filter(|r| r.region_type == MemoryRegionType::Usable);
         // map each region to its address range
-        let addr_ranges = usable_regions.map(|r| return r.range.start_addr()..r.range.end_addr());
+        let addr_ranges = usable_regions.map(|r| r.range.start_addr()..r.range.end_addr());
         // transform to an iterator of frame start addresses
-        let frame_addresses = addr_ranges.flat_map(|r| return r.step_by(4096));
+        let frame_addresses = addr_ranges.flat_map(|r| r.step_by(4096));
         // create `PhysFrame` types from the start addresses
-        frame_addresses.map(|addr| return PhysFrame::containing_address(PhysAddr::new(addr)))
+        frame_addresses.map(|addr| PhysFrame::containing_address(PhysAddr::new(addr)))
     }
 
     // pub unsafe fn map_physical_region(
@@ -75,6 +75,6 @@ unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
     fn allocate_frame(&mut self) -> Option<PhysFrame> {
         let frame = self.usable_frames().nth(self.next);
         self.next += 1;
-        return frame
+        frame
     }
 }

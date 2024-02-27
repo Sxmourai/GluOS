@@ -2,7 +2,7 @@ pub mod ata;
 pub mod driver;
 pub mod nvme;
 
-/// Identifies the different ATA disks (and we are working on NVMe which is hard asf)
+/// Identifies the different ATA disks (and we are working on `NVMe` which is hard asf)
 /// Puts them into a hashmap, for easier use
 pub fn init() {
     let mut disks = hashbrown::HashMap::new();
@@ -30,7 +30,7 @@ pub fn init() {
                     }
                 }
                 Err(err) => {
-                    log::error!("Failed initialising NVMe driver: {:?}", err)
+                    log::error!("Failed initialising NVMe driver: {:?}", err);
                 }
             }
         }
@@ -64,12 +64,12 @@ impl DiskLoc {
     fn as_index(&self) -> usize {
         let mut i = 0;
         if self.0 == Channel::Secondary {
-            i += 2
+            i += 2;
         }
         if self.1 == Drive::Slave {
-            i += 1
+            i += 1;
         }
-        return i
+        i
     }
     #[cfg(feature = "fs")]
     fn as_path(
@@ -78,56 +78,56 @@ impl DiskLoc {
     ) -> Option<crate::fs::path::FilePath> {
         use alloc::string::ToString;
 
-        return Some(crate::fs::path::FilePath::new("/".to_string(), partition))
+        Some(crate::fs::path::FilePath::new("/".to_string(), partition))
     }
     fn as_diskloc(&self) -> DiskLoc {
-        return DiskLoc(self.channel(), self.drive())
+        DiskLoc(self.channel(), self.drive())
     }
     fn channel(&self) -> Channel {
         match self.as_index() {
-            0 => return Channel::Primary,
-            1 => return Channel::Primary,
-            2 => return Channel::Secondary,
-            3 => return Channel::Secondary,
+            0 => Channel::Primary,
+            1 => Channel::Primary,
+            2 => Channel::Secondary,
+            3 => Channel::Secondary,
             _ => panic!("Invalid channel address"),
         }
     }
     fn drive(&self) -> Drive {
         match self.as_index() {
-            0 => return Drive::Master,
-            1 => return Drive::Slave,
-            2 => return Drive::Master,
-            3 => return Drive::Slave,
+            0 => Drive::Master,
+            1 => Drive::Slave,
+            2 => Drive::Master,
+            3 => Drive::Slave,
             _ => panic!("Invalid drive address"),
         }
     }
     fn channel_addr(&self) -> u16 {
-        return self.channel() as u16
+        self.channel() as u16
     }
     fn drive_select_addr(&self) -> u8 {
         match self.drive() {
-            Drive::Master => return 0xA0,
-            Drive::Slave => return 0xB0,
+            Drive::Master => 0xA0,
+            Drive::Slave => 0xB0,
         }
     }
     fn drive_lba28_addr(&self) -> u8 {
         match self.drive() {
-            Drive::Master => return 0xE0,
-            Drive::Slave => return 0xF0,
+            Drive::Master => 0xE0,
+            Drive::Slave => 0xF0,
         }
     }
     fn drive_lba48_addr(&self) -> u8 {
         match self.drive() {
-            Drive::Master => return 0x40,
-            Drive::Slave => return 0x50,
+            Drive::Master => 0x40,
+            Drive::Slave => 0x50,
         }
     }
     fn base(&self) -> u16 {
-        return self.channel_addr()
+        self.channel_addr()
     }
 
-    pub fn from_idx(idx: u8) -> Option<Self> {
-        return Some(match idx {
+    #[must_use] pub fn from_idx(idx: u8) -> Option<Self> {
+        Some(match idx {
             0 => Self(Channel::Primary, Drive::Master),
             1 => Self(Channel::Primary, Drive::Slave),
             2 => Self(Channel::Secondary, Drive::Master),

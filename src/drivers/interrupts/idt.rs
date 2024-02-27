@@ -5,7 +5,7 @@ use x86_64::structures::idt::InterruptDescriptorTable;
 
 use crate::drivers::gdt::DOUBLE_FAULT_IST_INDEX;
 
-use super::exceptions::*;
+use super::exceptions::{alignment_check, bound_range_exceeded, breakpoint_handler, debug_handler, device_not_available, divide_error, double_fault_handler, general_protection_fault, invalid_opcode, invalid_tss, machine_check, non_maskable_interrupt, overflow, page_fault_handler, security_exception, segment_not_present, simd_floating_point, stack_segment_fault, virtualization, vmm_communication_exception, x87_floating_point};
 
 pub static mut IDT: Option<RwLock<InterruptDescriptorTable>> = None;
 
@@ -48,5 +48,5 @@ pub fn create_idt() -> InterruptDescriptorTable {
 
     // HARDWARE INTERRUPTS
     crate::interrupts::hardware::setup_hardware_interrupts(&mut idt);
-    return idt
+    idt
 }

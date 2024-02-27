@@ -24,10 +24,10 @@ use super::{ACPISDTHeader, SystemDescriptionPtr, SystemDescriptionTable};
 // const RSDP_BIOS_AREA_END: usize = 0xfffff;
 
 //TODO Do we really need this function ? If so maybe in utils or smth
-pub fn find_string(bytes: &[u8], search_string: &[u8]) -> Option<usize> {
+#[must_use] pub fn find_string(bytes: &[u8], search_string: &[u8]) -> Option<usize> {
     let search_len = search_string.len();
 
-    (0..(bytes.len() - search_len + 1)).find(|&i| return &bytes[i..(i + search_len)] == search_string)
+    (0..(bytes.len() - search_len + 1)).find(|&i| &bytes[i..(i + search_len)] == search_string)
 }
 
 pub const RSDP_SIGNATURE: &[u8; 8] = b"RSD PTR ";
@@ -58,16 +58,16 @@ fn search_rsdp_in_page(page: u64, physical_memory_offset: u64) -> Option<&'stati
 
         let rsdp_bytes: &[u8; core::mem::size_of::<RSDPDescriptor>()] =
             sl.try_into().expect("Invalid slice size");
-        let rsdp_descriptor = unsafe { &*(rsdp_bytes.as_ptr() as *const _) };
+        let rsdp_descriptor = unsafe { &*rsdp_bytes.as_ptr().cast() };
 
         return Some(rsdp_descriptor);
     }
-    return None
+    None
 }
 
-pub fn search_rsdp(physical_memory_offset: u64) -> &'static RSDPDescriptor {
+#[must_use] pub fn search_rsdp(physical_memory_offset: u64) -> &'static RSDPDescriptor {
     // chains aren't const
-    let rsdp_addresses = (1003520..1003520 + 4096)
+    let rsdp_addresses = (1_003_520..1_003_520 + 4096)
         .chain(0x80000..0x9ffff)
         .chain(0xe0000..0xfffff);
     trace!("Searching RSDP in first&second memory region");
@@ -96,10 +96,10 @@ fn get_table_ptrs<
             &mut sdt_and_ptrs[i..i + core::mem::size_of::<T>()].iter(),
         ));
     }
-    return ptrs
+    ptrs
 }
 
-pub fn get_rsdt(sdp: &SystemDescriptionPtr) -> Option<SystemDescriptionTable> {
+#[must_use] pub fn get_rsdt(sdp: &SystemDescriptionPtr) -> Option<SystemDescriptionTable> {
     trace!("Getting system description table at {}", sdp.addr());
     let (sdt_header, raw) = read_sdt(sdp.addr(), sdp.addr());
 
@@ -126,5 +126,5 @@ pub fn get_rsdt(sdp: &SystemDescriptionPtr) -> Option<SystemDescriptionTable> {
         log::error!("Failed doing checksum of RSDT");
         return None;
     }
-    return Some(sdt)
+    Some(sdt)
 }

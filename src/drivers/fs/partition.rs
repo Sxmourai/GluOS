@@ -32,7 +32,7 @@ pub struct GPTPartition {
 /// Holds a disk loc, the start offset of the partition & size
 pub struct Partition(pub DiskLoc, pub u64, pub u64);
 impl Partition {
-    pub fn from_idx(loc: &DiskLoc, part_id: u8) -> Option<&Self> {
+    #[must_use] pub fn from_idx(loc: &DiskLoc, part_id: u8) -> Option<&Self> {
         unsafe { return fs_driver!().get_partition_from_id(loc, part_id) }
     }
 }
@@ -48,7 +48,7 @@ pub enum HeaderType {
 pub const MBR_SIGNATURE: [u8; 2] = [0x55, 0xAA];
 pub const GPT_SIGNATURE: [u8; 8] = [69, 70, 73, 32, 80, 65, 82, 84];
 
-pub fn read_header_type(disk: &DiskLoc) -> Option<HeaderType> {
+#[must_use] pub fn read_header_type(disk: &DiskLoc) -> Option<HeaderType> {
     // Check GPT
     //TODO Remove all of this nesting
     if let Ok(sec_sector) = read_from_disk(disk, 1, 1) {
@@ -63,10 +63,10 @@ pub fn read_header_type(disk: &DiskLoc) -> Option<HeaderType> {
                 for part_num in 0..4 {
                     // 128 bytes per partition, and 1 sector = 512 bytes
                     let partition = unsafe {
-                        &*(raw_partitions[128 * part_num..].as_ptr() as *const GPTPartition)
+                        &*raw_partitions[128 * part_num..].as_ptr().cast::<GPTPartition>()
                     };
                     // Check if only zeroes, if so done reading ?
-                    if partition.part_type_guid.into_iter().all(|x| return x == 0) {
+                    if partition.part_type_guid.into_iter().all(|x| x == 0) {
                         break;
                     }
                     let start_lba = partition.start_lba;
@@ -88,11 +88,11 @@ pub fn read_header_type(disk: &DiskLoc) -> Option<HeaderType> {
             let mut partitions = Vec::new();
             for part_num in 0..4 {
                 let mbr_part = unsafe {
-                    &*(first_sector[446 + (16 * part_num)..].as_ptr() as *const MBRPartition)
+                    &*first_sector[446 + (16 * part_num)..].as_ptr().cast::<MBRPartition>()
                 };
                 if first_sector[446 + (16 * part_num)..446 + (16 * part_num) + 16]
                     .iter()
-                    .all(|x| return *x == 0)
+                    .all(|x| *x == 0)
                 {
                     continue;
                 }
@@ -100,8 +100,8 @@ pub fn read_header_type(disk: &DiskLoc) -> Option<HeaderType> {
                 let sector_count = mbr_part.sector_count;
                 partitions.push(Partition(
                     *disk,
-                    mbr_part.lba_start as u64,
-                    mbr_part.sector_count as u64,
+                    u64::from(mbr_part.lba_start),
+                    u64::from(mbr_part.sector_count),
                 ));
             }
             return Some(HeaderType::MBR(partitions));
@@ -109,12 +109,12 @@ pub fn read_header_type(disk: &DiskLoc) -> Option<HeaderType> {
     }
     // No MBR / GPT On disk (maybe a raw partition, or an empty disk)
     log::warn!("No MBR/GPT on disk at {:?}", disk);
-    return None
+    None
 }
 pub struct _FsDriverWrapper<'a>(pub &'a Partition);
 impl _FsDriverWrapper<'_> {
-    pub fn try_init_drv<T: FsDriver>(&self) -> Option<Box<T>> {
-        return T::try_init(self.0)
+    #[must_use] pub fn try_init_drv<T: FsDriver>(&self) -> Option<Box<T>> {
+        T::try_init(self.0)
     }
 }
 
@@ -124,7 +124,7 @@ macro_rules! fs_driver_init {
     };
 }
 
-pub fn find_and_init_fs_driver_for_part(part: &Partition) -> Option<Box<dyn FsDriver>> {
+#[must_use] pub fn find_and_init_fs_driver_for_part(part: &Partition) -> Option<Box<dyn FsDriver>> {
     if let Some(drv) = _FsDriverWrapper(part).try_init_drv::<Fat32Driver>() {
         return Some(drv);
     }
@@ -134,7 +134,7 @@ pub fn find_and_init_fs_driver_for_part(part: &Partition) -> Option<Box<dyn FsDr
     if let Some(drv) = _FsDriverWrapper(part).try_init_drv::<super::ntfs::NTFSDriver>() {
         return Some(drv);
     }
-    return None
+    None
 }
 //let fat_info = Fat32Driver::get_fat_boot(&partition).unwrap();
 // if fat_info.0.fs_type_label[0..5] == [70, 65, 84, 51, 50] {

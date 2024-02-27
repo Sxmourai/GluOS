@@ -27,7 +27,7 @@ pub struct MemoryHandler {
 }
 impl MemoryHandler {
     /// Inits heap & frame allocator
-    pub fn new(physical_memory_offset: u64, memory_map: &'static MemoryMap) -> Self {
+    #[must_use] pub fn new(physical_memory_offset: u64, memory_map: &'static MemoryMap) -> Self {
         let physical_memory_offset = VirtAddr::new(physical_memory_offset);
         // trace!("Getting active level 4 table");
         let level_4_table = unsafe { active_level_4_table(physical_memory_offset) };
@@ -41,10 +41,10 @@ impl MemoryHandler {
         crate::drivers::memory::allocator::init_heap(&mut _self)
             .expect("heap initialization failed"); // Initialize the heap allocator
         trace!("Finished initializing heap, can now begin tracing !");
-        return _self
+        _self
     }
     /// # Safety
-    /// Mapping can cause all sorts of panics, set OffsetPageTable
+    /// Mapping can cause all sorts of panics, set `OffsetPageTable`
     pub unsafe fn map(
         &mut self,
         page: Page<Size4KiB>,
@@ -56,19 +56,19 @@ impl MemoryHandler {
         }
         let frame = frame.unwrap();
         unsafe { self.map_frame(page, frame, flags)? }
-        return Ok(frame.start_address())
+        Ok(frame.start_address())
     }
     /// # Safety
-    /// Mapping can cause all sorts of panics, set OffsetPageTable
+    /// Mapping can cause all sorts of panics, set `OffsetPageTable`
     pub unsafe fn unmap(
         &mut self,
         page: Page<Size4KiB>,
     ) -> Result<(PhysFrame, MapperFlush<Size4KiB>), UnmapError> {
-        unsafe { return self.mapper.unmap(page) }
+        unsafe { self.mapper.unmap(page) }
     }
 
     /// # Safety
-    /// Mapping can cause all sorts of panics, set OffsetPageTable
+    /// Mapping can cause all sorts of panics, set `OffsetPageTable`
     pub unsafe fn map_frame(
         &mut self,
         page: Page<Size4KiB>,
@@ -78,26 +78,26 @@ impl MemoryHandler {
         unsafe {
             self.mapper
                 .map_to(page, frame, flags, &mut self.frame_allocator)
-                .map_err(|err| return MapFrameError::CantAllocateFrame)?
-                .flush()
+                .map_err(|err| MapFrameError::CantAllocateFrame)?
+                .flush();
         }
-        return Ok(())
+        Ok(())
     }
     pub fn malloc(&mut self, flags: PageTableFlags) -> Option<VirtAddr> {
         let frame = self.frame_allocator.allocate_frame()?;
         let virt_addr = VirtAddr::new(frame.start_address().as_u64());
         let page = Page::from_start_address(virt_addr).ok()?;
         unsafe { self.map_frame(page, frame, flags) }.ok()?;
-        return Some(virt_addr)
+        Some(virt_addr)
     }
 }
 /// Unsafe not set for ease of use... Maybe change that
 /// TODO Do we want to keep this function not unsafe even though it is ?
-pub fn map(page: Page<Size4KiB>, flags: PageTableFlags) -> PhysAddr {
-    return unsafe { mem_handler!().map(page, flags) }.unwrap()
+#[must_use] pub fn map(page: Page<Size4KiB>, flags: PageTableFlags) -> PhysAddr {
+    unsafe { mem_handler!().map(page, flags) }.unwrap()
 }
 pub fn map_frame(page: Page<Size4KiB>, frame: PhysFrame, flags: PageTableFlags) {
-    unsafe { mem_handler!().map_frame(page, frame, flags) }.unwrap()
+    unsafe { mem_handler!().map_frame(page, frame, flags) }.unwrap();
 }
 #[macro_export]
 macro_rules! mem_map {

@@ -34,8 +34,8 @@ pub struct MADT {
     pub cores: Vec<Core>, // (core id, apic id)
 }
 impl MADT {
-    pub fn new(bytes: &[u8]) -> Option<Self> {
-        let inner = unsafe { &*(bytes.as_ptr() as *const RawMADT) };
+    #[must_use] pub fn new(bytes: &[u8]) -> Option<Self> {
+        let inner = unsafe { &*bytes.as_ptr().cast::<RawMADT>() };
         let mut fields = Vec::new();
         let mut cores = Vec::new();
         let mut start_idx = core::mem::size_of::<RawMADT>(); // Fields start at end of RawMADT
@@ -47,42 +47,42 @@ impl MADT {
                 0 => {
                     // Entry Type 0: Processor Local APIC
                     let proc_local_apic =
-                        unsafe { &*(bytes[start_idx..].as_ptr() as *const ProcLocalAPIC) };
+                        unsafe { &*bytes[start_idx..].as_ptr().cast::<ProcLocalAPIC>() };
                     cores.push((cores.len(), proc_local_apic.acpi_proc_id));
                     ApicRecord::ProcLocalAPIC(proc_local_apic)
                 }
                 1 => {
                     // Entry Type 1: I/O APIC
-                    ApicRecord::IOAPIC(unsafe { &*(bytes[start_idx..].as_ptr() as *const IOAPIC) })
+                    ApicRecord::IOAPIC(unsafe { &*bytes[start_idx..].as_ptr().cast::<IOAPIC>() })
                 }
                 2 => {
                     // Entry Type 2: IO/APIC Interrupt Source Override
                     ApicRecord::IOAPICInterruptSourceOverride(unsafe {
-                        &*(bytes[start_idx..].as_ptr() as *const IOAPICInterruptSourceOverride)
+                        &*bytes[start_idx..].as_ptr().cast::<IOAPICInterruptSourceOverride>()
                     })
                 }
                 3 => {
                     // Entry type 3: IO/APIC Non-maskable interrupt source
                     ApicRecord::IOAPICNonMaskableInterruptSource(unsafe {
-                        &*(bytes[start_idx..].as_ptr() as *const IOAPICNonMaskableInterruptSource)
+                        &*bytes[start_idx..].as_ptr().cast::<IOAPICNonMaskableInterruptSource>()
                     })
                 }
                 4 => {
                     // Entry Type 4: Local APIC Non-maskable interrupts
                     ApicRecord::LocalAPICNonMaskableInterrupts(unsafe {
-                        &*(bytes[start_idx..].as_ptr() as *const LocalAPICNonMaskableInterrupts)
+                        &*bytes[start_idx..].as_ptr().cast::<LocalAPICNonMaskableInterrupts>()
                     })
                 }
                 5 => {
                     // Entry Type 5: Local APIC Address Override
                     ApicRecord::LocalAPICAddressOverride(unsafe {
-                        &*(bytes[start_idx..].as_ptr() as *const LocalAPICAddressOverride)
+                        &*bytes[start_idx..].as_ptr().cast::<LocalAPICAddressOverride>()
                     })
                 }
                 9 => {
                     // Entry Type 9: Processor Local x2APIC
                     ApicRecord::ProcLocalx2Apic(unsafe {
-                        &*(bytes[start_idx..].as_ptr() as *const ProcLocalx2Apic)
+                        &*bytes[start_idx..].as_ptr().cast::<ProcLocalx2Apic>()
                     })
                 }
 
@@ -96,7 +96,7 @@ impl MADT {
             start_idx += *record_length as usize - 2;
             fields.push(record);
         }
-        return Some(Self {
+        Some(Self {
             inner,
             fields,
             cores,

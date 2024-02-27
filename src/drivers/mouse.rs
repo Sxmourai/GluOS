@@ -46,8 +46,8 @@ pub fn init() {
         MOUSE.click.2 = packet.misc.get_bit(6);
         MOUSE.click.1 = packet.misc.get_bit(5);
 
-        let rel_x = packet.rel_x as i16 - (((packet.misc as i16) << 4) & 0x100);
-        let rel_y = packet.rel_y as i16 - (((packet.misc as i16) << 3) & 0x100);
+        let rel_x = i16::from(packet.rel_x) - ((i16::from(packet.misc) << 4) & 0x100);
+        let rel_y = i16::from(packet.rel_y) - ((i16::from(packet.misc) << 3) & 0x100);
 
         MOUSE.pos.0 = MOUSE.pos.0.wrapping_add_signed(rel_x);
         MOUSE.pos.1 = MOUSE.pos.1.wrapping_add_signed(rel_y);

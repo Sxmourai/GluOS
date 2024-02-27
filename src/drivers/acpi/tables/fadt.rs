@@ -60,21 +60,21 @@ pub struct FADT {
 }
 impl FADT {
     pub async fn new(bytes: &'static [u8]) -> &'static Self {
-        let _self = unsafe { &*(bytes.as_ptr() as *const Self) };
+        let _self = unsafe { &*bytes.as_ptr().cast::<Self>() };
         let boot_architecture_flags = _self.boot_architecture_flags;
         if _self.smi_command_port == 0
             && _self.acpi_disable == 0
             && _self.acpi_enable == 0
             && _self.pm1a_control_block & 0x1 == 1
         {
-            log::info!("ACPI is already enabled")
+            log::info!("ACPI is already enabled");
         } else if _self.enable_acpi().await.is_err() {
-            log::error!("Error whilst enabling ACPI mode !")
+            log::error!("Error whilst enabling ACPI mode !");
         }
         _self
     }
-    pub fn get_dsdt(&self) -> &'static super::dsdt::DSDT {
-        unsafe { return &*(self.dsdt as *const super::dsdt::DSDT) }
+    #[must_use] pub fn get_dsdt(&self) -> &'static super::dsdt::DSDT {
+        unsafe { &*(self.dsdt as *const super::dsdt::DSDT) }
     }
     async fn enable_acpi(&self) -> Result<(), AcpiEnablingError> {
         unsafe {

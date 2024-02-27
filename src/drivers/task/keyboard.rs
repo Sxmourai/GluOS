@@ -25,8 +25,8 @@ pub struct KeyboardHandler {
     pressed: Vec<KeyCode>,
 }
 impl KeyboardHandler {
-    pub fn is_pressed(&self, code: &KeyCode) -> bool {
-        return self.pressed.contains(code)
+    #[must_use] pub fn is_pressed(&self, code: &KeyCode) -> bool {
+        self.pressed.contains(code)
     }
 
     pub fn process_keyevent(&mut self, scancode: u8) {
@@ -39,7 +39,7 @@ impl KeyboardHandler {
                 self.pressed.swap_remove(
                     self.pressed
                         .iter()
-                        .position(|x| return *x == key_event.code)
+                        .position(|x| *x == key_event.code)
                         .unwrap(),
                 ); //TODO Change .retain to for loop or better (i.e. swap_remove is O(1) but u need the index)
             }
@@ -91,5 +91,5 @@ pub fn get_input_msg(idx: usize) -> Option<String> {
     if let Some(input) = KB_INPUTS.lock().get(idx) {
         return Some(input.0.get_return_message());
     }
-    return None
+    None
 }

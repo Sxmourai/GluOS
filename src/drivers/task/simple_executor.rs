@@ -7,15 +7,15 @@ use core::task::{RawWaker, Waker};
 fn dummy_raw_waker() -> RawWaker {
     fn no_op(_: *const ()) {}
     fn clone(_: *const ()) -> RawWaker {
-        return dummy_raw_waker()
+        dummy_raw_waker()
     }
 
     let vtable = &RawWakerVTable::new(clone, no_op, no_op, no_op);
-    return RawWaker::new(core::ptr::null::<()>(), vtable)
+    RawWaker::new(core::ptr::null::<()>(), vtable)
 }
 
 fn dummy_waker() -> Waker {
-    unsafe { return Waker::from_raw(dummy_raw_waker()) }
+    unsafe { Waker::from_raw(dummy_raw_waker()) }
 }
 
 pub struct SimpleExecutor {
@@ -24,19 +24,19 @@ pub struct SimpleExecutor {
 
 impl Default for SimpleExecutor {
     fn default() -> Self {
-        return Self::new()
+        Self::new()
     }
 }
 
 impl SimpleExecutor {
-    pub fn new() -> SimpleExecutor {
-        return SimpleExecutor {
+    #[must_use] pub fn new() -> SimpleExecutor {
+        SimpleExecutor {
             task_queue: VecDeque::new(),
         }
     }
 
     pub fn spawn(&mut self, task: Task) {
-        self.task_queue.push_back(task)
+        self.task_queue.push_back(task);
     }
     pub fn run(&mut self) {
         while let Some(mut task) = self.task_queue.pop_front() {

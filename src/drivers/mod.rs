@@ -26,7 +26,7 @@ pub mod userland;
 pub mod video;
 
 fn display_driver(driver: Driver) -> alloc::string::String {
-    return alloc::format!(
+    alloc::format!(
         "Driver {{ name: {} requires: {:?} }}",
         driver.name(),
         driver.requires
@@ -60,21 +60,21 @@ pub enum DriverId {
     Random,
 }
 impl DriverId {
-    pub fn name(&self) -> &'static str {
+    #[must_use] pub fn name(&self) -> &'static str {
         match self {
-            Self::Logger => return "Logger",
-            Self::Heap => return "Heap",
-            Self::Mapper => return "Mapper",
-            Self::Gdt => return "Gdt",
-            Self::Acpi => return "Acpi",
-            Self::Ps2Controller => return "Ps2Controller",
-            Self::Interrupts => return "Interrupts",
-            Self::Pci => return "Pci",
-            Self::Time => return "Time",
-            Self::Graphics => return "Graphics",
-            Self::Disk => return "Disk",
-            Self::Filesystem => return "Filesystem",
-            Self::Random => return "Random",
+            Self::Logger => "Logger",
+            Self::Heap => "Heap",
+            Self::Mapper => "Mapper",
+            Self::Gdt => "Gdt",
+            Self::Acpi => "Acpi",
+            Self::Ps2Controller => "Ps2Controller",
+            Self::Interrupts => "Interrupts",
+            Self::Pci => "Pci",
+            Self::Time => "Time",
+            Self::Graphics => "Graphics",
+            Self::Disk => "Disk",
+            Self::Filesystem => "Filesystem",
+            Self::Random => "Random",
         }
     }
 }
@@ -85,14 +85,14 @@ pub struct Driver {
     pub requires: Vec<DriverId>,
 }
 impl Driver {
-    pub fn name(&self) -> &'static str {
-        return self.name.name()
+    #[must_use] pub fn name(&self) -> &'static str {
+        self.name.name()
     }
 }
 ////////// TODO Remove the need to increment the len manually
 ////////// The best would be a vec/slice, but no vec because we don't have heap allocation and no slice because we can't use static because impl Future isn't sized !
-pub fn get_drivers() -> Vec<Driver> {
-    return alloc::vec![
+#[must_use] pub fn get_drivers() -> Vec<Driver> {
+    alloc::vec![
         // By default require logger, overwrite that.
         make_driver!(Logger, async { crate::user::log::init() }, requires = []),
         // make_driver!(Heap, crate::drivers::memory::init()), manually called in boot, to have executor

@@ -19,15 +19,15 @@ pub struct FatUser {
     pub id: u16,
     pub groups: Vec<u16>,
 }
-pub fn get_group(id: u16) -> FatGroup {
-    return FatGroup {
+#[must_use] pub fn get_group(id: u16) -> FatGroup {
+    FatGroup {
         group_name: "default".to_string(),
         id,
         derived_groups: Vec::new(),
     }
 }
-pub fn get_user(id: u16) -> FatUser {
-    return FatUser {
+#[must_use] pub fn get_user(id: u16) -> FatUser {
+    FatUser {
         username: "Sxmourai".to_string(),
         id,
         groups: alloc::vec![1],
@@ -39,11 +39,11 @@ pub enum FatPerson {
     User(FatUser),
 }
 impl FatPerson {
-    pub fn new(group: bool, id: u16) -> Self {
+    #[must_use] pub fn new(group: bool, id: u16) -> Self {
         if group {
-            return Self::Group(get_group(id))
+            Self::Group(get_group(id))
         } else {
-            return Self::User(get_user(id))
+            Self::User(get_user(id))
         }
     }
 }

@@ -39,11 +39,11 @@ pub enum Color {
 pub struct ColorCode(pub u8);
 
 impl ColorCode {
-    pub const fn new(foreground: Color, background: Color) -> ColorCode {
-        return ColorCode((background as u8) << 4 | (foreground as u8))
+    #[must_use] pub const fn new(foreground: Color, background: Color) -> ColorCode {
+        ColorCode((background as u8) << 4 | (foreground as u8))
     }
-    pub const fn newb(foreground: u8, background: u8) -> ColorCode {
-        return ColorCode(background << 4 | foreground)
+    #[must_use] pub const fn newb(foreground: u8, background: u8) -> ColorCode {
+        ColorCode(background << 4 | foreground)
     }
 }
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Hash)]
@@ -60,7 +60,7 @@ impl Writer {
     pub fn move_cursor(&mut self, x: u8, y: u8) {
         self.pos = ScreenPos(x, y);
 
-        let pos: u16 = y as u16 * 80 + x as u16;
+        let pos: u16 = u16::from(y) * 80 + u16::from(x);
 
         if self
             .console
@@ -81,7 +81,7 @@ impl Writer {
         }
     }
     pub fn write_char_at(&mut self, pos: ScreenPos, chr: ScreenChar) {
-        self.console.write_char_at(pos.0, pos.1, chr)
+        self.console.write_char_at(pos.0, pos.1, chr);
     }
     /// Move every line one up
     pub fn move_up(&mut self) {
@@ -90,21 +90,21 @@ impl Writer {
             let mut schrs = [ScreenChar::default(); SBUFFER_WIDTH];
             for (i, c) in self
                 .console
-                .get_str_at(&ScreenPos(0, 0), width as u16)
+                .get_str_at(&ScreenPos(0, 0), u16::from(width))
                 .iter()
                 .enumerate()
             {
-                schrs[i] = *c
+                schrs[i] = *c;
             }
             self.console.top_buffer.append(schrs);
             for y in 1..height {
-                let line = self.console.get_str_at(&ScreenPos(0, y), width as u16);
+                let line = self.console.get_str_at(&ScreenPos(0, y), u16::from(width));
                 self.write_screenchars_at_no_wrap(0, y - 1, line.iter());
             }
             if self.console.bottom_buffer.is_empty() {
                 self.write_screenchars_at_no_wrap(0, height - 1, [DEFAULT_CHAR; 80].iter());
                 if self.pos.1 != 0 {
-                    self.move_cursor(self.pos.0, self.pos.1 - 1)
+                    self.move_cursor(self.pos.0, self.pos.1 - 1);
                 } else {
                     //TODO Fix errors here
                     serial_println!("Bug whilst moving cursor: {:?}", self.pos);
@@ -121,7 +121,7 @@ impl Writer {
                 );
                 self.console.bottom_buffer.remove_youngest_line();
             }
-        })
+        });
     }
     /// Move every line one down
     pub fn move_down(&mut self) {
@@ -134,17 +134,17 @@ impl Writer {
             let mut schrs = [ScreenChar::default(); SBUFFER_WIDTH];
             for (i, c) in self
                 .console
-                .get_str_at(&ScreenPos(0, height - 1), width as u16)
+                .get_str_at(&ScreenPos(0, height - 1), u16::from(width))
                 .iter()
                 .enumerate()
             {
-                schrs[i] = *c
+                schrs[i] = *c;
             }
             self.console.bottom_buffer.append(schrs);
             for y in 2..=height {
                 let line = self
                     .console
-                    .get_str_at(&ScreenPos(0, height - y), width as u16);
+                    .get_str_at(&ScreenPos(0, height - y), u16::from(width));
                 self.write_screenchars_at_no_wrap(0, height - y + 1, line.iter());
             }
             if self.console.top_buffer.is_empty() {
@@ -153,7 +153,7 @@ impl Writer {
                     0,
                     [ScreenChar::default(); SBUFFER_WIDTH].iter(),
                 );
-                self.move_cursor(self.pos.0, self.pos.1 + 1)
+                self.move_cursor(self.pos.0, self.pos.1 + 1);
             } else {
                 self.write_screenchars_at_no_wrap(
                     0,
@@ -162,7 +162,7 @@ impl Writer {
                 );
                 self.console.top_buffer.remove_youngest_line();
             }
-        })
+        });
     }
     pub fn write_screenchars_at_no_wrap<'a>(
         &mut self,
@@ -180,12 +180,12 @@ impl Writer {
         mut y: u8,
         s: impl IntoIterator<Item = ScreenChar>,
     ) -> (u8, u8) {
-        for c in s.into_iter() {
+        for c in s {
             if (x + 1 >= BUFFER_WIDTH) || (c.ascii_character == b'\n') {
                 if y + 1 >= BUFFER_HEIGHT {
-                    self.move_up()
+                    self.move_up();
                 } else {
-                    y += 1
+                    y += 1;
                 }
                 x = 0;
             }
@@ -195,7 +195,7 @@ impl Writer {
             self.write_char_at(ScreenPos(x, y), c);
             x += 1;
         }
-        return (x, y)
+        (x, y)
     }
     // Prints characters at desired position, with color of self.color_code and returns the end index
     pub fn write_string_at(&mut self, x: u8, y: u8, s: &str) -> (u8, u8) {
@@ -204,13 +204,13 @@ impl Writer {
             screenchars.push(ScreenChar {
                 ascii_character: c,
                 color_code: self.color_code,
-            })
+            });
         }
 
-        return self.write_screenchars_at(x, y, screenchars)
+        self.write_screenchars_at(x, y, screenchars)
     }
     pub fn write_string_atp(&mut self, pos: &ScreenPos, s: &str) -> (u8, u8) {
-        return self.write_string_at(pos.0, pos.1, s)
+        self.write_string_at(pos.0, pos.1, s)
     }
 
     pub fn write_string(&mut self, s: &str) {
@@ -220,7 +220,7 @@ impl Writer {
 
     pub fn new_line(&mut self) {
         if self.pos.1 + 1 < BUFFER_HEIGHT {
-            self.move_cursor(0, self.pos.1 + 1)
+            self.move_cursor(0, self.pos.1 + 1);
         } else {
             // Move everything
             self.move_up();
@@ -231,7 +231,7 @@ impl Writer {
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         self.write_string(s);
-        return Ok(())
+        Ok(())
     }
 }
 
@@ -264,18 +264,18 @@ pub fn _print(args: fmt::Arguments) {
     use x86_64::instructions::interrupts;
     interrupts::without_interrupts(|| {
         WRITER.lock().write_fmt(args).unwrap();
-    })
+    });
 }
 
-pub fn print_at(x: u8, y: u8, s: &str) -> (u8, u8) {
+#[must_use] pub fn print_at(x: u8, y: u8, s: &str) -> (u8, u8) {
     return x86_64::instructions::interrupts::without_interrupts(|| return WRITER.lock().write_string_at(x, y, s))
 }
 
 pub fn print_char_at(x: u8, y: u8, c: char) {
-    print_byte_at(x, y, c as u8)
+    print_byte_at(x, y, c as u8);
 }
 pub fn print_byte_at(x: u8, y: u8, byte: u8) {
-    print_screenchar_at(x, y, ScreenChar::from(byte))
+    print_screenchar_at(x, y, ScreenChar::from(byte));
 }
 pub fn print_screenchar_at(x: u8, y: u8, c: ScreenChar) {
     x86_64::instructions::interrupts::without_interrupts(|| {
@@ -283,13 +283,13 @@ pub fn print_screenchar_at(x: u8, y: u8, c: ScreenChar) {
     });
 }
 pub fn print_char_atp(pos: &ScreenPos, c: char) {
-    print_byte_at(pos.0, pos.1, c as u8)
+    print_byte_at(pos.0, pos.1, c as u8);
 }
 pub fn print_byte_atp(pos: &ScreenPos, byte: u8) {
-    print_screenchar_at(pos.0, pos.1, ScreenChar::from(byte))
+    print_screenchar_at(pos.0, pos.1, ScreenChar::from(byte));
 }
 pub fn print_screenchar_atp(pos: &ScreenPos, c: ScreenChar) {
-    print_screenchar_at(pos.0, pos.1, c)
+    print_screenchar_at(pos.0, pos.1, c);
 }
 pub fn print_atp(pos: &ScreenPos, s: &str) {
     x86_64::instructions::interrupts::without_interrupts(|| {
@@ -302,8 +302,8 @@ pub fn print_screenchars_atp(pos: &ScreenPos, s: impl IntoIterator<Item = Screen
     });
 }
 
-pub fn calculate_end(start: &ScreenPos, len: usize) -> ScreenPos {
-    return ScreenPos(
+#[must_use] pub fn calculate_end(start: &ScreenPos, len: usize) -> ScreenPos {
+    ScreenPos(
         start.0 + (len % SBUFFER_WIDTH) as u8,
         start.1 + ((len + start.0 as usize) / SBUFFER_WIDTH) as u8,
     )

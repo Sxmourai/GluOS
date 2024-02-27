@@ -41,7 +41,7 @@ impl FsDriverInitialiser for NTFSDriver {
         drv.read_upcase_table(&mut reader).ok()?;
         let root = drv.root_directory(&mut reader).ok()?;
         let files = Self::walk_dir(partition, "", &mut reader, &drv, root)?;
-        return Some(alloc::boxed::Box::new(Self {
+        Some(alloc::boxed::Box::new(Self {
             partition: partition.clone(),
             ntfs: drv,
             io: reader,
@@ -84,11 +84,11 @@ impl NTFSDriver {
                             file.clone(),
                         )?;
                         let mut soft_entries = Vec::new();
-                        for (path, soft_entry) in a.iter() {
+                        for (path, soft_entry) in &a {
                             soft_entries.push(SoftEntry {
                                 path: path.clone(),
                                 size: 0,
-                            })
+                            });
                         }
                         parsed_entries.extend(a);
                         Entry::Dir(Dir {
@@ -121,7 +121,7 @@ impl NTFSDriver {
                 }
             }
         }
-        return Some(parsed_entries)
+        Some(parsed_entries)
     }
 }
 
@@ -131,7 +131,7 @@ impl FsDriver for NTFSDriver {
         path: &FilePath,
     ) -> Result<super::fs_driver::Entry, super::fs_driver::FsReadError> {
         dbg!(self.files);
-        return Ok(self
+        Ok(self
             .files
             .get(path)
             .ok_or(FsReadError::EntryNotFound)?
@@ -139,11 +139,11 @@ impl FsDriver for NTFSDriver {
     }
 
     fn as_enum(&self) -> super::fs_driver::FsDriverEnum {
-        return super::fs_driver::FsDriverEnum::NTFS
+        super::fs_driver::FsDriverEnum::NTFS
     }
 
     fn partition(&self) -> &super::partition::Partition {
-        return &self.partition
+        &self.partition
     }
 }
 
@@ -168,7 +168,7 @@ impl binrw::io::Read for DiskReader {
             buf[i] = sec[i + off as usize];
             self.pos += 1;
         }
-        return binrw::io::Result::Ok(buf.len())
+        binrw::io::Result::Ok(buf.len())
     }
 }
 impl binrw::io::Seek for DiskReader {
@@ -180,6 +180,6 @@ impl binrw::io::Seek for DiskReader {
                 self.pos + <i64 as TryInto<u64>>::try_into(c).unwrap()
             }
         };
-        return binrw::io::Result::Ok(self.pos)
+        binrw::io::Result::Ok(self.pos)
     }
 }

@@ -46,10 +46,10 @@ unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut
     let virt = physical_memory_offset + phys.as_u64();
     let page_table_ptr: *mut PageTable = virt.as_mut_ptr();
 
-    unsafe { return &mut *page_table_ptr }
+    unsafe { &mut *page_table_ptr }
 }
 
-/// Initialize a new OffsetPageTable.
+/// Initialize a new `OffsetPageTable`.
 ///
 /// This function is unsafe because the caller must guarantee that the
 /// complete physical memory is mapped to virtual memory at the passed
@@ -61,7 +61,7 @@ unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut
 // }
 
 // end_page is using .containing address
-pub fn read_phys_memory_and_map(location: u64, size: usize, end_page: u64) -> &'static [u8] {
+#[must_use] pub fn read_phys_memory_and_map(location: u64, size: usize, end_page: u64) -> &'static [u8] {
     let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
 
     let _size_64 = size as u64;

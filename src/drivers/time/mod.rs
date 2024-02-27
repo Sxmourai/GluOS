@@ -12,7 +12,7 @@ pub fn init() {
 
 pub fn try_udelay(micros: u16) -> Result<(), TimerError> {
     set(micros)?;
-    return wait_for_timeout()
+    wait_for_timeout()
 }
 pub fn try_mdelay(millis: u32) -> Result<(), TimerError> {
     let id = pit::register_wait().ok_or(TimerError::NoTicksAvailable)?;
@@ -20,19 +20,19 @@ pub fn try_mdelay(millis: u32) -> Result<(), TimerError> {
         x86_64::instructions::hlt();
     }
     log::debug!("Finished waiting");
-    return Ok(())
+    Ok(())
 }
 pub fn try_sdelay(seconds: u32) -> Result<(), TimerError> {
     if seconds>=u32::MAX/1000 {return Err(TimerError::OutOfRange)}
-    return try_mdelay(seconds*1000)
+    try_mdelay(seconds*1000)
 }
 pub fn udelay(micros: u16) {
-    try_udelay(micros).unwrap()
+    try_udelay(micros).unwrap();
 }
 pub fn mdelay(millis: u32) {
-    try_mdelay(millis).unwrap()
+    try_mdelay(millis).unwrap();
 }
 //TODO Make real async
 pub fn sdelay(seconds: u32) {
-    try_sdelay(seconds).unwrap()
+    try_sdelay(seconds).unwrap();
 }

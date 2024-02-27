@@ -41,8 +41,8 @@ pub struct Ps2Controller {
     available_channels: [bool; 2],
 }
 impl Ps2Controller {
-    /// Tries to init Ps2Controller, returns option because we can't do much error handling
-    pub fn init() -> Option<Self> {
+    /// Tries to init `Ps2Controller`, returns option because we can't do much error handling
+    #[must_use] pub fn init() -> Option<Self> {
         match descriptor_tables!().version() {
             crate::acpi::tables::AcpiVersion::One => {}
             crate::acpi::tables::AcpiVersion::Two => {
@@ -139,13 +139,13 @@ impl Ps2Controller {
         log::trace!("Resetting devices");
         Self::device_send_data_first(0xFF);
         if Self::assert_ack() {
-            log::trace!("First port reseted !")
+            log::trace!("First port reseted !");
         }
         if available_channels[1] {
             Self::device_send_data_second(0xFF);
             if Self::assert_ack() {
                 dbg!(1);
-                log::trace!("Second port reseted !")
+                log::trace!("Second port reseted !");
             }
         }
         // Identify devices
@@ -174,14 +174,14 @@ impl Ps2Controller {
         // Self::device_send_data_second(0xF4); // Re Enable scanning
         // assert!(Self::assert_ack());
 
-        return Some(Self { available_channels })
+        Some(Self { available_channels })
     }
     /// Sends a byte to the first port
     pub fn device_send_data_first(data: u8) {
         Self::poll_bit(STATUS_INPUT_BUFFER).unwrap();
         #[allow(const_item_mutation)]
         unsafe {
-            DATA_PORT.write(data)
+            DATA_PORT.write(data);
         }
     }
     /// Sends a byte to the second port
@@ -190,7 +190,7 @@ impl Ps2Controller {
         Self::poll_bit(STATUS_INPUT_BUFFER).unwrap();
         #[allow(const_item_mutation)]
         unsafe {
-            DATA_PORT.write(data)
+            DATA_PORT.write(data);
         }
     }
 
@@ -200,10 +200,10 @@ impl Ps2Controller {
             COMMAND_REG.write(command);
         };
     }
-    pub fn read_data() -> u8 {
+    #[must_use] pub fn read_data() -> u8 {
         #[allow(const_item_mutation)]
         unsafe {
-            return DATA_PORT.read()
+            DATA_PORT.read()
         }
     }
     /// Sends a 2 bytes command to Ps2 controller
@@ -216,35 +216,35 @@ impl Ps2Controller {
         }
     }
 
-    pub fn assert_ack() -> bool {
+    #[must_use] pub fn assert_ack() -> bool {
         let ack = Self::retrieve_command().unwrap() == 0xFA;
         if !ack && ACK_LOGGING {
             log::error!("Failed assert on ACK !");
         }
-        return ack
+        ack
     }
 
     /// Reads status port until inb(status) & bit == 0
     /// If times out, return error
     pub fn poll_bit(bit: u8) -> Result<(), Ps2PollingError> {
-        for i in 0..100000 {
+        for i in 0..100_000 {
             #[allow(const_item_mutation)]
             if unsafe { STATUS_REG.read() } & bit == 0 {
                 return Ok(());
             }
         }
-        return Err(Ps2PollingError::TimeOut)
+        Err(Ps2PollingError::TimeOut)
     }
     /// Reads status port until inb(status) & bit == bit
     /// If times out, return error
     pub fn poll_bit_set(bit: u8) -> Result<(), Ps2PollingError> {
-        for i in 0..100000 {
+        for i in 0..100_000 {
             #[allow(const_item_mutation)]
             if unsafe { STATUS_REG.read() } & bit == bit {
                 return Ok(());
             }
         }
-        return Err(Ps2PollingError::TimeOut)
+        Err(Ps2PollingError::TimeOut)
     }
     /// Tries to retrieve the contents of a previously sent command
     /// TODO Make a proper safe wrapper around send/receiving commands

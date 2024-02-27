@@ -15,13 +15,13 @@ pub struct Executor {
 
 impl Default for Executor {
     fn default() -> Self {
-        return Self::new()
+        Self::new()
     }
 }
 
 impl Executor {
-    pub fn new() -> Self {
-        return Executor {
+    #[must_use] pub fn new() -> Self {
+        Executor {
             tasks: BTreeMap::new(),
             task_queue: Arc::new(ArrayQueue::new(100)),
             waker_cache: BTreeMap::new(),
@@ -29,9 +29,7 @@ impl Executor {
     }
     pub fn spawn(&mut self, task: Task) {
         let task_id = task.id;
-        if self.tasks.insert(task.id, task).is_some() {
-            panic!("task with same ID already in tasks");
-        }
+        assert!(self.tasks.insert(task.id, task).is_none(), "task with same ID already in tasks");
         self.task_queue.push(task_id).expect("queue full");
     }
     pub fn run(&mut self) -> ! {
@@ -61,7 +59,7 @@ impl Executor {
             let waker = self
                 .waker_cache
                 .entry(task_id)
-                .or_insert_with(|| return TaskWaker::get_waker(task_id, self.task_queue.clone()));
+                .or_insert_with(|| TaskWaker::get_waker(task_id, self.task_queue.clone()));
             let mut context = Context::from_waker(waker);
             match task.poll(&mut context) {
                 Poll::Ready(()) => {
@@ -81,7 +79,7 @@ struct TaskWaker {
 }
 impl TaskWaker {
     fn get_waker(task_id: TaskId, task_queue: Arc<ArrayQueue<TaskId>>) -> Waker {
-        return Waker::from(Arc::new(TaskWaker {
+        Waker::from(Arc::new(TaskWaker {
             task_id,
             task_queue,
         }))

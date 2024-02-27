@@ -16,7 +16,7 @@ pub struct Console {
 }
 impl Console {
     pub fn new(buffer: &'static mut VgaBuffer) -> Self {
-        return Self {
+        Self {
             buffer,
             top_buffer: ConsoleBuffer::new(),
             bottom_buffer: ConsoleBuffer::new(),
@@ -27,20 +27,20 @@ impl Console {
         if x < self.size().0 && y < self.size().1 {
             unsafe { write_volatile(&mut self.buffer.chars[y as usize][x as usize], chr) }
         } else {
-            log::error!("Tried to write {:?} at {:?}", chr, (x, y))
+            log::error!("Tried to write {:?} at {:?}", chr, (x, y));
         }
     }
-    pub fn get_char_at(&self, x: u8, y: u8) -> ScreenChar {
+    #[must_use] pub fn get_char_at(&self, x: u8, y: u8) -> ScreenChar {
         if x < self.size().0 && y < self.size().1 {
-            unsafe { return read_volatile(&self.buffer.chars[y as usize][x as usize]) }
+            unsafe { read_volatile(&self.buffer.chars[y as usize][x as usize]) }
         } else {
             log::error!("Tried to read {:?}", (x, y));
-            return DEFAULT_CHAR
+            DEFAULT_CHAR
         }
     }
 
     pub fn write_byte_at(&mut self, x: u8, y: u8, byte: u8) {
-        self.write_char_at(x, y, ScreenChar::from(byte))
+        self.write_char_at(x, y, ScreenChar::from(byte));
     }
 
     pub fn clear(&mut self) {
@@ -59,21 +59,21 @@ impl Console {
         self.write_char_at(x, y, DEFAULT_CHAR);
     }
     //Doesn't support top and bottom buffer because we ScreenPos is u8's, where the max value is 256, which means we won't be able to read a lot from the buffers
-    pub fn get_str_at(&self, pos: &ScreenPos, len: u16) -> &'static [ScreenChar] {
+    #[must_use] pub fn get_str_at(&self, pos: &ScreenPos, len: u16) -> &'static [ScreenChar] {
         let (width, _height) = self.size();
         let mut first_char = core::ptr::addr_of!(self.buffer) as *const ScreenChar;
         first_char = unsafe { first_char.add(width as usize * pos.1 as usize + pos.0 as usize) };
         unsafe { return core::slice::from_raw_parts(first_char, len as usize) }
     }
-    pub fn size(&self) -> (u8, u8) {
-        return (super::buffer::BUFFER_WIDTH, super::buffer::BUFFER_HEIGHT)
+    #[must_use] pub fn size(&self) -> (u8, u8) {
+        (super::buffer::BUFFER_WIDTH, super::buffer::BUFFER_HEIGHT)
     }
 }
 unsafe impl Sync for Console {}
 unsafe impl Send for Console {}
 
 pub fn clear_console() {
-    print_screenchars_atp(&ScreenPos(0, 0), [DEFAULT_CHAR; 80 * 25])
+    print_screenchars_atp(&ScreenPos(0, 0), [DEFAULT_CHAR; 80 * 25]);
 }
 
 #[derive(Eq, PartialEq, Hash, Debug, Clone)]
@@ -91,16 +91,16 @@ pub struct ScreenChar {
     pub color_code: ColorCode,
 }
 impl ScreenChar {
-    pub const fn new(ascii_character: u8, color_code: ColorCode) -> Self {
-        return Self {
+    #[must_use] pub const fn new(ascii_character: u8, color_code: ColorCode) -> Self {
+        Self {
             ascii_character,
             color_code,
         }
     }
-    pub const fn from(ascii_character: u8) -> Self {
-        return Self::new(ascii_character, ColorCode::new(Color::White, Color::Black))
+    #[must_use] pub const fn from(ascii_character: u8) -> Self {
+        Self::new(ascii_character, ColorCode::new(Color::White, Color::Black))
     }
-    pub const fn default() -> Self {
-        return Self::from(0x00)
+    #[must_use] pub const fn default() -> Self {
+        Self::from(0x00)
     }
 }

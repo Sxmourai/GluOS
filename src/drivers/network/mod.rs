@@ -12,7 +12,7 @@ pub fn init() {
                 if subclass.id() == 0 {
                     let mut drv = E1000NetworkDriver::new(d);
                     match drv.start() {
-                        Ok(_) => {
+                        Ok(()) => {
                             log::trace!("Initialised a ethernet driver !");
                         }
                         Err(e) => match e {

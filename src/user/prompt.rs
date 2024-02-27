@@ -24,7 +24,7 @@ pub trait KbInput: Send + Sync {
     fn get_origin(&self) -> ScreenPos;
     fn get_pressed_keys_len(&self) -> usize;
     fn get_return_message(&self) -> String {
-        return String::new()
+        String::new()
     } //TODO: For blocking prompt, have to change this
     fn move_cursor(&mut self, pos: usize);
 
@@ -50,7 +50,7 @@ struct BlockingPrompt {
 
 impl BlockingPrompt {
     pub fn new(message: &str) -> Self {
-        return Self {
+        Self {
             message: message.to_string(),
             pressed_keys: Vec::new(),
             pos: 0,
@@ -63,12 +63,12 @@ impl BlockingPrompt {
         self.return_message = self
             .pressed_keys
             .iter()
-            .map(|sc| return sc.ascii_character as char)
+            .map(|sc| sc.ascii_character as char)
             .collect();
         self.return_message.push(' '); // Flag for the run fn
     }
     pub fn cursor_pos(&self) -> ScreenPos {
-        return ScreenPos(
+        ScreenPos(
             (self.pos / BUFFER_WIDTH as usize) as u8,
             (self.pos % SBUFFER_WIDTH) as u8,
         )
@@ -80,10 +80,10 @@ impl KbInput for BlockingPrompt {
         crate::terminal::writer::WRITER.lock().move_cursor(
             ((self.pos + self.origin.0 as usize) % SBUFFER_WIDTH) as u8,
             (self.pos / SBUFFER_WIDTH) as u8 + self.origin.1,
-        )
+        );
     }
     fn get_message(&self) -> String {
-        return self.message.to_string()
+        self.message.to_string()
     }
     fn run(mut self) -> String {
         self.origin = crate::terminal::writer::calculate_end(
@@ -96,9 +96,7 @@ impl KbInput for BlockingPrompt {
             if let Some(mut msg) = crate::task::keyboard::get_input_msg(idx) {
                 if msg.ends_with(' ') {
                     crate::task::keyboard::remove_input(idx);
-                    if msg.remove(msg.len() - 1) != ' ' {
-                        panic!("ERROR: {}", msg)
-                    }
+                    assert!(msg.remove(msg.len() - 1) == ' ', "ERROR: {msg}");
                     return msg;
                 }
             // let scancode = crate::terminal::serial::read_serial_input();
@@ -117,13 +115,13 @@ impl KbInput for BlockingPrompt {
         }
     }
     fn get_return_message(&self) -> String {
-        return self.return_message.to_string()
+        self.return_message.to_string()
     }
     fn get_origin(&self) -> ScreenPos {
-        return self.origin.clone()
+        self.origin.clone()
     }
     fn get_pressed_keys_len(&self) -> usize {
-        return self.pressed_keys.len()
+        self.pressed_keys.len()
     }
     fn handle_key(&mut self, key: DecodedKey) {
         match key {
@@ -209,7 +207,7 @@ impl KbInput for BlockingPrompt {
                             let history = unsafe { COMMANDS_HISTORY.read() };
                             let last_command =
                                 history.get(unsafe { *COMMANDS_INDEX.read_with_timeout() }).unwrap();
-                            self.pressed_keys = last_command.clone()
+                            self.pressed_keys = last_command.clone();
                         };
                         print_screenchars_atp(&self.origin, [DEFAULT_CHAR; 70]);
                         print_screenchars_atp(&self.origin, self.pressed_keys.clone());
@@ -225,7 +223,7 @@ impl KbInput for BlockingPrompt {
                             let history = unsafe { COMMANDS_HISTORY.read() };
                             let last_command =
                                 history.get(unsafe { *COMMANDS_INDEX.read() }).unwrap();
-                            self.pressed_keys = last_command.clone()
+                            self.pressed_keys = last_command.clone();
                         };
                         print_screenchars_atp(&self.origin, [DEFAULT_CHAR; 70]);
                         print_screenchars_atp(&self.origin, self.pressed_keys.clone());
@@ -238,10 +236,10 @@ impl KbInput for BlockingPrompt {
     }
 
     fn remove(&mut self, idx: usize) -> ScreenChar {
-        return self.pressed_keys.remove(idx)
+        self.pressed_keys.remove(idx)
     }
 }
 
-pub fn input(message: &str) -> String {
-    return crate::user::prompt::BlockingPrompt::new(message).run()
+#[must_use] pub fn input(message: &str) -> String {
+    crate::user::prompt::BlockingPrompt::new(message).run()
 }

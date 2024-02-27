@@ -27,46 +27,46 @@ pub struct ConsoleBuffer {
 }
 impl Default for ConsoleBuffer {
     fn default() -> Self {
-        return Self::new()
+        Self::new()
     }
 }
 
 impl ConsoleBuffer {
-    pub fn new() -> Self {
-        return Self { inner: Vec::new() }
+    #[must_use] pub fn new() -> Self {
+        Self { inner: Vec::new() }
     }
     // appends item at end of buffer
     pub fn append(&mut self, line: [ScreenChar; SBUFFER_WIDTH]) {
-        self.inner.push(line)
+        self.inner.push(line);
     }
     // pushes item at start of buffer and moves everything else
     pub fn push(&mut self, line: [ScreenChar; SBUFFER_WIDTH]) {
         self.inner.insert(0, line);
     }
-    pub fn get_youngest_line(&self) -> Option<[ScreenChar; BUFFER_WIDTH as usize]> {
+    #[must_use] pub fn get_youngest_line(&self) -> Option<[ScreenChar; BUFFER_WIDTH as usize]> {
         return self.inner.last().copied()
     }
     pub fn remove_youngest_line(&mut self) -> [ScreenChar; BUFFER_WIDTH as usize] {
-        return self.inner.remove(self.inner.len() - 1)
+        self.inner.remove(self.inner.len() - 1)
     }
-    pub fn get_oldest_line(&self) -> Option<[ScreenChar; BUFFER_WIDTH as usize]> {
+    #[must_use] pub fn get_oldest_line(&self) -> Option<[ScreenChar; BUFFER_WIDTH as usize]> {
         return self.inner.first().copied()
     }
 
-    pub fn size(&self) -> (u8, u8) {
-        return (BUFFER_WIDTH, self.inner.len().try_into().unwrap())
+    #[must_use] pub fn size(&self) -> (u8, u8) {
+        (BUFFER_WIDTH, self.inner.len().try_into().unwrap())
     }
     pub fn write_screenchar_at(&mut self, pos: &ScreenPos, chr: ScreenChar) {
         if pos.0 < BUFFER_WIDTH && pos.1 < BUFFER_HEIGHT {
-            self.inner[pos.1 as usize][pos.0 as usize] = chr
+            self.inner[pos.1 as usize][pos.0 as usize] = chr;
         } else {
             panic!("Tried to write {:?} at {:?}", chr, pos)
         }
     }
-    pub fn get_screenchar_at(&self, pos: &ScreenPos) -> ScreenChar {
-        return self.inner[pos.1 as usize][pos.0 as usize]
+    #[must_use] pub fn get_screenchar_at(&self, pos: &ScreenPos) -> ScreenChar {
+        self.inner[pos.1 as usize][pos.0 as usize]
     }
-    pub fn is_empty(&self) -> bool {
-        return self.inner.is_empty()
+    #[must_use] pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
     }
 }
