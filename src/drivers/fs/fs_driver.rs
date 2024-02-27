@@ -117,7 +117,7 @@ pub enum Entry {
 #[derive(Debug, Clone)]
 pub struct File {
     pub path: FilePath,
-    pub content: String,
+    pub content: Vec<u8>,
     pub size: usize,
 }
 #[derive(Debug, Clone)]

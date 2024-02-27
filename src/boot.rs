@@ -15,7 +15,7 @@ use crate::{
         executor.spawn(drv.task);
     }
     executor.spawn(Task::new(
-        Shell::default().run_with_command("exec 10/userland.o".to_string()),
+        Shell::default().run_with_command("exec 10/userland".to_string()),
     ));
     executor
 }

@@ -53,7 +53,7 @@ def main(args):
         cmd(fr"echo hi | sudo tee -a mounted_disk/hello.txt", "Creating a test file")
         cmd(fr"sudo mkdir mounted_disk/hello_dirs", "Creating a test dir")
         cmd(fr"echo hello | sudo tee -a mounted_disk/hello_dirs/second_hello_wewe.txt", "Creating another test file in the folder")
-        cmd(fr"sudo cp userland.o mounted_disk/userland.o", "Copying a simple executable file")
+        cmd(fr"sudo cp userland mounted_disk/", "Copying a simple executable file")
         cmd(fr"sudo umount mounted_disk", "Unmounting partition")
         cmd(fr"sudo losetup -d /dev/loop3", "Unmounting partition from loop device")
 

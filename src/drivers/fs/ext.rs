@@ -151,7 +151,7 @@ impl ExtDriver {
                 inode: entry.inner.inode,
                 size: u64::from(inode.lo_32b_size),
                 type_indicator: entry.type_indicator(),
-                content: String::from_utf8_lossy(&data_blk).to_string(),
+                content: data_blk,
             }))
         } else {
             let typ = inode.type_n_perms;
@@ -268,7 +268,7 @@ pub struct ExtFile {
     inode: u32,
     size: u64,
     type_indicator: ExtInodeType,
-    content: String,
+    content: Vec<u8>,
 }
 //TODO Not use vec but [Inode; 4]
 /// `inode_size` should be u16

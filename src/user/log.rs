@@ -57,7 +57,7 @@ impl Log for Logger {
         let _buffer = [0_u8; 128];
         let args = match record.level() {
             Level::Trace => {
-                let args = alloc::format!("{}:{}\t - {}", file!(), line!(), record.args());
+                let args = alloc::format!("{}:{}\t - {}", record.file().unwrap(), record.line().unwrap(), record.args());
                 crate::user::log::TRACES.write_with_timeout().push(args.clone());
                 return; // We don't want to print traces
             }
@@ -96,14 +96,19 @@ macro_rules! dbg {
     };
     ($variable:expr) => {
         $crate::serial_println!(
-            "{} = {:?} at {}:{}",
-            stringify!($variable),
-            $variable,
+            "[{}:{}] {} = {:?}",
             file!(),
             line!(),
+            stringify!($variable),
+            $variable,
         )
     };
     ($($var:expr),+ $(,)?) => {
+        $crate::serial_print!(
+            "[{}:{}] ",
+            file!(),
+            line!(),
+        );
         $(
             $crate::serial_print!(
                 "{} = {:?}, ",
@@ -111,11 +116,7 @@ macro_rules! dbg {
                 $var,
             );
         )+
-        $crate::serial_println!(
-            "at {}:{}",
-            file!(),
-            line!(),
-        );
+        $crate::serial_println!();
     };
 }
 

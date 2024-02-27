@@ -17,7 +17,7 @@ use super::handler::MemoryHandler;
 #[global_allocator]
 static ALLOCATOR: Locked<FixedSizeBlockAllocator> = Locked::new(FixedSizeBlockAllocator::new());
 pub const HEAP_START: usize = 0x_4444_4444_0000;
-pub const HEAP_SIZE: usize = 100 * 1024 * 5;
+pub const HEAP_SIZE: usize = 1000 * 1024; // 1000Kib
 
 pub struct Dummy;
 

@@ -119,16 +119,16 @@ pub extern "x86-interrupt" fn page_fault_handler(
 ) {
     use x86_64::registers::control::Cr2;
     let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE;
-    map(Page::containing_address(Cr2::read()), flags);
     error!(
         "EXCEPTION: PAGE FAULT
-    Accessed Address: {:?}
-    Error Code: {:?}
-    Stack frame: {:#?}",
+        Accessed Address: {:?}
+        Error Code: {:?}
+        Stack frame: {:#?}",
         Cr2::read(),
         error_code,
         stack_frame
     );
+    map(Page::containing_address(Cr2::read()), flags);
 }
 
 // pub fn map_phys_memory(location: u64, size: usize, end_page:u64) -> &'static [u8] {

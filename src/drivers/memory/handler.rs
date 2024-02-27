@@ -1,7 +1,7 @@
 use bootloader::bootinfo::MemoryMap;
 use x86_64::{
     structures::paging::{
-        mapper::{MapperFlush, UnmapError},
+        mapper::{MapToError, MapperFlush, UnmapError},
         FrameAllocator, Mapper, OffsetPageTable, Page, PageTableFlags, PhysFrame, Size4KiB,
     },
     PhysAddr, VirtAddr,
@@ -49,10 +49,10 @@ impl MemoryHandler {
         &mut self,
         page: Page<Size4KiB>,
         flags: PageTableFlags,
-    ) -> Result<PhysAddr, MapFrameError> {
+    ) -> Result<PhysAddr, MapToError<Size4KiB>> {
         let frame = self.frame_allocator.allocate_frame();
         if frame.is_none() {
-            return Err(MapFrameError::CantAllocateFrame);
+            return Err(MapToError::FrameAllocationFailed);
         }
         let frame = frame.unwrap();
         unsafe { self.map_frame(page, frame, flags)? }
@@ -74,11 +74,10 @@ impl MemoryHandler {
         page: Page<Size4KiB>,
         frame: PhysFrame,
         flags: PageTableFlags,
-    ) -> Result<(), MapFrameError> {
+    ) -> Result<(), MapToError<Size4KiB>> {
         unsafe {
             self.mapper
-                .map_to(page, frame, flags, &mut self.frame_allocator)
-                .map_err(|err| MapFrameError::CantAllocateFrame)?
+                .map_to(page, frame, flags, &mut self.frame_allocator)?
                 .flush();
         }
         Ok(())
@@ -93,11 +92,24 @@ impl MemoryHandler {
 }
 /// Unsafe not set for ease of use... Maybe change that
 /// TODO Do we want to keep this function not unsafe even though it is ?
+#[track_caller]
 #[must_use] pub fn map(page: Page<Size4KiB>, flags: PageTableFlags) -> PhysAddr {
     unsafe { mem_handler!().map(page, flags) }.unwrap()
-}
+} // TODO Refactor those functions
+#[track_caller]
 pub fn map_frame(page: Page<Size4KiB>, frame: PhysFrame, flags: PageTableFlags) {
-    unsafe { mem_handler!().map_frame(page, frame, flags) }.unwrap();
+    match unsafe { mem_handler!().map_frame(page, frame, flags) } {
+        Ok(()) => {},
+        Err(err) => match err {
+            MapToError::FrameAllocationFailed => todo!(),
+            MapToError::ParentEntryHugePage => todo!(),
+            MapToError::PageAlreadyMapped(already_frame) => {
+                log::error!("Tried to map page at {:#x} -> {:#x}({:?}) but it's already mapped to {:#x}", page.start_address(), frame.start_address(), flags, already_frame.start_address());
+                unsafe{mem_handler!().unmap(page).unwrap()};
+                unsafe { mem_handler!().map_frame(page, frame, flags) }.unwrap();
+            }, // If the page is already mapped, it like nothing happened, so we don't need to panic
+        },
+    }
 }
 #[macro_export]
 macro_rules! mem_map {

@@ -18,6 +18,8 @@
 #![deny(clippy::perf)]
 #![warn(clippy::pedantic)]
 #![warn(clippy::complexity)]
+#![cfg_attr(not(debug_assertions), deny(clippy::unwrap_used))]
+#![cfg_attr(not(debug_assertions), deny(clippy::expect_used))]
 
 pub mod bit_manipulation;
 pub mod boot;

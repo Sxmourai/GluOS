@@ -170,7 +170,7 @@ fn exec(raw_args: String) -> Result<(), String> {
         let entry = fs_driver.read(&path).or(Err("Error reading file ! Maybe specified path couldn't be found".to_string()))?;
         match entry {
             Entry::File(mut f) => {
-                if crate::fs::elf::execute(f.content).is_err() {
+                if crate::fs::elf::execute(&f.content).is_err() {
                     return Err("Failed executing file".to_string());
                 }
             }
@@ -209,7 +209,7 @@ fn read(raw_args: String) -> Result<(), String> {
     if let Ok(entry) = fs_driver.read(&path) {
         match entry {
             Entry::File(mut f) => {
-                println!("{}", f.content);
+                println!("{}", String::from_utf8_lossy(&f.content));
             }
             Entry::Dir(mut d) => {
                 for sub in d.entries {

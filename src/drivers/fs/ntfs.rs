@@ -105,13 +105,12 @@ impl NTFSDriver {
                         let v = b.to_attribute().unwrap();
                         let mut buf = Vec::new();
                         v.value(reader).unwrap().read(reader, &mut buf).unwrap();
-                        let content = String::from_utf8_lossy(&buf).to_string();
                         Entry::File(File {
                             path: FilePath::new(
                                 format!("{}/{}", prefix, file_name.name()),
                                 partition.clone(),
                             ),
-                            content,
+                            content: buf,
                             size: file.data_size() as usize,
                         })
                     } else {
