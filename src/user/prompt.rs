@@ -9,11 +9,11 @@ use alloc::{
 use pc_keyboard::{DecodedKey, KeyCode};
 use spin::RwLock;
 
-use crate::terminal::{
+use crate::{sync::TimeOutRwLock, terminal::{
     buffer::{BUFFER_WIDTH, SBUFFER_WIDTH},
     console::{ScreenChar, DEFAULT_CHAR},
     writer::{print_at, print_screenchar_at, print_screenchars_atp, ScreenPos},
-};
+}};
 use crate::{print, println};
 
 pub static mut COMMANDS_HISTORY: RwLock<Vec<Vec<ScreenChar>>> = RwLock::new(Vec::new());
@@ -198,17 +198,17 @@ impl KbInput for BlockingPrompt {
                     }
                 }),
                 KeyCode::ArrowUp => {
-                    if unsafe { *COMMANDS_INDEX.read() } > 0 {
-                        *unsafe { COMMANDS_INDEX.write() } -= 1;
-                        if unsafe { *COMMANDS_INDEX.read() }
-                            == unsafe { COMMANDS_HISTORY.read().len() } - 1
+                    if unsafe { *COMMANDS_INDEX.read_with_timeout() } > 0 {
+                        *unsafe { COMMANDS_INDEX.write_with_timeout() } -= 1;
+                        if unsafe { *COMMANDS_INDEX.read_with_timeout() }
+                            == unsafe { COMMANDS_HISTORY.read_with_timeout().len() } - 1
                         {
-                            unsafe { COMMANDS_HISTORY.write().push(self.pressed_keys.clone()) };
+                            unsafe { COMMANDS_HISTORY.write_with_timeout().push(self.pressed_keys.clone()) };
                         }
                         {
                             let history = unsafe { COMMANDS_HISTORY.read() };
                             let last_command =
-                                history.get(unsafe { *COMMANDS_INDEX.read() }).unwrap();
+                                history.get(unsafe { *COMMANDS_INDEX.read_with_timeout() }).unwrap();
                             self.pressed_keys = last_command.clone();
                         }
                         print_screenchars_atp(&self.origin, [DEFAULT_CHAR; 70]);
@@ -220,7 +220,7 @@ impl KbInput for BlockingPrompt {
                     if unsafe { *COMMANDS_INDEX.read() } + 1
                         < unsafe { COMMANDS_HISTORY.read().len() }
                     {
-                        *unsafe { COMMANDS_INDEX.write() } += 1;
+                        *unsafe { COMMANDS_INDEX.write_with_timeout() } += 1;
                         {
                             let history = unsafe { COMMANDS_HISTORY.read() };
                             let last_command =

@@ -123,7 +123,7 @@ pub fn get_drivers() -> Vec<Driver> {
         // #[cfg(feature = "smp")]
         // ("multiprocessing (SMP)", super::smp::init),
         // ("Userland (Ring 3)", super::userland::go_ring3),
-        make_driver!(Random, async{super::rand::init()}),
+        // make_driver!(Random, async{super::rand::init()}),
         // ("Network", super::network::init),
         // Don't need to init mouse driver cuz we don't have a use for it currently
         // ("Mouse", super::mouse::init),

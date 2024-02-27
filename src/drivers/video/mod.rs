@@ -1,5 +1,7 @@
 use alloc::boxed::Box;
 
+use crate::sync::TimeOutRwLock;
+
 use self::{
     drawer::{Circle, Pos, Rect, Shape},
     frame_buffer::{SCREEN, SH},
@@ -33,7 +35,7 @@ pub fn init() {
             8,
         ),
     ];
-    let mut screen_lock = SCREEN.write();
+    let mut screen_lock = SCREEN.write_with_timeout();
     for (mut shape, color) in shapes {
         shape.draw(color, &mut screen_lock);
     }

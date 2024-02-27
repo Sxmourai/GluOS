@@ -10,16 +10,10 @@ use raw_cpuid::CpuId;
 use shell_macro::command;
 
 use crate::{
-    dbg, descriptor_tables,
-    disk::{
+    dbg, descriptor_tables, disk::{
         driver::{read_from_disk, write_to_disk},
         DiskLoc,
-    },
-    disk_manager,
-    drivers::disk::ata::{self, Channel, Drive},
-    pci::PciLocation,
-    pci_manager, print, println, serial_println,
-    terminal::console::{ScreenChar, DEFAULT_CHAR},
+    }, disk_manager, drivers::disk::ata::{self, Channel, Drive}, pci::PciLocation, pci_manager, print, println, serial_println, sync::TimeOutRwLock, terminal::console::{ScreenChar, DEFAULT_CHAR}
 };
 
 use super::prompt::{input, COMMANDS_HISTORY, COMMANDS_INDEX};
@@ -457,7 +451,7 @@ impl CommandRunner {
             command.push(ScreenChar::new(char, DEFAULT_CHAR.color_code));
         }
         unsafe {
-            COMMANDS_HISTORY.write().push(command);
+            COMMANDS_HISTORY.write_with_timeout().push(command);
             let history_len = COMMANDS_HISTORY.read().len();
             if history_len > 1
                 && COMMANDS_HISTORY
@@ -467,11 +461,11 @@ impl CommandRunner {
                     .is_empty()
             {
                 COMMANDS_HISTORY
-                    .write()
+                    .write_with_timeout()
                     .swap(history_len - 2, history_len - 1);
             }
         }
-        unsafe { *COMMANDS_INDEX.write() += 1 };
+        unsafe { *COMMANDS_INDEX.write_with_timeout() += 1 };
 
         let mut args = cmd.split(' ');
         let program = args.next().unwrap();

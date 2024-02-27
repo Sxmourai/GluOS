@@ -2,6 +2,8 @@ use core::ptr::write_volatile;
 
 use spin::{RwLock, RwLockWriteGuard};
 
+use crate::sync::TimeOutRwLock;
+
 use super::Color;
 pub struct VgaLinearBuffer {
     pub inner: [[u8; 320]; 200],
@@ -26,7 +28,7 @@ pub type ScreenLock = RwLockWriteGuard<'static, FrameBuffer>;
 
 pub fn fill_rect(_x: usize, _y: usize, _w: usize, _h: usize, _color: Color) {}
 pub fn put_pixel(x: usize, y: usize, color: Color) {
-    put_pixel_lock(x, y, color, &mut SCREEN.write())
+    put_pixel_lock(x, y, color, &mut SCREEN.write_with_timeout())
 }
 pub fn put_pixel_lock(x: usize, y: usize, color: Color, screen: &mut ScreenLock) {
     unsafe { write_volatile(&mut screen.buffer.inner[y][x], color) }

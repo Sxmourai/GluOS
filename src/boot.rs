@@ -15,14 +15,6 @@ pub fn boot(boot_info: &'static bootloader::BootInfo) -> Executor {
         executor.spawn(drv.task);
     }
     executor.spawn(Task::new(
-        async {
-            log::debug!("Finished booting");
-            crate::time::sdelay(3);
-            log::debug!("Finished booting");
-
-        },
-    ));
-    executor.spawn(Task::new(
         Shell::default().run_with_command("exec 10/userland.o".to_string()),
     ));
     executor

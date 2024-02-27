@@ -54,7 +54,7 @@ impl DiskManager {
     ) -> Result<Vec<u8>, DiskError> {
         match self.disks.get(loc).ok_or(DiskError::NotFound)?.drv {
             DiskDriverEnum::Ata => {
-                let mut ata_drv = unsafe { ATA_DRIVER.as_mut().unwrap().write() };
+                let mut ata_drv = unsafe { ATA_DRIVER.as_mut().unwrap().write_with_timeout() };
                 ata_drv.read(loc, start_sector, sector_count)
             }
             DiskDriverEnum::NVMe => {
@@ -70,7 +70,7 @@ impl DiskManager {
     ) -> Result<(), DiskError> {
         match self.disks.get(loc).ok_or(DiskError::NotFound)?.drv {
             DiskDriverEnum::Ata => {
-                let mut ata_drv = unsafe { ATA_DRIVER.as_mut().unwrap().write() };
+                let mut ata_drv = unsafe { ATA_DRIVER.as_mut().unwrap().write_with_timeout() };
                 ata_drv.write(loc, start_sector, content)
             }
             DiskDriverEnum::NVMe => {
@@ -89,6 +89,7 @@ pub fn read_from_disk(
 }
 #[cfg(feature = "fs")]
 use crate::fs::partition::Partition;
+use crate::sync::TimeOutRwLock;
 #[cfg(feature = "fs")]
 pub fn read_from_partition(
     partition: &Partition,

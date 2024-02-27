@@ -1,4 +1,4 @@
-use crate::{dbg, drivers::time, ps2, serial_print};
+use crate::{dbg, drivers::time, ps2, serial_print, sync::TimeOutRwLock};
 
 use alloc::boxed::Box;
 use pic8259::ChainedPics;
@@ -41,7 +41,7 @@ pub fn register_interrupt(
     int: extern "x86-interrupt" fn(x86_64::structures::idt::InterruptStackFrame),
 ) {
     unsafe {
-        IDT.as_mut().unwrap().write()[int_num as usize + PIC_1_OFFSET as usize].set_handler_fn(int)
+        IDT.as_mut().unwrap().write_with_timeout()[int_num as usize + PIC_1_OFFSET as usize].set_handler_fn(int)
     };
 }
 

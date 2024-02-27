@@ -1,6 +1,6 @@
 use alloc::{format, string::String};
 
-use crate::serial_println;
+use crate::{serial_println, sync::TimeOutRwLock};
 
 use log::{error, Level, LevelFilter, Log, Metadata, Record};
 
@@ -58,7 +58,7 @@ impl Log for Logger {
         let args = match record.level() {
             Level::Trace => {
                 let args = alloc::format!("{}:{}\t - {}", file!(), line!(), record.args());
-                crate::user::log::TRACES.write().push(args.clone());
+                crate::user::log::TRACES.write_with_timeout().push(args.clone());
                 return; // We don't want to print traces
             }
             _ => {

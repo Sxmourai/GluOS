@@ -9,13 +9,7 @@ pub trait TimeOutMutex<'a, T> {
 impl<'a, M: 'a> TimeOutMutex<'a, M> for spin::Mutex<M> {
     type Guard = spin::MutexGuard<'a, M>;
     fn try_lock_with_timeout(&'a self) -> Option<Self::Guard> {
-        for i in 0..100_000 {
-            if !self.is_locked() {
-                return Some(self.lock())
-            }
-            core::hint::spin_loop()
-        }
-        None
+        timeout(&|| !self.is_locked(), &|| self.lock())
     }
 }
 
