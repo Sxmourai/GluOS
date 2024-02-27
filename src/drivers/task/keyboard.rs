@@ -26,7 +26,7 @@ pub struct KeyboardHandler {
 }
 impl KeyboardHandler {
     pub fn is_pressed(&self, code: &KeyCode) -> bool {
-        self.pressed.contains(code)
+        return self.pressed.contains(code)
     }
 
     pub fn process_keyevent(&mut self, scancode: u8) {
@@ -39,7 +39,7 @@ impl KeyboardHandler {
                 self.pressed.swap_remove(
                     self.pressed
                         .iter()
-                        .position(|x| *x == key_event.code)
+                        .position(|x| return *x == key_event.code)
                         .unwrap(),
                 ); //TODO Change .retain to for loop or better (i.e. swap_remove is O(1) but u need the index)
             }
@@ -81,15 +81,15 @@ unsafe impl<T: ?Sized> Send for SendSyncWrapper<T> {}
 // Adds prompt to list and returns its index
 pub fn add_input(input: impl KbInput + 'static) -> usize {
     KB_INPUTS.lock().push(Box::new(SendSyncWrapper(input)));
-    KB_INPUTS.lock().len() - 1
+    return KB_INPUTS.lock().len() - 1
 }
 // Removes prompt from list and returns it
 pub fn remove_input(idx: usize) -> Box<SendSyncWrapper<dyn KbInput>> {
-    KB_INPUTS.lock().remove(idx)
+    return KB_INPUTS.lock().remove(idx)
 }
 pub fn get_input_msg(idx: usize) -> Option<String> {
     if let Some(input) = KB_INPUTS.lock().get(idx) {
         return Some(input.0.get_return_message());
     }
-    None
+    return None
 }

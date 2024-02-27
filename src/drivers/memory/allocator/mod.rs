@@ -1,7 +1,7 @@
 //pub mod bump;
 //pub mod linked_list;
 pub mod fixed_size_block;
-use alloc::alloc::{GlobalAlloc, Layout};
+use core::alloc::{GlobalAlloc, Layout};
 use core::ptr::null_mut;
 use x86_64::{
     structures::paging::{
@@ -23,7 +23,7 @@ pub struct Dummy;
 
 unsafe impl GlobalAlloc for Dummy {
     unsafe fn alloc(&self, _layout: Layout) -> *mut u8 {
-        null_mut()
+        return null_mut()
     }
 
     unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
@@ -34,7 +34,7 @@ unsafe impl GlobalAlloc for Dummy {
 pub fn init_heap(mem_handler: &mut MemoryHandler) -> Result<(), MapToError<Size4KiB>> {
     let page_range = {
         let heap_start = VirtAddr::new(HEAP_START as u64);
-        let heap_end = heap_start + HEAP_SIZE - 1u64;
+        let heap_end = heap_start + HEAP_SIZE - 1_u64;
         let heap_start_page = Page::containing_address(heap_start);
         let heap_end_page = Page::containing_address(heap_end);
         Page::range_inclusive(heap_start_page, heap_end_page)
@@ -45,10 +45,10 @@ pub fn init_heap(mem_handler: &mut MemoryHandler) -> Result<(), MapToError<Size4
     }
 
     unsafe {
-        ALLOCATOR.lock().init(HEAP_START, HEAP_SIZE);
-    }
+        ALLOCATOR.lock().init(HEAP_START, HEAP_SIZE)
+    };
 
-    Ok(())
+    return Ok(())
 }
 
 /// A wrapper around spin::Mutex to permit trait implementations.
@@ -58,12 +58,12 @@ pub struct Locked<A> {
 
 impl<A> Locked<A> {
     pub const fn new(inner: A) -> Self {
-        Locked {
+        return Locked {
             inner: spin::Mutex::new(inner),
         }
     }
 
     pub fn lock(&self) -> spin::MutexGuard<A> {
-        self.inner.lock()
+        return self.inner.lock()
     }
 }

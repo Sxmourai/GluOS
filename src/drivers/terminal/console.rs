@@ -16,7 +16,7 @@ pub struct Console {
 }
 impl Console {
     pub fn new(buffer: &'static mut VgaBuffer) -> Self {
-        Self {
+        return Self {
             buffer,
             top_buffer: ConsoleBuffer::new(),
             bottom_buffer: ConsoleBuffer::new(),
@@ -32,10 +32,10 @@ impl Console {
     }
     pub fn get_char_at(&self, x: u8, y: u8) -> ScreenChar {
         if x < self.size().0 && y < self.size().1 {
-            unsafe { read_volatile(&self.buffer.chars[y as usize][x as usize]) }
+            unsafe { return read_volatile(&self.buffer.chars[y as usize][x as usize]) }
         } else {
             log::error!("Tried to read {:?}", (x, y));
-            DEFAULT_CHAR
+            return DEFAULT_CHAR
         }
     }
 
@@ -63,10 +63,10 @@ impl Console {
         let (width, _height) = self.size();
         let mut first_char = core::ptr::addr_of!(self.buffer) as *const ScreenChar;
         first_char = unsafe { first_char.add(width as usize * pos.1 as usize + pos.0 as usize) };
-        unsafe { core::slice::from_raw_parts(first_char, len as usize) }
+        unsafe { return core::slice::from_raw_parts(first_char, len as usize) }
     }
     pub fn size(&self) -> (u8, u8) {
-        (super::buffer::BUFFER_WIDTH, super::buffer::BUFFER_HEIGHT)
+        return (super::buffer::BUFFER_WIDTH, super::buffer::BUFFER_HEIGHT)
     }
 }
 unsafe impl Sync for Console {}
@@ -92,15 +92,15 @@ pub struct ScreenChar {
 }
 impl ScreenChar {
     pub const fn new(ascii_character: u8, color_code: ColorCode) -> Self {
-        Self {
+        return Self {
             ascii_character,
             color_code,
         }
     }
     pub const fn from(ascii_character: u8) -> Self {
-        Self::new(ascii_character, ColorCode::new(Color::White, Color::Black))
+        return Self::new(ascii_character, ColorCode::new(Color::White, Color::Black))
     }
     pub const fn default() -> Self {
-        Self::from(0x00)
+        return Self::from(0x00)
     }
 }

@@ -41,7 +41,7 @@ impl FsDriverInitialiser for NTFSDriver {
         drv.read_upcase_table(&mut reader).ok()?;
         let root = drv.root_directory(&mut reader).ok()?;
         let files = Self::walk_dir(partition, "", &mut reader, &drv, root)?;
-        Some(alloc::boxed::Box::new(Self {
+        return Some(alloc::boxed::Box::new(Self {
             partition: partition.clone(),
             ntfs: drv,
             io: reader,
@@ -121,7 +121,7 @@ impl NTFSDriver {
                 }
             }
         }
-        Some(parsed_entries)
+        return Some(parsed_entries)
     }
 }
 
@@ -131,7 +131,7 @@ impl FsDriver for NTFSDriver {
         path: &FilePath,
     ) -> Result<super::fs_driver::Entry, super::fs_driver::FsReadError> {
         dbg!(self.files);
-        Ok(self
+        return Ok(self
             .files
             .get(path)
             .ok_or(FsReadError::EntryNotFound)?
@@ -139,11 +139,11 @@ impl FsDriver for NTFSDriver {
     }
 
     fn as_enum(&self) -> super::fs_driver::FsDriverEnum {
-        super::fs_driver::FsDriverEnum::NTFS
+        return super::fs_driver::FsDriverEnum::NTFS
     }
 
     fn partition(&self) -> &super::partition::Partition {
-        &self.partition
+        return &self.partition
     }
 }
 
@@ -168,7 +168,7 @@ impl binrw::io::Read for DiskReader {
             buf[i] = sec[i + off as usize];
             self.pos += 1;
         }
-        binrw::io::Result::Ok(buf.len())
+        return binrw::io::Result::Ok(buf.len())
     }
 }
 impl binrw::io::Seek for DiskReader {
@@ -180,6 +180,6 @@ impl binrw::io::Seek for DiskReader {
                 self.pos + <i64 as TryInto<u64>>::try_into(c).unwrap()
             }
         };
-        binrw::io::Result::Ok(self.pos)
+        return binrw::io::Result::Ok(self.pos)
     }
 }

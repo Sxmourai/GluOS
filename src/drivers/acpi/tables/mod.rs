@@ -44,12 +44,12 @@ impl core::fmt::Debug for ACPISDTHeader {
         let creator_id = self.creator_id;
         let creator_revision = self.creator_revision;
         f.debug_struct("ACPISDTHeader")
-            .field("signature", &self.signature.map(|c| c as char))
+            .field("signature", &self.signature.map(|c| return c as char))
             .field("length", &length)
             .field("revision", &self.revision)
             .field("checksum", &self.checksum)
-            .field("oemid", &self.oemid.map(|c| c as char))
-            .field("oem_table_id", &self.oem_table_id.map(|c| c as char))
+            .field("oemid", &self.oemid.map(|c| return c as char))
+            .field("oem_table_id", &self.oem_table_id.map(|c| return c as char))
             .field("oem_revision", &oem_revision)
             .field("creator_id", &creator_id)
             .field("creator_revision", &creator_revision)
@@ -64,8 +64,8 @@ pub enum SystemDescriptionPtr {
 impl SystemDescriptionPtr {
     pub fn addr(&self) -> u64 {
         match self {
-            SystemDescriptionPtr::Root(rsdp) => rsdp.rsdt_addr.into(),
-            SystemDescriptionPtr::Extended(xsdp) => xsdp.xsdt_addr,
+            SystemDescriptionPtr::Root(rsdp) => return rsdp.rsdt_addr.into(),
+            SystemDescriptionPtr::Extended(xsdp) => return xsdp.xsdt_addr,
         }
     }
 }
@@ -77,8 +77,8 @@ pub enum SystemDescriptionTable {
 impl SystemDescriptionTable {
     pub fn tables(&self) -> Vec<u64> {
         match self {
-            SystemDescriptionTable::Root(rsdt) => rsdt.1.iter().map(|ptr| *ptr as u64).collect(),
-            SystemDescriptionTable::Extended(xsdt) => xsdt.1.clone(),
+            SystemDescriptionTable::Root(rsdt) => rsdt.1.iter().map(|ptr| return *ptr as u64).collect(),
+            SystemDescriptionTable::Extended(xsdt) => return xsdt.1.clone(),
         }
     }
 }
@@ -134,7 +134,7 @@ impl DescriptorTablesHandler {
                 }
             };
         }
-        Some(Self {
+        return Some(Self {
             fadt: acpi?, // TODO Try to continue even if one table wasn't found
             madt: madt?,
             hpet: hpet?,
@@ -144,12 +144,12 @@ impl DescriptorTablesHandler {
     }
 
     pub fn num_core(&self) -> usize {
-        self.madt.cores.len()
+        return self.madt.cores.len()
     }
     pub fn version(&self) -> AcpiVersion {
         match self.description_table {
-            SystemDescriptionTable::Root(_) => AcpiVersion::One,
-            SystemDescriptionTable::Extended(_) => AcpiVersion::Two,
+            SystemDescriptionTable::Root(_) => return AcpiVersion::One,
+            SystemDescriptionTable::Extended(_) => return AcpiVersion::Two,
         }
     }
 }
@@ -171,7 +171,7 @@ fn read_sdt(ptr: u64, end_page: u64) -> (&'static ACPISDTHeader, &'static [u8]) 
     let bytes = unsafe { read_phys_memory_and_map(ptr, ACPI_HEAD_SIZE, end_page) };
     let entry: &ACPISDTHeader = unsafe { &*(bytes.as_ptr() as *const _) };
     let bytes = unsafe { core::slice::from_raw_parts(bytes.as_ptr(), entry.length as usize) };
-    (entry, bytes)
+    return (entry, bytes)
 }
 
 #[repr(C, packed)]

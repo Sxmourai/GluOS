@@ -23,7 +23,7 @@ impl Date {
 }
 impl Display for Date {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str(&alloc::format!(
+        return f.write_str(&alloc::format!(
             "{}:{}:{}",
             self.days,
             self.months,
@@ -37,11 +37,11 @@ const CMOS_DATA: Port<u8> = Port::new(0x71);
 fn get_reg(reg: u8) -> u8 {
     unsafe {
         CMOS_ADDRESS.write((1 << 7) | reg);
-        CMOS_DATA.read()
+        return CMOS_DATA.read()
     }
 }
 fn get_update_in_progress_flag() -> bool {
-    get_reg(0x0A) & 0x80 != 0
+    return get_reg(0x0A) & 0x80 != 0
 }
 // int century_register = 0x00;                                // Set by ACPI table parsing code if possible
 pub fn init() {
@@ -110,5 +110,5 @@ pub fn tick() {
     *ELAPSED_TICKS_SINCE_BOOT.lock() += 1;
 }
 pub fn get_ticks() -> usize {
-    *ELAPSED_TICKS_SINCE_BOOT.lock()
+    return *ELAPSED_TICKS_SINCE_BOOT.lock()
 }

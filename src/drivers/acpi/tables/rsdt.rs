@@ -27,7 +27,7 @@ use super::{ACPISDTHeader, SystemDescriptionPtr, SystemDescriptionTable};
 pub fn find_string(bytes: &[u8], search_string: &[u8]) -> Option<usize> {
     let search_len = search_string.len();
 
-    (0..(bytes.len() - search_len + 1)).find(|&i| &bytes[i..(i + search_len)] == search_string)
+    (0..(bytes.len() - search_len + 1)).find(|&i| return &bytes[i..(i + search_len)] == search_string)
 }
 
 pub const RSDP_SIGNATURE: &[u8; 8] = b"RSD PTR ";
@@ -62,7 +62,7 @@ fn search_rsdp_in_page(page: u64, physical_memory_offset: u64) -> Option<&'stati
 
         return Some(rsdp_descriptor);
     }
-    None
+    return None
 }
 
 pub fn search_rsdp(physical_memory_offset: u64) -> &'static RSDPDescriptor {
@@ -96,7 +96,7 @@ fn get_table_ptrs<
             &mut sdt_and_ptrs[i..i + core::mem::size_of::<T>()].iter(),
         ));
     }
-    ptrs
+    return ptrs
 }
 
 pub fn get_rsdt(sdp: &SystemDescriptionPtr) -> Option<SystemDescriptionTable> {
@@ -126,5 +126,5 @@ pub fn get_rsdt(sdp: &SystemDescriptionPtr) -> Option<SystemDescriptionTable> {
         log::error!("Failed doing checksum of RSDT");
         return None;
     }
-    Some(sdt)
+    return Some(sdt)
 }

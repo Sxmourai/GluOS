@@ -27,13 +27,13 @@ pub struct ConsoleBuffer {
 }
 impl Default for ConsoleBuffer {
     fn default() -> Self {
-        Self::new()
+        return Self::new()
     }
 }
 
 impl ConsoleBuffer {
     pub fn new() -> Self {
-        Self { inner: Vec::new() }
+        return Self { inner: Vec::new() }
     }
     // appends item at end of buffer
     pub fn append(&mut self, line: [ScreenChar; SBUFFER_WIDTH]) {
@@ -44,17 +44,17 @@ impl ConsoleBuffer {
         self.inner.insert(0, line);
     }
     pub fn get_youngest_line(&self) -> Option<[ScreenChar; BUFFER_WIDTH as usize]> {
-        self.inner.last().copied()
+        return self.inner.last().copied()
     }
     pub fn remove_youngest_line(&mut self) -> [ScreenChar; BUFFER_WIDTH as usize] {
-        self.inner.remove(self.inner.len() - 1)
+        return self.inner.remove(self.inner.len() - 1)
     }
     pub fn get_oldest_line(&self) -> Option<[ScreenChar; BUFFER_WIDTH as usize]> {
-        self.inner.first().copied()
+        return self.inner.first().copied()
     }
 
     pub fn size(&self) -> (u8, u8) {
-        (BUFFER_WIDTH, self.inner.len().try_into().unwrap())
+        return (BUFFER_WIDTH, self.inner.len().try_into().unwrap())
     }
     pub fn write_screenchar_at(&mut self, pos: &ScreenPos, chr: ScreenChar) {
         if pos.0 < BUFFER_WIDTH && pos.1 < BUFFER_HEIGHT {
@@ -64,9 +64,9 @@ impl ConsoleBuffer {
         }
     }
     pub fn get_screenchar_at(&self, pos: &ScreenPos) -> ScreenChar {
-        self.inner[pos.1 as usize][pos.0 as usize]
+        return self.inner[pos.1 as usize][pos.0 as usize]
     }
     pub fn is_empty(&self) -> bool {
-        self.inner.is_empty()
+        return self.inner.is_empty()
     }
 }

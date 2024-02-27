@@ -74,12 +74,12 @@ impl FADT {
         _self
     }
     pub fn get_dsdt(&self) -> &'static super::dsdt::DSDT {
-        unsafe { &*(self.dsdt as *const super::dsdt::DSDT) }
+        unsafe { return &*(self.dsdt as *const super::dsdt::DSDT) }
     }
     async fn enable_acpi(&self) -> Result<(), AcpiEnablingError> {
         unsafe {
-            PortWrite::write_to_port(self.smi_command_port.try_into().unwrap(), self.acpi_enable)
-        };
+            PortWrite::write_to_port(self.smi_command_port.try_into().unwrap(), self.acpi_enable);
+        }
         #[cfg(not(debug_assertions))]
         // On QEMU, we don't need to wait for much time to go to acpi mode
         crate::time::sdelay(1).await;
@@ -151,7 +151,7 @@ impl core::fmt::Debug for FADT {
         let x_gpe0_block = self.x_gpe0_block.clone();
         let x_gpe1_block = self.x_gpe1_block.clone();
 
-        f.debug_struct("FADT")
+        return f.debug_struct("FADT")
             .field("h", &h)
             .field("firmware_ctrl", &firmware_ctrl)
             .field("dsdt", &dsdt)

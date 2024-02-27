@@ -25,7 +25,7 @@ pub fn _print(args: ::core::fmt::Arguments) {
 
 pub fn read_serial_input() -> u8 {
     use crate::x86_64::instructions::port::PortRead;
-    interrupts::without_interrupts(|| unsafe { u8::read_from_port(0x3F8) })
+    interrupts::without_interrupts(|| unsafe { return u8::read_from_port(0x3F8) })
 }
 
 /// Prints to the host through the serial interface.

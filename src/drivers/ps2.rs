@@ -174,7 +174,7 @@ impl Ps2Controller {
         // Self::device_send_data_second(0xF4); // Re Enable scanning
         // assert!(Self::assert_ack());
 
-        Some(Self { available_channels })
+        return Some(Self { available_channels })
     }
     /// Sends a byte to the first port
     pub fn device_send_data_first(data: u8) {
@@ -203,7 +203,7 @@ impl Ps2Controller {
     pub fn read_data() -> u8 {
         #[allow(const_item_mutation)]
         unsafe {
-            DATA_PORT.read()
+            return DATA_PORT.read()
         }
     }
     /// Sends a 2 bytes command to Ps2 controller
@@ -212,8 +212,8 @@ impl Ps2Controller {
         Self::poll_bit(STATUS_OUTPUT_BUFFER).unwrap();
         #[allow(const_item_mutation)]
         unsafe {
-            DATA_PORT.write(next_byte)
-        };
+            DATA_PORT.write(next_byte);
+        }
     }
 
     pub fn assert_ack() -> bool {
@@ -221,7 +221,7 @@ impl Ps2Controller {
         if !ack && ACK_LOGGING {
             log::error!("Failed assert on ACK !");
         }
-        ack
+        return ack
     }
 
     /// Reads status port until inb(status) & bit == 0
@@ -233,7 +233,7 @@ impl Ps2Controller {
                 return Ok(());
             }
         }
-        Err(Ps2PollingError::TimeOut)
+        return Err(Ps2PollingError::TimeOut)
     }
     /// Reads status port until inb(status) & bit == bit
     /// If times out, return error
@@ -244,7 +244,7 @@ impl Ps2Controller {
                 return Ok(());
             }
         }
-        Err(Ps2PollingError::TimeOut)
+        return Err(Ps2PollingError::TimeOut)
     }
     /// Tries to retrieve the contents of a previously sent command
     /// TODO Make a proper safe wrapper around send/receiving commands
@@ -252,7 +252,7 @@ impl Ps2Controller {
         Self::poll_bit_set(STATUS_OUTPUT_BUFFER)?;
         // We know the output buffer status port has been polled, so the data has arrived
         #[allow(const_item_mutation)]
-        Ok(unsafe { DATA_PORT.read() })
+        return Ok(unsafe { DATA_PORT.read() })
     }
 }
 

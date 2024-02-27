@@ -30,14 +30,14 @@ pub fn bytes<T: Into<u128>>(num: T) -> String {
         let str_bit = if bit == 0 { '0' } else { '1' };
         result.push(str_bit);
     }
-    result
+    return result
 }
 pub fn bytes_list<T: Into<u128> + Copy, I: IntoIterator<Item = T>>(list: I) -> String {
     let mut result = String::new();
     for ele in list.into_iter() {
         result.push_str(bytes(ele).as_str());
     }
-    result
+    return result
 }
 pub fn numeric_to_char_vec<T>(value: T) -> String
 where
@@ -51,7 +51,7 @@ where
         char_vec.push(char::from(byte));
     }
 
-    char_vec
+    return char_vec
 }
 pub fn bytes_to_numeric<T>(bytes: &[u8]) -> T
 where
@@ -65,14 +65,14 @@ where
         }
     }
 
-    T::from(result)
+    return T::from(result)
 }
 pub fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
-    unsafe { core::slice::from_raw_parts((p as *const T) as *const u8, core::mem::size_of::<T>()) }
+    unsafe { return core::slice::from_raw_parts((p as *const T) as *const u8, core::mem::size_of::<T>()) }
 }
 // mut iter: impl Iterator<Item=impl PartialEq<u8>>
 pub fn all_zeroes(mut iter: &[u8]) -> bool {
-    iter.iter().all(|x| *x == 0)
+    iter.iter().all(|x| return *x == 0)
 }
 
 pub fn list_to_num<T, R>(content: impl Iterator<Item = T> + DoubleEndedIterator) -> R
@@ -87,7 +87,7 @@ where
         }
         result = Into::<R>::into(result << (size_of::<T>() * 8)) | byte.into();
     }
-    result
+    return result
 }
 pub fn ptrlist_to_num<'a, T, R>(
     content: &mut (impl Iterator<Item = &'a T> + ?Sized + DoubleEndedIterator),
@@ -103,11 +103,11 @@ where
         }
         result = Into::<R>::into(result << (size_of::<T>() * 8)) | Into::<R>::into(byte.clone());
     }
-    result
+    return result
 }
 
 pub fn u16_to_u8(w: u16) -> (u8, u8) {
-    (((w >> 8) as u8), (w & 0xFF) as u8)
+    return (((w >> 8) as u8), (w & 0xFF) as u8)
 }
 struct CharArray<const N: usize>([char; N]);
 
@@ -117,7 +117,7 @@ impl<const N: usize> Display for CharArray<N> {
         for element in &self.0 {
             s.push(*element);
         }
-        write!(f, "{}", s)
+        return write!(f, "{}", s)
     }
 }
 impl<const N: usize> core::fmt::Debug for CharArray<N> {
@@ -126,7 +126,7 @@ impl<const N: usize> core::fmt::Debug for CharArray<N> {
         for element in &self.0 {
             s.push(*element);
         }
-        write!(f, "[{}]", s)
+        return write!(f, "[{}]", s)
     }
 }
 struct CharSlice([char]);
@@ -137,7 +137,7 @@ impl Display for CharSlice {
         for element in &self.0 {
             s.push(*element);
         }
-        write!(f, "{}", s)
+        return write!(f, "{}", s)
     }
 }
 impl core::fmt::Debug for CharSlice {
@@ -146,7 +146,7 @@ impl core::fmt::Debug for CharSlice {
         for element in &self.0 {
             s.push(*element);
         }
-        write!(f, "[{}]", s)
+        return write!(f, "[{}]", s)
     }
 }
 struct CharSlicePtr<'a>(&'a [char]);
@@ -157,7 +157,7 @@ impl Display for CharSlicePtr<'_> {
         for element in self.0 {
             s.push(*element);
         }
-        write!(f, "[{}]", s)
+        return write!(f, "[{}]", s)
     }
 }
 
@@ -166,7 +166,7 @@ pub fn as_chars(list: &[u8]) -> String {
     for byte in list {
         r.push(*byte as char);
     }
-    r
+    return r
 }
 /// # Safety
 /// Ensure that writing to this port doesn't crash anything
@@ -176,7 +176,7 @@ pub fn outb(port: u16, val: u8) {
 /// # Safety
 /// Ensure that reading to this port doesn't crash anything
 pub fn inb(port: u16) -> u8 {
-    unsafe { PortRead::read_from_port(port) }
+    unsafe { return PortRead::read_from_port(port) }
 }
 
 // pub fn is_set<T: core::ops::BitAnd<usize>>(value: T,n: usize) -> bool {
@@ -186,7 +186,7 @@ pub fn inb(port: u16) -> u8 {
 /// # Safety
 /// Breaks memory safety from rust
 pub unsafe fn read_at<T: Clone>(addr: usize) -> T {
-    unsafe { (*(addr as *const T)).clone() }
+    unsafe { return (*(addr as *const T)).clone() }
     // todo!()
 }
 

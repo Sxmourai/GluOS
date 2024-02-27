@@ -14,7 +14,7 @@ pub struct FrameBuffer {
 }
 impl FrameBuffer {
     pub const fn new() -> Self {
-        Self {
+        return Self {
             buffer: unsafe { &mut *(0xA0000 as *mut VgaLinearBuffer) },
         }
     }

@@ -155,7 +155,7 @@ impl E1000NetworkDriver {
             .raw
             .location
             .pci_write(crate::pci::PCI_COMMAND, command as u32);
-        Self {
+        return Self {
             base,
             eerprom_exists: false,
             int_line: pci_device.raw.int_line,
@@ -207,7 +207,7 @@ impl E1000NetworkDriver {
         self.rx_init();
         self.tx_init();
         self.send_packet(&[10; 4096]);
-        Ok(())
+        return Ok(())
     }
     pub fn fire(&self) {
         todo!()
@@ -228,7 +228,7 @@ impl E1000NetworkDriver {
             }
         }
         log::error!("Timed out sending packet");
-        Err(PacketSendError::StatusTimeOut)
+        return Err(PacketSendError::StatusTimeOut)
     }
     /// Send Commands and read results From NICs either using MMIO or IO Ports
     fn write_command(&self, p_addr: u16, p_value: u32) {
@@ -250,13 +250,13 @@ impl E1000NetworkDriver {
         // dbg!("Read",r,"from", p_addr);
         match self.base {
             PciMemoryBase::MemorySpace(mem) => unsafe {
-                read_at::<u32>(mem.as_u64() as usize + p_addr as usize)
+                return read_at::<u32>(mem.as_u64() as usize + p_addr as usize)
             },
             PciMemoryBase::IOSpace(io) => {
                 let io = io.try_into().unwrap();
                 unsafe {
                     PortWrite::write_to_port(io, p_addr as u32);
-                    PortRead::read_from_port(io + 4)
+                    return PortRead::read_from_port(io + 4)
                 }
             }
         }
@@ -272,7 +272,7 @@ impl E1000NetworkDriver {
                 return true;
             }
         }
-        false
+        return false
     }
     /// Read 2 bytes from a specific EEProm Address
     fn ee_prom_read(&self, addr: u8) -> u32 {
@@ -295,7 +295,7 @@ impl E1000NetworkDriver {
                 }
             }
         }
-        ((tmp >> 16) & 0xFFFF)
+        return ((tmp >> 16) & 0xFFFF)
     }
     /// Read MAC Address and returns true if success
     fn read_mac_addr(&mut self) -> Result<(), E1000ReadMac> {
@@ -326,11 +326,11 @@ impl E1000NetworkDriver {
                 return Err(E1000ReadMac::NoMemoryBase);
             }
         }
-        Ok(())
+        return Ok(())
     }
     fn mem_base(&self) -> u64 {
         match self.base {
-            PciMemoryBase::MemorySpace(mem) => mem.as_u64(),
+            PciMemoryBase::MemorySpace(mem) => return mem.as_u64(),
             PciMemoryBase::IOSpace(io) => todo!(),
         }
     }

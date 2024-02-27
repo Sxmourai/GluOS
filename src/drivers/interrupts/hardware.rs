@@ -41,8 +41,8 @@ pub fn register_interrupt(
     int: extern "x86-interrupt" fn(x86_64::structures::idt::InterruptStackFrame),
 ) {
     unsafe {
-        IDT.as_mut().unwrap().write_with_timeout()[int_num as usize + PIC_1_OFFSET as usize].set_handler_fn(int)
-    };
+        IDT.as_mut().unwrap().write_with_timeout()[int_num as usize + PIC_1_OFFSET as usize].set_handler_fn(int);
+    }
 }
 
 pub const INTERRUPTS: &[(
@@ -108,7 +108,7 @@ pub enum InterruptIndex {
 }
 impl InterruptIndex {
     pub fn from_num_pic(num: u8) -> Option<Self> {
-        Some(match num {
+        return Some(match num {
             0 => Self::Timer,
             1 => Self::Keyboard,
             3 => Self::COM2,

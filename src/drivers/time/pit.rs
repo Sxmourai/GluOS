@@ -27,13 +27,13 @@ pub fn irq() {
 pub fn register_wait() -> Option<usize> {
     unsafe{PIT_CONTROLLER.get_mut().map(|c| {
         c.ticks.push(AtomicU32::new(0));
-        c.ticks.len()-1
+        return c.ticks.len()-1
     })}
 }
 /// Gets the ticks from the id, if it exists
 pub fn get_ticks(id: usize) -> Option<u32> {
     unsafe{PIT_CONTROLLER.get_mut().and_then(|c| {
-        Some(c.ticks.get(id)?.load(core::sync::atomic::Ordering::Acquire))
+        return Some(c.ticks.get(id)?.load(core::sync::atomic::Ordering::Acquire))
     })}
 }
 
@@ -61,7 +61,7 @@ pub fn init() {
         ticks: Vec::new(),
         elapsed_ticks: 0,
     };
-    unsafe { PIT_CONTROLLER.set(pit) };
+    unsafe { PIT_CONTROLLER.set(pit); }
 }
 
 #[derive(Debug)]
@@ -92,9 +92,9 @@ pub enum Regs {
 impl Regs {
     pub fn from_channel(channel: Channel) -> Self {
         match channel {
-            Channel::Channel0 => Regs::Channel0,
-            Channel::Channel1 => Regs::Channel1,
-            Channel::Channel2 => Regs::Channel2,
+            Channel::Channel0 => return Regs::Channel0,
+            Channel::Channel1 => return Regs::Channel1,
+            Channel::Channel2 => return Regs::Channel2,
             Channel::ReadBackCommand => todo!(),
         }
     }
@@ -112,13 +112,13 @@ impl PIT {
         unsafe { PortWrite::write_to_port(reg as u16, value) }
     }
     pub fn read_reg(reg: Regs) -> u8 {
-        unsafe { PortRead::read_from_port(reg as u16) }
+        unsafe { return PortRead::read_from_port(reg as u16) }
     }
     pub fn read_pit_count(channel: Channel) -> u16 {
         without_interrupts(|| {
             let channel_reg = Regs::from_channel(channel);
             Self::write_reg(Regs::ModeCommand, 0);
-            ((Self::read_reg(channel_reg) as u16) | (Self::read_reg(channel_reg) as u16) << 8)
+            return ((Self::read_reg(channel_reg) as u16) | (Self::read_reg(channel_reg) as u16) << 8)
         })
     }
     //TODO Handle LoByte Only and Hi
@@ -153,7 +153,7 @@ pub fn wait_for_timeout() -> Result<(), TimerError> {
 }
 pub const MAX_COUNTER_VALUE: u16 = u16::MAX;
 pub const MAX_COUNTER_VALUE_INPUT: u16 =
-    ((MAX_COUNTER_VALUE as u64 * 1_000_000u64) / BASE_FREQUENCY) as u16; // ~= 54924.5630591142
+    ((MAX_COUNTER_VALUE as u64 * 1_000_000_u64) / BASE_FREQUENCY) as u16; // ~= 54924.5630591142
 pub fn set(micros: u16) -> Result<(), TimerError> {
     let counter = (BASE_FREQUENCY * micros as u64) / 1_000_000;
     if counter > MAX_COUNTER_VALUE as u64 {
@@ -173,7 +173,7 @@ pub fn set(micros: u16) -> Result<(), TimerError> {
 
     PIT::write_reg(Regs::Channel2, (counter & 0xff) as u8);
     PIT::write_reg(Regs::Channel2, ((counter >> 8) & 0xff) as u8);
-    Ok(())
+    return Ok(())
 }
 
 bitfield::bitfield! {
@@ -187,7 +187,7 @@ bitfield::bitfield! {
 }
 impl Mode {
     pub fn read() -> Self {
-        Self(PIT::read_reg(Regs::ModeCommand))
+        return Self(PIT::read_reg(Regs::ModeCommand))
     }
     pub fn write(&self) {
         PIT::write_reg(Regs::ModeCommand, self.0)
@@ -208,7 +208,7 @@ bitfield::bitfield! {
 }
 impl Control {
     pub fn read() -> Self {
-        Self(PIT::read_reg(Regs::Control))
+        return Self(PIT::read_reg(Regs::Control))
     }
     pub fn write(&self) {
         PIT::write_reg(Regs::Control, self.0)

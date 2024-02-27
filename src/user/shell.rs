@@ -27,7 +27,7 @@ fn lsdisk(_args: String) -> Result<(), String> {
         println!("- {:?} {:?}", disk.loc, disk.drv);
         let partitions = drvs.partitions.get(loc).ok_or("Partition not found".to_string())?;
         // If the partition start is 1 we know it's MBR because on GPT the first 33 sectors are reserved !
-        let start_lba = partitions.first().map(|x| x.1).unwrap_or(0);
+        let start_lba = partitions.first().map(|x| return x.1).unwrap_or(0);
         if start_lba == 1 {
             println!("--MBR--");
         }
@@ -40,7 +40,7 @@ fn lsdisk(_args: String) -> Result<(), String> {
         }
         println!();
     }
-    Ok(())
+    return Ok(())
 }
 
 #[command("read_raw", "Reads a raw sector from disk")]
@@ -98,7 +98,7 @@ fn read_sector(raw_args: String) -> Result<(), String> {
     } else {
         println!("{}", sectors);
     }
-    Ok(())
+    return Ok(())
 }
 
 #[command("write_sector", "Writes a raw sector to disk")]
@@ -139,7 +139,7 @@ fn write_sector(raw_args: String) -> Result<(), String> {
     }
     write_to_disk(&DiskLoc(channel, drive), start, &bytes).unwrap();
     println!("Done");
-    Ok(())
+    return Ok(())
 }
 
 /// n = DriveLoc
@@ -152,7 +152,7 @@ fn parse_path(path: &str) -> Option<crate::fs::path::FilePath> {
     let loc = DiskLoc::from_idx(loc_idx)?;
     let part_idx = chars.next()?.to_string().parse::<u8>().ok()?;
     let part = crate::fs::partition::Partition::from_idx(&loc, part_idx)?;
-    Some(crate::fs::path::FilePath::new(
+    return Some(crate::fs::path::FilePath::new(
         path[2..].to_string(),
         part.clone(),
     ))
@@ -179,7 +179,7 @@ fn exec(raw_args: String) -> Result<(), String> {
             }
         }
     }
-    Ok(())
+    return Ok(())
 }
 
 #[command("panic", "Creates a kernel panic for testing")]
@@ -220,7 +220,7 @@ fn read(raw_args: String) -> Result<(), String> {
     } else {
         println!("Error reading file ! Maybe specified path couldn't be found")
     }
-    Ok(())
+    return Ok(())
 }
 
 // #[command("write", "Writes a file to disk")]
@@ -287,7 +287,7 @@ fn dump_disk(args: String) -> Result<(), String> {
             break;
         }
         let sectors = sectors.unwrap();
-        if sectors.iter().all(|x| *x == 0) {
+        if sectors.iter().all(|x| return *x == 0) {
             if i % 1000 == 0 {
                 serial_println!("-----------{}----------", i);
             }
@@ -298,7 +298,7 @@ fn dump_disk(args: String) -> Result<(), String> {
         i += 1;
     }
 
-    Ok(())
+    return Ok(())
 }
 
 // #[command("test_disk", "Reads multiple times some sectors to see if same content is returned")]
@@ -343,15 +343,15 @@ fn lspci(rargs: String) -> Result<(), String> {
         let mut args = rargs.split(' ');
         let bus = args
             .next()
-            .and_then(|s| s.parse().ok())
+            .and_then(|s| return s.parse().ok())
             .ok_or("Please specify bus location")?;
         let slot = args
             .next()
-            .and_then(|s| s.parse().ok())
+            .and_then(|s| return s.parse().ok())
             .ok_or("Please specify slot location")?;
         let func = args
             .next()
-            .and_then(|s| s.parse().ok())
+            .and_then(|s| return s.parse().ok())
             .ok_or("Please specify func location")?;
         let user_loc = PciLocation { bus, slot, func };
         let device = manager.get(&user_loc).ok_or("No device on this bus !")?;
@@ -367,7 +367,7 @@ fn lspci(rargs: String) -> Result<(), String> {
             println!("{}", device.display_classes());
         }
     }
-    Ok(())
+    return Ok(())
 }
 
 #[command("sysinfo", "Gets info about computer")]
@@ -405,7 +405,7 @@ fn sysinfo(args: String) -> Result<(), String> {
     } else {
         println!("- No cache parameter information available")
     }
-    Ok(())
+    return Ok(())
 }
 
 pub struct CommandRunner {
@@ -415,7 +415,7 @@ pub struct CommandRunner {
 }
 impl CommandRunner {
     pub fn new(prefix: &str, commands: HashMap<String, Command>) -> Self {
-        Self {
+        return Self {
             previous: Vec::new(),
             prefix: String::from(prefix),
             commands,
@@ -461,7 +461,7 @@ impl CommandRunner {
                     .swap(history_len - 2, history_len - 1);
             }
         }
-        unsafe { *COMMANDS_INDEX.write_with_timeout() += 1 };
+        unsafe { *COMMANDS_INDEX.write_with_timeout() += 1; }
 
         let mut args = cmd.split(' ');
         let program = args.next().unwrap();
@@ -472,7 +472,7 @@ impl CommandRunner {
         }) = self.commands.get(program)
         {
             let args = args
-                .map(|s| alloc::string::ToString::to_string(&s))
+                .map(|s| return alloc::string::ToString::to_string(&s))
                 .collect::<Vec<String>>()
                 .join(" ");
             if let Err(error_message) = fun(args) {
@@ -514,7 +514,7 @@ impl Default for Shell {
             }
             res
         };
-        Self {
+        return Self {
             inner: CommandRunner::new("> ", commands),
         }
     }

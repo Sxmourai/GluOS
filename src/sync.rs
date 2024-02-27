@@ -4,7 +4,7 @@ pub trait TimeOutMutex<'a, T> {
     fn try_lock_with_timeout(&'a self) -> Option<Self::Guard>;
     #[track_caller]
     fn lock_with_timeout(&'a self) -> Self::Guard {
-        self.try_lock_with_timeout().expect("Locking timed out !")
+        return self.try_lock_with_timeout().expect("Locking timed out !")
     }
 }
 
@@ -12,7 +12,7 @@ impl<'a, M: 'a> TimeOutMutex<'a, M> for spin::Mutex<M> {
     type Guard = spin::MutexGuard<'a, M>;
     #[track_caller]
     fn try_lock_with_timeout(&'a self) -> Option<Self::Guard> {
-        timeout(&|| !self.is_locked(), &|| self.lock())
+        timeout(&|| return !self.is_locked(), &|| return self.lock())
     }
 }
 
@@ -25,11 +25,11 @@ pub trait TimeOutRwLock<'a, T> {
     fn try_write_with_timeout(&'a self) -> Option<Self::WriteGuard>;
     #[track_caller]
     fn read_with_timeout(&'a self) -> Self::ReadGuard {
-        self.try_read_with_timeout().expect("Reading timed out !")
+        return self.try_read_with_timeout().expect("Reading timed out !")
     }
     #[track_caller]
     fn write_with_timeout(&'a self) -> Self::WriteGuard {
-        self.try_write_with_timeout().expect("Writing timed out !")
+        return self.try_write_with_timeout().expect("Writing timed out !")
     }
 }
 
@@ -37,12 +37,12 @@ impl<'a, M: 'a> TimeOutRwLock<'a, M> for spin::RwLock<M> {
     type ReadGuard = spin::RwLockReadGuard<'a, M>;
     #[track_caller]
     fn try_read_with_timeout(&'a self) -> Option<Self::ReadGuard> {
-        timeout(&|| self.writer_count()==0, &||self.read())
+        timeout(&|| return self.writer_count()==0, &||return self.read())
     }
     type WriteGuard = spin::RwLockWriteGuard<'a, M>;
     #[track_caller]
     fn try_write_with_timeout(&'a self) -> Option<Self::WriteGuard> {
-        timeout(&|| self.writer_count()==0&&self.reader_count()==0, &||self.write())
+        timeout(&|| return self.writer_count()==0&&self.reader_count()==0, &||return self.write())
     }
 }
 #[track_caller]
@@ -54,5 +54,5 @@ fn timeout<T>(check_avail: &dyn Fn() -> bool, on_avail: &dyn Fn() -> T) -> Optio
         core::hint::spin_loop()
     }
     log::error!("Mutex/RwLock timeout at {}:{}:{}", file!(), line!(), column!());
-    None
+    return None
 }

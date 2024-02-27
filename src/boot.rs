@@ -8,7 +8,7 @@ use crate::{
 };
 
 pub fn boot(boot_info: &'static bootloader::BootInfo) -> Executor {
-    unsafe { crate::state::BOOT_INFO.replace(boot_info) };
+    unsafe { crate::state::BOOT_INFO.replace(boot_info); }
     crate::drivers::memory::init(); // Executor needs heap allocation
     let mut executor = Executor::new();
     for drv in get_drivers() {
@@ -17,7 +17,7 @@ pub fn boot(boot_info: &'static bootloader::BootInfo) -> Executor {
     executor.spawn(Task::new(
         Shell::default().run_with_command("exec 10/userland.o".to_string()),
     ));
-    executor
+    return executor
 }
 
 pub fn end(mut executor: Executor) -> ! {

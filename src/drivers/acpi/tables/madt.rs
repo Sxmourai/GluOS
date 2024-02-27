@@ -20,7 +20,7 @@ impl core::fmt::Debug for RawMADT {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let local_apic_addr = self.local_apic_addr;
         let flags = self.flags;
-        f.debug_struct("RawMADT")
+        return f.debug_struct("RawMADT")
             .field("h", &self.h)
             .field("local_apic_addr", &local_apic_addr)
             .field("flags", &flags)
@@ -96,7 +96,7 @@ impl MADT {
             start_idx += *record_length as usize - 2;
             fields.push(record);
         }
-        Some(Self {
+        return Some(Self {
             inner,
             fields,
             cores,

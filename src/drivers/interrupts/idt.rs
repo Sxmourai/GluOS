@@ -23,8 +23,8 @@ pub fn create_idt() -> InterruptDescriptorTable {
         // If double fault fails, a triple fault is invoked which, on most hardware, cause a system reboot
         idt.double_fault
             .set_handler_fn(double_fault_handler)
-            .set_stack_index(DOUBLE_FAULT_IST_INDEX);
-    }
+            .set_stack_index(DOUBLE_FAULT_IST_INDEX)
+    };
     idt.general_protection_fault
         .set_handler_fn(general_protection_fault);
     idt.invalid_opcode.set_handler_fn(invalid_opcode);
@@ -48,5 +48,5 @@ pub fn create_idt() -> InterruptDescriptorTable {
 
     // HARDWARE INTERRUPTS
     crate::interrupts::hardware::setup_hardware_interrupts(&mut idt);
-    idt
+    return idt
 }

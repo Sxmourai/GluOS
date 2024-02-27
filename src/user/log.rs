@@ -18,17 +18,17 @@ enum Color {
 impl From<u8> for Color {
     fn from(value: u8) -> Self {
         match value {
-            0 => Color::Black,
-            1 => Color::Red,
-            2 => Color::Green,
-            3 => Color::Yellow,
-            4 => Color::Blue,
-            5 => Color::Magenta,
-            6 => Color::Cyan,
-            7 => Color::White,
+            0 => return Color::Black,
+            1 => return Color::Red,
+            2 => return Color::Green,
+            3 => return Color::Yellow,
+            4 => return Color::Blue,
+            5 => return Color::Magenta,
+            6 => return Color::Cyan,
+            7 => return Color::White,
             _ => {
                 error!("From u8 but u8 is too big !");
-                Color::White
+                return Color::White
             }
         }
     }
@@ -42,7 +42,7 @@ pub enum Codes {
 }
 impl Codes {
     fn reset() -> &'static str {
-        "\x1b[0;0m"
+        return "\x1b[0;0m"
     }
 }
 
@@ -50,11 +50,11 @@ struct Logger;
 impl Log for Logger {
     fn enabled(&self, metadata: &Metadata) -> bool {
         // metadata.level() <= MAX_LEVEL
-        true
+        return true
     }
     #[track_caller]
     fn log(&self, record: &Record) {
-        let _buffer = [0u8; 128];
+        let _buffer = [0_u8; 128];
         let args = match record.level() {
             Level::Trace => {
                 let args = alloc::format!("{}:{}\t - {}", file!(), line!(), record.args());

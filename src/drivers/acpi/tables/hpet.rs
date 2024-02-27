@@ -17,7 +17,7 @@ impl core::fmt::Debug for HPET {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let min_tick = self.minimum_tick;
         let vendor_id = self.pci_vendor_id;
-        f.debug_struct("HPET")
+        return f.debug_struct("HPET")
             .field("header", &self.header)
             .field("hardware_rev_id", &self.hardware_rev_id)
             .field("comparator_count", &self.comparator_count)
@@ -37,5 +37,5 @@ impl core::fmt::Debug for HPET {
 /// Must ensure bytes is proper HPET
 pub unsafe fn handle_hpet(bytes: &[u8]) -> Option<&'static HPET> {
     let hpet = unsafe { &*(bytes.as_ptr() as *const HPET) };
-    Some(hpet)
+    return Some(hpet)
 }

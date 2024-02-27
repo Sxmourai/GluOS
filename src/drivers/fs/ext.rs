@@ -35,13 +35,13 @@ pub struct ExtDriver {
 }
 impl ExtDriver {
     fn extsuperblock(&self) -> &ExtendedExtSuperblock {
-        self.superblock.as_ext_super_block()
+        return self.superblock.as_ext_super_block()
     }
     fn superblock(&self) -> &ExtSuperBlock {
-        self.superblock.as_super_block()
+        return self.superblock.as_super_block()
     }
     fn block_size(&self) -> u32 {
-        self.superblock().block_size() / 256
+        return self.superblock().block_size() / 256
     }
     fn walk_dir(
         &self,
@@ -63,17 +63,17 @@ impl ExtDriver {
             );
         }
 
-        Ok(files)
+        return Ok(files)
     }
     fn index_disk(&mut self) -> Result<(), FsReadError> {
         let root = ExtEntryDescriptor::new_raw(2, "/".to_string(), false);
         self.files = self.walk_dir(&root)?;
         self.files
             .insert(FilePath::new("/".to_string(), self.partition.clone()), root);
-        Ok(())
+        return Ok(())
     }
     fn dir_entries_contain_type(&self) -> bool {
-        self.extsuperblock().required_feat_present & 0x2 != 0
+        return self.extsuperblock().required_feat_present & 0x2 != 0
     }
     fn read_inode(&self, inode: Inode) -> Option<ExtEntryDescriptor> {
         let block_size = self.block_size();
@@ -84,7 +84,7 @@ impl ExtDriver {
         )
         .ok()?;
         let inode_entry = ExtEntryDescriptor::new(&data_blk, self.dir_entries_contain_type());
-        Some(inode_entry)
+        return Some(inode_entry)
     }
     /// Takes a inode number and returns the inode
     fn get_inode(&self, inode_number: u32) -> Option<Inode> {
@@ -98,7 +98,7 @@ impl ExtDriver {
             inode_table_start_sector + ((inode_number as u64 - 1) / (512 / inode_size as u64));
         let tables = get_inode_table(&self.partition, inode_table_start_sector, inode_size)?;
         let inode = tables.get((inode_number as usize - 1) % (512 / inode_size))?;
-        Some(inode.clone())
+        return Some(inode.clone())
     }
     fn read_inode_block(
         &self,
@@ -130,7 +130,7 @@ impl ExtDriver {
                 // };
                 entries.push(ext_entry);
             }
-            Ok(ExtEntry::Dir(ExtDir {
+            return Ok(ExtEntry::Dir(ExtDir {
                 path: FilePath::new(entry.name.clone(), self.partition.clone()),
                 inode: entry.inner.inode,
                 size: inode.lo_32b_size as u64,
@@ -146,7 +146,7 @@ impl ExtDriver {
             //     path: FilePath::new(entry.name.clone(), self.partition),
             //     size: inode.lo_32b_size as usize, //TODO Combine with hi_32b_size if 64bit feature ste
             // }))
-            Ok(ExtEntry::File(ExtFile {
+            return Ok(ExtEntry::File(ExtFile {
                 path: FilePath::new(entry.name.clone(), self.partition.clone()),
                 inode: entry.inner.inode,
                 size: inode.lo_32b_size as u64,
@@ -157,7 +157,7 @@ impl ExtDriver {
             let typ = inode.type_n_perms;
             log::error!("Unknown inode type: {:b}", typ);
             dbg!(inode);
-            Err(FsReadError::ParsingError)
+            return Err(FsReadError::ParsingError)
         }
     }
 }
@@ -180,13 +180,13 @@ impl FsDriver for ExtDriver {
                         size: 0,
                     })
                 }
-                Ok(Entry::Dir(Dir {
+                return Ok(Entry::Dir(Dir {
                     path: d.path,
                     entries,
                     size: d.size as usize,
                 }))
             }
-            ExtEntry::File(f) => Ok(Entry::File(File {
+            ExtEntry::File(f) => return Ok(Entry::File(File {
                 path: f.path,
                 content: f.content,
                 size: f.size as usize,
@@ -194,10 +194,10 @@ impl FsDriver for ExtDriver {
         }
     }
     fn as_enum(&self) -> FsDriverEnum {
-        FsDriverEnum::Ext
+        return FsDriverEnum::Ext
     }
     fn partition(&self) -> &Partition {
-        &self.partition
+        return &self.partition
     }
 }
 impl FsDriverInitialiser for ExtDriver {
@@ -234,7 +234,7 @@ impl FsDriverInitialiser for ExtDriver {
         // dbg!(raw_bgdt);
         for raw_bgd in raw_bgdt.chunks_exact(32) {
             //TODO Support 64 bit mode for ext4 i.e.
-            if raw_bgd.iter().all(|x| *x == 0) {
+            if raw_bgd.iter().all(|x| return *x == 0) {
                 break;
             }
             let bgd = unsafe { &*(raw_bgd.as_ptr() as *const BlockGroupDescriptor) }.clone();
@@ -248,7 +248,7 @@ impl FsDriverInitialiser for ExtDriver {
         };
         // dbg!(_self);
         _self.index_disk().ok()?;
-        Some(Box::new(_self))
+        return Some(Box::new(_self))
     }
 }
 
@@ -284,7 +284,7 @@ fn get_inode_table(
             unsafe { &*(raw_inode_table[i * inode_size..].as_ptr() as *const Inode) }.clone();
         tables.push(inode_table);
     }
-    Some(tables)
+    return Some(tables)
 }
 
 fn read_superblock(partition: &Partition) -> Option<Superblock> {
@@ -294,7 +294,7 @@ fn read_superblock(partition: &Partition) -> Option<Superblock> {
         return None;
     }
     let superblock = Superblock::new(rawsuper_block.to_vec());
-    Some(superblock)
+    return Some(superblock)
 }
 
 pub struct Superblock {
@@ -304,24 +304,24 @@ pub struct Superblock {
 
 impl Superblock {
     pub fn new(data: Vec<u8>) -> Self {
-        Self { data }
+        return Self { data }
     }
 
     pub fn as_super_block(&self) -> &ExtSuperBlock {
-        bytemuck::from_bytes(&self.data[..core::mem::size_of::<ExtSuperBlock>()])
+        return bytemuck::from_bytes(&self.data[..core::mem::size_of::<ExtSuperBlock>()])
     }
     pub fn as_ext_super_block(&self) -> &ExtendedExtSuperblock {
-        bytemuck::from_bytes(&self.data[..core::mem::size_of::<ExtendedExtSuperblock>()])
+        return bytemuck::from_bytes(&self.data[..core::mem::size_of::<ExtendedExtSuperblock>()])
     }
 }
 impl core::fmt::Debug for Superblock {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         if self.as_super_block().major_portion_version >= 1 {
-            f.debug_struct("Superblock")
+            return f.debug_struct("Superblock")
                 .field("data", &self.as_ext_super_block())
                 .finish()
         } else {
-            f.debug_struct("Superblock")
+            return f.debug_struct("Superblock")
                 .field("data", &self.as_super_block())
                 .finish()
         }
@@ -346,14 +346,14 @@ fn check_superblock(extsuperblock: &ExtendedExtSuperblock) -> bool {
         log::error!("Compression used !");
         return true;
     }
-    false
+    return false
 }
 fn block_group_of_inode(inode_number: u64, inodes_per_group: u32) -> u64 {
-    (inode_number - 1) / inodes_per_group as u64
+    return (inode_number - 1) / inodes_per_group as u64
 }
 fn get_blkgrp64(block_group: u64, bgd: &[u8]) -> Option<&BlockGroupDescriptor64> {
     let raw_bgd = bgd.chunks_exact(64).nth(block_group as usize)?;
-    Some(unsafe { &*(raw_bgd.as_ptr() as *const BlockGroupDescriptor64) })
+    return Some(unsafe { &*(raw_bgd.as_ptr() as *const BlockGroupDescriptor64) })
 }
 // fn get_inode(inode_number: u64) -> String {
 
@@ -409,10 +409,10 @@ pub struct ExtSuperBlock {
 }
 impl ExtSuperBlock {
     pub fn block_size(&self) -> u32 {
-        self.block_size_shift << 10 // Shifts it 1024
+        return self.block_size_shift << 10 // Shifts it 1024
     }
     pub fn fragment_size(&self) -> u32 {
-        self.fragment_size_shift << 10
+        return self.fragment_size_shift << 10
     }
 }
 
@@ -471,18 +471,18 @@ impl ExtendedExtSuperblock {
     pub fn block_descriptor_group_size(&self) -> u8 {
         if self.required_feat_present & 0x80 == 0x80 {
             // Fs uses 64 bit features
-            64
+            return 64
         } else {
-            32
+            return 32
         }
     }
     pub fn flex_blocks(&self) -> u32 {
-        (self.e4_n_flex_groups as u32) << 10
+        return (self.e4_n_flex_groups as u32) << 10
     }
 }
 unsafe impl bytemuck::Zeroable for ExtendedExtSuperblock {
     fn zeroed() -> Self {
-        unsafe { core::mem::zeroed() }
+        unsafe { return core::mem::zeroed() }
     }
 }
 unsafe impl bytemuck::Pod for ExtendedExtSuperblock {}
@@ -506,7 +506,7 @@ impl core::fmt::Debug for ExtendedExtSuperblock {
         let journal_inode = self.journal_inode;
         let journal_device = self.journal_device;
         let head_orphan_inode_list = self.head_orphan_inode_list;
-        f.debug_struct("ExtendedExtSuperblock")
+        return f.debug_struct("ExtendedExtSuperblock")
             .field("super_block", &self.super_block)
             .field("fst_non_reserved_inode", &fst_non_reserved_inode)
             .field("size_inode_struct", &size_inode_struct)
@@ -563,7 +563,7 @@ impl<'a> ExtEntryDescriptor {
         for chr in &data[core::mem::size_of::<RawExtEntryDescriptor>()..len] {
             name.push(*chr as char);
         }
-        Self {
+        return Self {
             inner: _self.clone(),
             name,
         }
@@ -571,7 +571,7 @@ impl<'a> ExtEntryDescriptor {
     /// Name.len() u8
     pub fn new_raw(inode_number: u32, name: String, file: bool) -> Self {
         let type_indicator = if file { 1 } else { 2 };
-        Self {
+        return Self {
             inner: RawExtEntryDescriptor {
                 inode: inode_number,
                 entry_size: 8 + name.len() as u16,
@@ -584,17 +584,17 @@ impl<'a> ExtEntryDescriptor {
 
     pub fn type_indicator(&self) -> ExtInodeType {
         match self.inner.type_indicator {
-            0 => ExtInodeType::Unknown,
-            1 => ExtInodeType::File,
-            2 => ExtInodeType::Dir,
-            3 => ExtInodeType::ChrDevice,
-            4 => ExtInodeType::BlockDevice,
-            5 => ExtInodeType::FIFO,
-            6 => ExtInodeType::Socket,
-            7 => ExtInodeType::SoftLink,
+            0 => return ExtInodeType::Unknown,
+            1 => return ExtInodeType::File,
+            2 => return ExtInodeType::Dir,
+            3 => return ExtInodeType::ChrDevice,
+            4 => return ExtInodeType::BlockDevice,
+            5 => return ExtInodeType::FIFO,
+            6 => return ExtInodeType::Socket,
+            7 => return ExtInodeType::SoftLink,
             _ => {
                 log::error!("Read a wrong type from disk !");
-                ExtInodeType::Unknown
+                return ExtInodeType::Unknown
             }
         }
     }
@@ -663,7 +663,7 @@ pub struct BlockGroupDescriptor64 {
 }
 impl BlockGroupDescriptor64 {
     pub fn inode_table_addr(&self) -> u64 {
-        self.block_group.lo_block_addr_inode as u64 | ((self.hi_block_addr_inode as u64) << 32)
+        return self.block_group.lo_block_addr_inode as u64 | ((self.hi_block_addr_inode as u64) << 32)
     }
 }
 impl core::fmt::Debug for BlockGroupDescriptor64 {
@@ -680,7 +680,7 @@ impl core::fmt::Debug for BlockGroupDescriptor64 {
         let hi_chksum_blk_usage_bitmap = self.hi_chksum_blk_usage_bitmap;
         let hi_chksum_inode_usage_bitmap = self.hi_chksum_inode_usage_bitmap;
         let reserved = self.reserved;
-        f.debug_struct("BlockGroupDescriptor64")
+        return f.debug_struct("BlockGroupDescriptor64")
             .field("block_group", &blk_group)
             .field("hi_block_addr_block", &hi_block_addr_block)
             .field("hi_block_addr_inode", &hi_block_addr_inode)

@@ -9,25 +9,25 @@ pub struct Pos {
 }
 impl Pos {
     pub fn new(x: u16, y: u8) -> Self {
-        Self { x, y }
+        return Self { x, y }
     }
     pub fn center() -> Self {
-        Self::new(160, 100)
+        return Self::new(160, 100)
     }
     pub fn origin() -> Self {
-        Self::new(0, 0)
+        return Self::new(0, 0)
     }
     pub fn top_left() -> Self {
-        Self::origin()
+        return Self::origin()
     }
     pub fn top_right() -> Self {
-        Self::new(320, 0)
+        return Self::new(320, 0)
     }
     pub fn bottom_left() -> Self {
-        Self::new(0, 200)
+        return Self::new(0, 200)
     }
     pub fn bottom_right() -> Self {
-        Self::new(320, 200)
+        return Self::new(320, 200)
     }
 }
 pub trait Shape {

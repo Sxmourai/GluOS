@@ -35,14 +35,14 @@ pub struct FsDriverManager {
 impl FsDriverManager {
     pub fn read(&self, path: &FilePath) -> Result<Entry, FsReadError> {
         if let Some(driver) = self.drivers.get(&path.partition) {
-            driver.read(path)
+            return driver.read(path)
         } else {
             dbg!(self.drivers);
-            Err(FsReadError::EntryNotFound)
+            return Err(FsReadError::EntryNotFound)
         }
     }
     pub fn get_partition_from_id(&self, loc: &DiskLoc, part_id: u8) -> Option<&Partition> {
-        self.partitions.get(loc)?.get(part_id as usize)
+        return self.partitions.get(loc)?.get(part_id as usize)
     }
     pub async fn new() -> Self {
         let mut self_drivers = HashMap::new();
@@ -50,7 +50,7 @@ impl FsDriverManager {
         // Collect into vec to drop lock, for instance disk locs are light
         let locs = unsafe { &DISK_MANAGER.lock().as_mut().unwrap().disks }
             .iter()
-            .map(|d| *d.0)
+            .map(|d| return *d.0)
             .collect::<Vec<DiskLoc>>();
         for loc in locs {
             log::trace!("Fetching filesystem on disk {}", loc);
@@ -77,7 +77,7 @@ impl FsDriverManager {
             }
         }
 
-        Self {
+        return Self {
             drivers: self_drivers,
             partitions: self_partitions,
         }
@@ -86,7 +86,7 @@ impl FsDriverManager {
 
 #[allow(clippy::borrowed_box)]
 pub fn get_fs_driver(loc: &Partition) -> Option<&Box<dyn FsDriver>> {
-    fs_driver!().drivers.get(loc)
+    return fs_driver!().drivers.get(loc)
 }
 
 /// Tries to identify the different filesystems on all of the drives, and binds a driver to it if there is a supported driver
@@ -95,5 +95,5 @@ pub fn get_fs_driver(loc: &Partition) -> Option<&Box<dyn FsDriver>> {
 /// - Fat32
 /// - Ext2/3/4
 pub async fn init() {
-    unsafe { FS_DRIVER.replace(FsDriverManager::new().await) };
+    unsafe { FS_DRIVER.replace(FsDriverManager::new().await); }
 }

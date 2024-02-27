@@ -53,7 +53,7 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
         let mut traces_len = 0;
         for trace in traces[firsts..]
             .iter()
-            .filter(|trace| trace.contains(loc.file()))
+            .filter(|trace| return trace.contains(loc.file()))
         {
             serial_println!("[TRACE] {}", trace);
             traces_len += 1;

@@ -9,6 +9,6 @@ pub mod tables;
 /// And many more (like computer shutdown which isn't implemented rn)
 pub async fn init() {
     unsafe {
-        crate::state::DESCRIPTOR_TABLES.replace(DescriptorTablesHandler::new().await.unwrap())
-    };
+        crate::state::DESCRIPTOR_TABLES.replace(DescriptorTablesHandler::new().await.unwrap());
+    }
 }

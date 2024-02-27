@@ -33,7 +33,7 @@ pub struct GPTPartition {
 pub struct Partition(pub DiskLoc, pub u64, pub u64);
 impl Partition {
     pub fn from_idx(loc: &DiskLoc, part_id: u8) -> Option<&Self> {
-        unsafe { fs_driver!().get_partition_from_id(loc, part_id) }
+        unsafe { return fs_driver!().get_partition_from_id(loc, part_id) }
     }
 }
 
@@ -66,7 +66,7 @@ pub fn read_header_type(disk: &DiskLoc) -> Option<HeaderType> {
                         &*(raw_partitions[128 * part_num..].as_ptr() as *const GPTPartition)
                     };
                     // Check if only zeroes, if so done reading ?
-                    if partition.part_type_guid.into_iter().all(|x| x == 0) {
+                    if partition.part_type_guid.into_iter().all(|x| return x == 0) {
                         break;
                     }
                     let start_lba = partition.start_lba;
@@ -92,7 +92,7 @@ pub fn read_header_type(disk: &DiskLoc) -> Option<HeaderType> {
                 };
                 if first_sector[446 + (16 * part_num)..446 + (16 * part_num) + 16]
                     .iter()
-                    .all(|x| *x == 0)
+                    .all(|x| return *x == 0)
                 {
                     continue;
                 }
@@ -109,12 +109,12 @@ pub fn read_header_type(disk: &DiskLoc) -> Option<HeaderType> {
     }
     // No MBR / GPT On disk (maybe a raw partition, or an empty disk)
     log::warn!("No MBR/GPT on disk at {:?}", disk);
-    None
+    return None
 }
 pub struct _FsDriverWrapper<'a>(pub &'a Partition);
 impl _FsDriverWrapper<'_> {
     pub fn try_init_drv<T: FsDriver>(&self) -> Option<Box<T>> {
-        T::try_init(self.0)
+        return T::try_init(self.0)
     }
 }
 
@@ -134,7 +134,7 @@ pub fn find_and_init_fs_driver_for_part(part: &Partition) -> Option<Box<dyn FsDr
     if let Some(drv) = _FsDriverWrapper(part).try_init_drv::<super::ntfs::NTFSDriver>() {
         return Some(drv);
     }
-    None
+    return None
 }
 //let fat_info = Fat32Driver::get_fat_boot(&partition).unwrap();
 // if fat_info.0.fs_type_label[0..5] == [70, 65, 84, 51, 50] {

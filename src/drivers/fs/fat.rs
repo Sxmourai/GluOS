@@ -65,7 +65,7 @@ impl Fat32Driver {
                 sector: root_sector,
             },
         );
-        Some(Self {
+        return Some(Self {
             files,
             fat_info,
             partition: partition.clone(),
@@ -73,7 +73,7 @@ impl Fat32Driver {
         })
     }
     pub fn get_sector(&self, path: &FilePath) -> Option<u64> {
-        Some(self.files.get(path)?.sector)
+        return Some(self.files.get(path)?.sector)
     }
     pub fn read_file(&self, path: &FilePath) -> Option<String> {
         let sector = self.get_sector(path)?;
@@ -84,7 +84,7 @@ impl Fat32Driver {
             self.fat_info.first_fat_sector() as u64,
         )?;
         let content = String::from_utf8_lossy(&raw).to_string();
-        Some(content)
+        return Some(content)
     }
     pub fn read_dir(&self, path: &FilePath) -> Option<Vec<Fat32SoftEntry>> {
         let sector = self.get_sector(path)?;
@@ -101,7 +101,7 @@ impl Fat32Driver {
             path,
             &self.partition,
         );
-        Some(entries_part)
+        return Some(entries_part)
     }
     /// Reads a fat32 entry and follow clusters from fat table
     pub fn read_and_follow_clusters(
@@ -139,7 +139,7 @@ impl Fat32Driver {
             res.extend(sector);
             // next_sector+=1;
         }
-        Some(res)
+        return Some(res)
     }
 
     fn read_fat(
@@ -181,7 +181,7 @@ impl Fat32Driver {
                 }
             }
         }
-        FatTable {
+        return FatTable {
             size: fat_size,
             first_sector: first_fat_sector,
             last_sector,
@@ -217,17 +217,17 @@ impl Fat32Driver {
             | (table_value[0] as u32);
         table_value &= 0x0FFFFFFF;
         if table_value >= 0x0FFFFFF8 || table_value == 0 {
-            Some(ClusterEnum::EndOfChain)
+            return Some(ClusterEnum::EndOfChain)
         } else if table_value == 0x0FFFFFF7 {
-            Some(ClusterEnum::BadCluster)
+            return Some(ClusterEnum::BadCluster)
         } else {
-            Some(ClusterEnum::Cluster(table_value))
+            return Some(ClusterEnum::Cluster(table_value))
         }
     }
     fn get_fat_boot(partition: &Partition) -> Result<FatInfo, DiskError> {
         let raw_fat_boot = read_from_partition(partition, 0, 2)?;
         let fat_boot = unsafe { &*(raw_fat_boot.as_ptr() as *const BiosParameterBlock) };
-        Ok(FatInfo(fat_boot.clone()))
+        return Ok(FatInfo(fat_boot.clone()))
     }
     //TODO Change prefix to String/&str ?
     fn walk_dir(
@@ -256,7 +256,7 @@ impl Fat32Driver {
             }
             files.insert(entry.path.clone(), entry);
         }
-        files
+        return files
     }
     fn get_raw_entries(sector: &[u8]) -> Vec<RawFat32Entry> {
         let mut entries = Vec::new();
@@ -294,7 +294,7 @@ impl Fat32Driver {
                 entries.push(entry);
             }
         }
-        entries
+        return entries
     }
     fn parse_entries(
         entries: &[RawFat32Entry],
@@ -382,12 +382,12 @@ impl Fat32Driver {
                 }
             }
         }
-        files
+        return files
     }
 }
 impl FsDriver for Fat32Driver {
     fn as_enum(&self) -> FsDriverEnum {
-        FsDriverEnum::Fat32
+        return FsDriverEnum::Fat32
     }
     fn read(&self, path: &FilePath) -> Result<Entry, FsReadError> {
         let soft_entry = self.files.get(path).ok_or(FsReadError::EntryNotFound)?;
@@ -406,7 +406,7 @@ impl FsDriver for Fat32Driver {
                     .read_dir(path)
                     .unwrap()
                     .into_iter()
-                    .map(|entry| SoftEntry {
+                    .map(|entry| return SoftEntry {
                         path: entry.path,
                         size: 0,
                     })
@@ -418,10 +418,10 @@ impl FsDriver for Fat32Driver {
                 })
             }
         };
-        Ok(entry)
+        return Ok(entry)
     }
     fn partition(&self) -> &Partition {
-        &self.partition
+        return &self.partition
     }
 }
 impl FsDriverInitialiser for Fat32Driver {
@@ -429,7 +429,7 @@ impl FsDriverInitialiser for Fat32Driver {
     where
         Self: Sized,
     {
-        Some(Box::new(Self::new(partition)?))
+        return Some(Box::new(Self::new(partition)?))
     }
 }
 
@@ -449,16 +449,16 @@ pub struct Fat32File {
 }
 impl Fat32File {
     pub fn path(&self) -> &FilePath {
-        &self.path
+        return &self.path
     }
     pub fn name(&self) -> &str {
-        self.path.name()
+        return self.path.name()
     }
     pub fn sector(&self) -> u32 {
-        self.sector
+        return self.sector
     }
     pub fn attributes(&self) -> &FatAttributes {
-        &self.attributes
+        return &self.attributes
     }
 }
 #[derive(Debug, Clone)]
@@ -470,13 +470,13 @@ pub struct Fat32Dir {
 }
 impl Fat32Dir {
     pub fn path(&self) -> &FilePath {
-        &self.path
+        return &self.path
     }
     pub fn name(&self) -> &str {
-        self.path.name()
+        return self.path.name()
     }
     pub fn sector(&self) -> u32 {
-        self.sector
+        return self.sector
     }
     // pub fn attributes(&self) -> &FatAttributes {
     //     &self.attributes
@@ -486,10 +486,10 @@ impl Fat32Dir {
 //TODO Mult by sectors_per_cluster
 // All safely to u32
 pub fn cluster_to_sector(cluster_number: u64, first_data_sector: u64) -> u64 {
-    (cluster_number - 2) + first_data_sector
+    return (cluster_number - 2) + first_data_sector
 }
 pub fn sector_to_cluster(sector_number: u64, first_data_sector: u64) -> u64 {
-    (sector_number - first_data_sector) + 2
+    return (sector_number - first_data_sector) + 2
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -537,55 +537,55 @@ pub struct FatInfo(pub BiosParameterBlock);
 impl FatInfo {
     pub fn first_sector_of_cluster(&self) -> u64 {
         let first_data_sector = self.get_first_data_sector();
-        cluster_to_sector(self.0.root_dir_first_cluster as u64, first_data_sector)
+        return cluster_to_sector(self.0.root_dir_first_cluster as u64, first_data_sector)
         // , self.0.sectors_per_cluster as u64
     }
     pub fn get_first_data_sector(&self) -> u64 {
         let fat_size = self.get_fat_size();
         let root_dir_sectors = self.get_root_dir_sectors();
         let reserved_sector_count = self.0.reserved_sectors;
-        reserved_sector_count as u64 + (self.0.fats as u64 * fat_size as u64) + root_dir_sectors
+        return reserved_sector_count as u64 + (self.0.fats as u64 * fat_size as u64) + root_dir_sectors
     }
     pub fn fat_type(&self) -> FatType {
         let total_clusters = self.get_total_clusters();
         if total_clusters < 4085 {
-            FatType::Fat12
-        } else if total_clusters < 65525 {
-            FatType::Fat16
+            return FatType::Fat12
+        } else if total_clusters < 0xFFF5 {
+            return FatType::Fat16
         } else {
-            FatType::Fat32
+            return FatType::Fat32
         }
     }
     pub fn get_total_clusters(&self) -> u64 {
-        self.get_data_sectors() / self.0.sectors_per_cluster as u64
+        return self.get_data_sectors() / self.0.sectors_per_cluster as u64
     }
     pub fn get_data_sectors(&self) -> u64 {
-        self.get_total_sectors() as u64
+        return self.get_total_sectors() as u64
             - (self.0.reserved_sectors as u64
                 + (self.0.fats as u64 * self.get_fat_size() as u64)
                 + self.get_root_dir_sectors())
     }
     pub fn get_total_sectors(&self) -> u32 {
         if self.0.total_sectors_16 == 0 {
-            self.0.total_sectors_32
+            return self.0.total_sectors_32
         } else {
-            self.0.total_sectors_16.into()
+            return self.0.total_sectors_16.into()
         }
     }
     // Gets fat size in sectors
     pub fn get_fat_size(&self) -> u32 {
         if self.0.sectors_per_fat_16 == 0 {
-            self.0.sectors_per_fat_32
+            return self.0.sectors_per_fat_32
         } else {
-            self.0.sectors_per_fat_16 as u32
+            return self.0.sectors_per_fat_16 as u32
         }
     }
     pub fn get_root_dir_sectors(&self) -> u64 {
-        ((self.0.root_entries as u64 * 32_u64) + (self.0.bytes_per_sector as u64 - 1))
+        return ((self.0.root_entries as u64 * 32_u64) + (self.0.bytes_per_sector as u64 - 1))
             / self.0.bytes_per_sector as u64
     }
     pub fn first_fat_sector(&self) -> u16 {
-        self.0.reserved_sectors
+        return self.0.reserved_sectors
     }
 }
 
@@ -624,7 +624,7 @@ pub struct Standard32 {
 }
 impl Standard32 {
     pub fn name(&self) -> String {
-        String::from_utf8_lossy(
+        return String::from_utf8_lossy(
             [self.name.to_vec(), self.extension.to_vec()]
                 .concat()
                 .as_slice(),
@@ -643,7 +643,7 @@ impl Standard32 {
         let size = self.size;
         let _entry_type = self.name[0];
         let name = self.name();
-        format!(
+        return format!(
             "File8.3: {}\t | creation_date: {} | 1st cluster: {}({}) \t| size: {}\t| attrs: {:#b}",
             name, creation_date, fst_cluster, sector, size, self.attributes
         )
@@ -657,7 +657,7 @@ impl core::fmt::Debug for Standard32 {
         let size = self.size;
         let _entry_type = self.name[0];
         let _name = self.name();
-        f.write_str(format!("Standard8.3Entry({} creation_date: {} | 1st cluster: {} \t| size: {}\t| attrs: {:#b})", self.name(), creation_date, fst_cluster, size, self.attributes).as_str())
+        return f.write_str(format!("Standard8.3Entry({} creation_date: {} | 1st cluster: {} \t| size: {}\t| attrs: {:#b})", self.name(), creation_date, fst_cluster, size, self.attributes).as_str())
     }
 }
 
@@ -688,13 +688,13 @@ impl LFN32 {
             }
             name.push_str(String::from_utf16_lossy(&[chr]).to_string().as_str());
         }
-        name
+        return name
         // String::from_utf16_lossy(&raw_name).to_string()
     }
 }
 impl core::fmt::Debug for LFN32 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str(format!("LFN32({})", self.name()).as_str())
+        return f.write_str(format!("LFN32({})", self.name()).as_str())
     }
 }
 #[derive(Debug, Clone)]

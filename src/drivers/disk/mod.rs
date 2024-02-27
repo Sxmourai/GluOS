@@ -35,7 +35,7 @@ pub fn init() {
             }
         }
     }
-    unsafe { DISK_MANAGER.lock().replace(DiskManager { disks }) };
+    unsafe { DISK_MANAGER.lock().replace(DiskManager { disks }); }
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
@@ -69,7 +69,7 @@ impl DiskLoc {
         if self.1 == Drive::Slave {
             i += 1
         }
-        i
+        return i
     }
     #[cfg(feature = "fs")]
     fn as_path(
@@ -78,56 +78,56 @@ impl DiskLoc {
     ) -> Option<crate::fs::path::FilePath> {
         use alloc::string::ToString;
 
-        Some(crate::fs::path::FilePath::new("/".to_string(), partition))
+        return Some(crate::fs::path::FilePath::new("/".to_string(), partition))
     }
     fn as_diskloc(&self) -> DiskLoc {
-        DiskLoc(self.channel(), self.drive())
+        return DiskLoc(self.channel(), self.drive())
     }
     fn channel(&self) -> Channel {
         match self.as_index() {
-            0 => Channel::Primary,
-            1 => Channel::Primary,
-            2 => Channel::Secondary,
-            3 => Channel::Secondary,
+            0 => return Channel::Primary,
+            1 => return Channel::Primary,
+            2 => return Channel::Secondary,
+            3 => return Channel::Secondary,
             _ => panic!("Invalid channel address"),
         }
     }
     fn drive(&self) -> Drive {
         match self.as_index() {
-            0 => Drive::Master,
-            1 => Drive::Slave,
-            2 => Drive::Master,
-            3 => Drive::Slave,
+            0 => return Drive::Master,
+            1 => return Drive::Slave,
+            2 => return Drive::Master,
+            3 => return Drive::Slave,
             _ => panic!("Invalid drive address"),
         }
     }
     fn channel_addr(&self) -> u16 {
-        self.channel() as u16
+        return self.channel() as u16
     }
     fn drive_select_addr(&self) -> u8 {
         match self.drive() {
-            Drive::Master => 0xA0,
-            Drive::Slave => 0xB0,
+            Drive::Master => return 0xA0,
+            Drive::Slave => return 0xB0,
         }
     }
     fn drive_lba28_addr(&self) -> u8 {
         match self.drive() {
-            Drive::Master => 0xE0,
-            Drive::Slave => 0xF0,
+            Drive::Master => return 0xE0,
+            Drive::Slave => return 0xF0,
         }
     }
     fn drive_lba48_addr(&self) -> u8 {
         match self.drive() {
-            Drive::Master => 0x40,
-            Drive::Slave => 0x50,
+            Drive::Master => return 0x40,
+            Drive::Slave => return 0x50,
         }
     }
     fn base(&self) -> u16 {
-        self.channel_addr()
+        return self.channel_addr()
     }
 
     pub fn from_idx(idx: u8) -> Option<Self> {
-        Some(match idx {
+        return Some(match idx {
             0 => Self(Channel::Primary, Drive::Master),
             1 => Self(Channel::Primary, Drive::Slave),
             2 => Self(Channel::Secondary, Drive::Master),
@@ -138,6 +138,6 @@ impl DiskLoc {
 }
 impl core::fmt::Display for DiskLoc {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_fmt(format_args!("Drive: {:?} Channel: {:?}", self.1, self.0))
+        return f.write_fmt(format_args!("Drive: {:?} Channel: {:?}", self.1, self.0))
     }
 }

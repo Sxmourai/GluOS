@@ -15,13 +15,13 @@ pub struct Executor {
 
 impl Default for Executor {
     fn default() -> Self {
-        Self::new()
+        return Self::new()
     }
 }
 
 impl Executor {
     pub fn new() -> Self {
-        Executor {
+        return Executor {
             tasks: BTreeMap::new(),
             task_queue: Arc::new(ArrayQueue::new(100)),
             waker_cache: BTreeMap::new(),
@@ -61,7 +61,7 @@ impl Executor {
             let waker = self
                 .waker_cache
                 .entry(task_id)
-                .or_insert_with(|| TaskWaker::get_waker(task_id, self.task_queue.clone()));
+                .or_insert_with(|| return TaskWaker::get_waker(task_id, self.task_queue.clone()));
             let mut context = Context::from_waker(waker);
             match task.poll(&mut context) {
                 Poll::Ready(()) => {
@@ -81,7 +81,7 @@ struct TaskWaker {
 }
 impl TaskWaker {
     fn get_waker(task_id: TaskId, task_queue: Arc<ArrayQueue<TaskId>>) -> Waker {
-        Waker::from(Arc::new(TaskWaker {
+        return Waker::from(Arc::new(TaskWaker {
             task_id,
             task_queue,
         }))

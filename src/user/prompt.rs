@@ -24,7 +24,7 @@ pub trait KbInput: Send + Sync {
     fn get_origin(&self) -> ScreenPos;
     fn get_pressed_keys_len(&self) -> usize;
     fn get_return_message(&self) -> String {
-        String::new()
+        return String::new()
     } //TODO: For blocking prompt, have to change this
     fn move_cursor(&mut self, pos: usize);
 
@@ -32,9 +32,9 @@ pub trait KbInput: Send + Sync {
     fn handle_key(&mut self, key: DecodedKey);
     fn get_message(&self) -> String;
 }
-impl alloc::fmt::Debug for dyn KbInput {
+impl core::fmt::Debug for dyn KbInput {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("Input")
+        return f.debug_struct("Input")
             .field("msg", &self.get_message())
             .finish()
     }
@@ -50,7 +50,7 @@ struct BlockingPrompt {
 
 impl BlockingPrompt {
     pub fn new(message: &str) -> Self {
-        Self {
+        return Self {
             message: message.to_string(),
             pressed_keys: Vec::new(),
             pos: 0,
@@ -63,12 +63,12 @@ impl BlockingPrompt {
         self.return_message = self
             .pressed_keys
             .iter()
-            .map(|sc| sc.ascii_character as char)
+            .map(|sc| return sc.ascii_character as char)
             .collect();
         self.return_message.push(' '); // Flag for the run fn
     }
     pub fn cursor_pos(&self) -> ScreenPos {
-        ScreenPos(
+        return ScreenPos(
             (self.pos / BUFFER_WIDTH as usize) as u8,
             (self.pos % SBUFFER_WIDTH) as u8,
         )
@@ -83,7 +83,7 @@ impl KbInput for BlockingPrompt {
         )
     }
     fn get_message(&self) -> String {
-        self.message.to_string()
+        return self.message.to_string()
     }
     fn run(mut self) -> String {
         self.origin = crate::terminal::writer::calculate_end(
@@ -117,13 +117,13 @@ impl KbInput for BlockingPrompt {
         }
     }
     fn get_return_message(&self) -> String {
-        self.return_message.to_string()
+        return self.return_message.to_string()
     }
     fn get_origin(&self) -> ScreenPos {
-        self.origin.clone()
+        return self.origin.clone()
     }
     fn get_pressed_keys_len(&self) -> usize {
-        self.pressed_keys.len()
+        return self.pressed_keys.len()
     }
     fn handle_key(&mut self, key: DecodedKey) {
         match key {
@@ -203,14 +203,14 @@ impl KbInput for BlockingPrompt {
                         if unsafe { *COMMANDS_INDEX.read_with_timeout() }
                             == unsafe { COMMANDS_HISTORY.read_with_timeout().len() } - 1
                         {
-                            unsafe { COMMANDS_HISTORY.write_with_timeout().push(self.pressed_keys.clone()) };
+                            unsafe { COMMANDS_HISTORY.write_with_timeout().push(self.pressed_keys.clone()); }
                         }
                         {
                             let history = unsafe { COMMANDS_HISTORY.read() };
                             let last_command =
                                 history.get(unsafe { *COMMANDS_INDEX.read_with_timeout() }).unwrap();
-                            self.pressed_keys = last_command.clone();
-                        }
+                            self.pressed_keys = last_command.clone()
+                        };
                         print_screenchars_atp(&self.origin, [DEFAULT_CHAR; 70]);
                         print_screenchars_atp(&self.origin, self.pressed_keys.clone());
                         self.move_cursor(self.get_pressed_keys_len());
@@ -225,8 +225,8 @@ impl KbInput for BlockingPrompt {
                             let history = unsafe { COMMANDS_HISTORY.read() };
                             let last_command =
                                 history.get(unsafe { *COMMANDS_INDEX.read() }).unwrap();
-                            self.pressed_keys = last_command.clone();
-                        }
+                            self.pressed_keys = last_command.clone()
+                        };
                         print_screenchars_atp(&self.origin, [DEFAULT_CHAR; 70]);
                         print_screenchars_atp(&self.origin, self.pressed_keys.clone());
                         self.move_cursor(self.get_pressed_keys_len());
@@ -238,10 +238,10 @@ impl KbInput for BlockingPrompt {
     }
 
     fn remove(&mut self, idx: usize) -> ScreenChar {
-        self.pressed_keys.remove(idx)
+        return self.pressed_keys.remove(idx)
     }
 }
 
 pub fn input(message: &str) -> String {
-    crate::user::prompt::BlockingPrompt::new(message).run()
+    return crate::user::prompt::BlockingPrompt::new(message).run()
 }

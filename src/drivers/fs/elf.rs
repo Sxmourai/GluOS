@@ -12,7 +12,7 @@ const ELF_MAGIC: [u8; 4] = [0x7F, b'E', b'L', b'F'];
 pub fn execute(content: String) -> Result<(), ElfError> {
     let bytes = content
         .chars()
-        .map(|c| c as u8)
+        .map(|c| return c as u8)
         .collect::<alloc::vec::Vec<u8>>();
     if bytes[0..4] != ELF_MAGIC {
         // Simple check of magic number
@@ -107,7 +107,7 @@ pub fn execute(content: String) -> Result<(), ElfError> {
     //     }
     //     _ => {} //TODO
     // }
-    Ok(())
+    return Ok(())
 }
 #[derive(Debug)]
 pub enum ElfSectionHeader<'a> {
@@ -116,7 +116,7 @@ pub enum ElfSectionHeader<'a> {
 }
 impl ElfSectionHeader<'_> {
     pub fn new(bytes: &[u8], format: ElfFormat) -> Option<Self> {
-        Some(match format {
+        return Some(match format {
             ElfFormat::_32Bit => {
                 Self::_32(unsafe { &*(bytes.as_ptr() as *const ElfSectionHeader32) })
             }
@@ -127,32 +127,32 @@ impl ElfSectionHeader<'_> {
     }
     pub fn type_header(&self) -> Option<ElfSectionHeaderType> {
         match self {
-            ElfSectionHeader::_32(sh) => sh.type_header(),
-            ElfSectionHeader::_64(sh) => sh.type_header(),
+            ElfSectionHeader::_32(sh) => return sh.type_header(),
+            ElfSectionHeader::_64(sh) => return sh.type_header(),
         }
     }
     pub fn offset_section_img(&self) -> u64 {
         match self {
-            ElfSectionHeader::_32(sh) => sh.offset_section_img.into(),
-            ElfSectionHeader::_64(sh) => sh.offset_section_img,
+            ElfSectionHeader::_32(sh) => return sh.offset_section_img.into(),
+            ElfSectionHeader::_64(sh) => return sh.offset_section_img,
         }
     }
     pub fn name(&self) -> u32 {
         match self {
-            ElfSectionHeader::_32(sh) => sh.name,
-            ElfSectionHeader::_64(sh) => sh.name,
+            ElfSectionHeader::_32(sh) => return sh.name,
+            ElfSectionHeader::_64(sh) => return sh.name,
         }
     }
     pub fn img_size(&self) -> u64 {
         match self {
-            ElfSectionHeader::_32(sh) => sh.section_size_img.into(),
-            ElfSectionHeader::_64(sh) => sh.section_size_img,
+            ElfSectionHeader::_32(sh) => return sh.section_size_img.into(),
+            ElfSectionHeader::_64(sh) => return sh.section_size_img,
         }
     }
     pub fn flags(&self) -> Option<ElfSectionHeaderFlags> {
         match self {
-            ElfSectionHeader::_32(sh) => sh.flags(),
-            ElfSectionHeader::_64(sh) => sh.flags(),
+            ElfSectionHeader::_32(sh) => return sh.flags(),
+            ElfSectionHeader::_64(sh) => return sh.flags(),
         }
     }
 }
@@ -182,10 +182,10 @@ pub struct ElfSectionHeader32 {
 }
 impl ElfSectionHeader32 {
     pub fn type_header(&self) -> Option<ElfSectionHeaderType> {
-        ElfSectionHeaderType::from_u32(self.type_id)
+        return ElfSectionHeaderType::from_u32(self.type_id)
     }
     pub fn flags(&self) -> Option<ElfSectionHeaderFlags> {
-        ElfSectionHeaderFlags::from_u32(self.flags)
+        return ElfSectionHeaderFlags::from_u32(self.flags)
     }
 }
 #[derive(Debug, Clone, Copy)]
@@ -213,10 +213,10 @@ pub struct ElfSectionHeader64 {
 }
 impl ElfSectionHeader64 {
     pub fn type_header(&self) -> Option<ElfSectionHeaderType> {
-        ElfSectionHeaderType::from_u32(self.type_id)
+        return ElfSectionHeaderType::from_u32(self.type_id)
     }
     pub fn flags(&self) -> Option<ElfSectionHeaderFlags> {
-        ElfSectionHeaderFlags::from_u32(self.flags as u32)
+        return ElfSectionHeaderFlags::from_u32(self.flags as u32)
     }
 }
 #[derive(Debug)]
@@ -239,7 +239,7 @@ pub enum ElfSectionHeaderFlags {
 }
 impl ElfSectionHeaderFlags {
     pub fn from_u32(n: u32) -> Option<Self> {
-        Some(match n {
+        return Some(match n {
             0x1 => Self::WRITE,             //Writable
             0x2 => Self::ALLOC,             //	Occupies memory during execution
             0x4 => Self::EXECINSTR,         //	Executable
@@ -282,7 +282,7 @@ pub enum ElfSectionHeaderType {
 }
 impl ElfSectionHeaderType {
     pub fn from_u32(n: u32) -> Option<Self> {
-        Some(match n {
+        return Some(match n {
             0x0 => Self::NULL,
             0x1 => Self::PROGBITS,
             0x2 => Self::SYMTAB,
@@ -314,30 +314,30 @@ pub enum ElfProgramHeader<'a> {
 impl ElfProgramHeader<'_> {
     pub fn virt_addr(&self) -> u64 {
         match self {
-            ElfProgramHeader::_32(ph) => ph.virt_addr as u64,
-            ElfProgramHeader::_64(ph) => ph.virt_addr,
+            ElfProgramHeader::_32(ph) => return ph.virt_addr as u64,
+            ElfProgramHeader::_64(ph) => return ph.virt_addr,
         }
     }
     pub fn size_mem(&self) -> u64 {
         match self {
-            ElfProgramHeader::_32(ph) => ph.size_mem as u64,
-            ElfProgramHeader::_64(ph) => ph.size_mem,
+            ElfProgramHeader::_32(ph) => return ph.size_mem as u64,
+            ElfProgramHeader::_64(ph) => return ph.size_mem,
         }
     }
     pub fn size_img(&self) -> u64 {
         match self {
-            ElfProgramHeader::_32(ph) => ph.size_img as u64,
-            ElfProgramHeader::_64(ph) => ph.size_img,
+            ElfProgramHeader::_32(ph) => return ph.size_img as u64,
+            ElfProgramHeader::_64(ph) => return ph.size_img,
         }
     }
     pub fn offset(&self) -> u64 {
         match self {
-            ElfProgramHeader::_32(ph) => ph.offset as u64,
-            ElfProgramHeader::_64(ph) => ph.offset,
+            ElfProgramHeader::_32(ph) => return ph.offset as u64,
+            ElfProgramHeader::_64(ph) => return ph.offset,
         }
     }
     pub fn new(bytes: &[u8], format: ElfFormat) -> Option<Self> {
-        Some(match format {
+        return Some(match format {
             ElfFormat::_32Bit => {
                 Self::_32(unsafe { &*(bytes.as_ptr() as *const ElfProgramHeader32) })
             }
@@ -348,14 +348,14 @@ impl ElfProgramHeader<'_> {
     }
     pub fn segment_type(&self) -> Option<ElfSegmentType> {
         match self {
-            ElfProgramHeader::_32(ph) => ph.segment_type(),
-            ElfProgramHeader::_64(ph) => ph.segment_type(),
+            ElfProgramHeader::_32(ph) => return ph.segment_type(),
+            ElfProgramHeader::_64(ph) => return ph.segment_type(),
         }
     }
     pub fn dependant_flags(&self) -> Option<u32> {
         match self {
-            ElfProgramHeader::_32(_) => None,
-            ElfProgramHeader::_64(ph) => Some(ph.dependant_flags()),
+            ElfProgramHeader::_32(_) => return None,
+            ElfProgramHeader::_64(ph) => return Some(ph.dependant_flags()),
         }
     }
 }
@@ -368,7 +368,7 @@ impl core::fmt::Display for ElfProgramHeader<'_> {
             }
             ElfProgramHeader::_64(ph) => {
                 let size = ph.size_img;
-                write!(
+                return write!(
                     f,
                     "Program header: {:?} {:?} Size: {:?}",
                     ph.segment_type(),
@@ -408,7 +408,7 @@ pub struct ElfProgramHeader32 {
 }
 impl ElfProgramHeader32 {
     pub fn segment_type(&self) -> Option<ElfSegmentType> {
-        ElfSegmentType::from_type(self.type_img)
+        return ElfSegmentType::from_type(self.type_img)
     }
 }
 #[repr(C, packed)]
@@ -432,10 +432,10 @@ pub struct ElfProgramHeader64 {
 }
 impl ElfProgramHeader64 {
     pub fn segment_type(&self) -> Option<ElfSegmentType> {
-        ElfSegmentType::from_type(self.type_img)
+        return ElfSegmentType::from_type(self.type_img)
     }
     pub fn dependant_flags(&self) -> u32 {
-        self.seg_dependant_flags
+        return self.seg_dependant_flags
     }
 }
 #[derive(Debug)]
@@ -461,7 +461,7 @@ pub enum ElfSegmentType {
 }
 impl ElfSegmentType {
     pub fn from_type(_type: u32) -> Option<Self> {
-        Some(match _type {
+        return Some(match _type {
             0x00000000 => Self::NULL,              //	Program header table entry unused.
             0x00000001 => Self::LOAD,              //	Loadable segment.
             0x00000002 => Self::DYNAMIC,           //	Dynamic linking information.
@@ -510,7 +510,7 @@ impl ELF<'_> {
         let end = unsafe {
             &*(bytes[core::mem::size_of::<ELFStart>() + idx..].as_ptr() as *const ElfEnd)
         };
-        Ok(Self {
+        return Ok(Self {
             start,
             middle,
             end,
@@ -527,20 +527,20 @@ pub enum ElfMiddle {
 impl ElfMiddle {
     pub fn start_section_header_table_ptr(&self) -> u64 {
         match self {
-            ElfMiddle::_32(m) => m.start_section_header_table_ptr as u64,
-            ElfMiddle::_64(m) => m.start_section_header_table_ptr,
+            ElfMiddle::_32(m) => return m.start_section_header_table_ptr as u64,
+            ElfMiddle::_64(m) => return m.start_section_header_table_ptr,
         }
     }
     pub fn entry(&self) -> u64 {
         match self {
-            ElfMiddle::_32(m) => m.entry as u64,
-            ElfMiddle::_64(m) => m.entry,
+            ElfMiddle::_32(m) => return m.entry as u64,
+            ElfMiddle::_64(m) => return m.entry,
         }
     }
     pub fn start_program_header_ptr(&self) -> u64 {
         match self {
-            ElfMiddle::_32(m) => m.start_program_header_ptr as u64,
-            ElfMiddle::_64(m) => m.start_program_header_ptr,
+            ElfMiddle::_32(m) => return m.start_program_header_ptr as u64,
+            ElfMiddle::_64(m) => return m.start_program_header_ptr,
         }
     }
 }
@@ -610,43 +610,43 @@ pub struct ElfMiddle64 {
 impl ELFStart {
     pub fn format(&self) -> Option<ElfFormat> {
         match self.bit_format {
-            1 => Some(ElfFormat::_32Bit),
-            2 => Some(ElfFormat::_64Bit),
-            _ => None,
+            1 => return Some(ElfFormat::_32Bit),
+            2 => return Some(ElfFormat::_64Bit),
+            _ => return None,
         }
     }
     pub fn endianness(&self) -> Option<ElfEndianness> {
         match self.endianness {
-            1 => Some(ElfEndianness::Little),
-            2 => Some(ElfEndianness::Big),
-            _ => None,
+            1 => return Some(ElfEndianness::Little),
+            2 => return Some(ElfEndianness::Big),
+            _ => return None,
         }
     }
     pub fn target(&self) -> Option<ElfTarget> {
         match self.target_abi {
-            0x00 => Some(ElfTarget::SystemV),
-            0x01 => Some(ElfTarget::HpUx),
-            0x02 => Some(ElfTarget::NetBSD),
-            0x03 => Some(ElfTarget::Linux),
-            0x04 => Some(ElfTarget::GnuHurd),
-            0x06 => Some(ElfTarget::Solaris),
-            0x07 => Some(ElfTarget::AixMonterey),
-            0x08 => Some(ElfTarget::IRIX),
-            0x09 => Some(ElfTarget::FreeBSD),
-            0x0A => Some(ElfTarget::Tru64),
-            0x0B => Some(ElfTarget::NovellModesto),
-            0x0C => Some(ElfTarget::OpenBSD),
-            0x0D => Some(ElfTarget::OpenVMS),
-            0x0E => Some(ElfTarget::NonStopKernel),
-            0x0F => Some(ElfTarget::AROS),
-            0x10 => Some(ElfTarget::FenixOS),
-            0x11 => Some(ElfTarget::NuxiCloudAbi),
-            0x12 => Some(ElfTarget::StratusTechnologiesOpenVos),
-            _ => None,
+            0x00 => return Some(ElfTarget::SystemV),
+            0x01 => return Some(ElfTarget::HpUx),
+            0x02 => return Some(ElfTarget::NetBSD),
+            0x03 => return Some(ElfTarget::Linux),
+            0x04 => return Some(ElfTarget::GnuHurd),
+            0x06 => return Some(ElfTarget::Solaris),
+            0x07 => return Some(ElfTarget::AixMonterey),
+            0x08 => return Some(ElfTarget::IRIX),
+            0x09 => return Some(ElfTarget::FreeBSD),
+            0x0A => return Some(ElfTarget::Tru64),
+            0x0B => return Some(ElfTarget::NovellModesto),
+            0x0C => return Some(ElfTarget::OpenBSD),
+            0x0D => return Some(ElfTarget::OpenVMS),
+            0x0E => return Some(ElfTarget::NonStopKernel),
+            0x0F => return Some(ElfTarget::AROS),
+            0x10 => return Some(ElfTarget::FenixOS),
+            0x11 => return Some(ElfTarget::NuxiCloudAbi),
+            0x12 => return Some(ElfTarget::StratusTechnologiesOpenVos),
+            _ => return None,
         }
     }
     pub fn object_file_type(&self) -> Option<ElfFileType> {
-        Some(match self.object_file_type {
+        return Some(match self.object_file_type {
             0x00 => ElfFileType::NONE,     //	Unknown.
             0x01 => ElfFileType::REL,      //	Relocatable file.
             0x02 => ElfFileType::EXEC,     //	Executable file.

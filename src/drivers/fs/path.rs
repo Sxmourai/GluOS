@@ -24,7 +24,7 @@ impl FilePath {
         if !full_path.starts_with('/') {
             full_path.insert(0, '/');
         }
-        Self {
+        return Self {
             raw_path: full_path.replace('\u{ffff}', ""),
             partition,
         }
@@ -35,29 +35,29 @@ impl FilePath {
         for _word in self.raw_path.split('/') {
             len += 1;
         }
-        len
+        return len
     }
     pub fn root(&self) -> &str {
         let mut splitted = self.raw_path.split('/');
-        splitted.next().unwrap()
+        return splitted.next().unwrap()
     }
     /// Creates a new filepath poiting to parent
     pub fn parent(&self) -> FilePath {
         let splitted: Vec<&str> = self.raw_path.split('/').collect();
-        FilePath::new(
+        return FilePath::new(
             splitted[0..splitted.len() - 2].join("/"),
             self.partition.clone(),
         )
     }
     pub fn path(&self) -> &String {
-        &self.raw_path
+        return &self.raw_path
     }
     // Both paths must be on same partition !
     pub fn join(&self, other_path: FilePath) -> FilePath {
         let mut path = self.raw_path.clone();
         assert_eq!(self.partition, other_path.partition);
         path.push_str(other_path.path());
-        Self::new(
+        return Self::new(
             path.replace("//", "/").replace('\\', "/"),
             self.partition.clone(),
         )
@@ -65,20 +65,20 @@ impl FilePath {
     //TODO Return new or mutate self ?
     pub fn join_str(&self, other_path: String) -> FilePath {
         let path = &format!("{}/{}", self.path(), other_path);
-        Self::new(
+        return Self::new(
             path.replace("//", "/").replace('\\', "/"),
             self.partition.clone(),
         )
     }
     pub fn disk_loc(&self) -> DiskLoc {
-        self.partition.0
+        return self.partition.0
     }
     pub fn name(&self) -> &str {
-        self.raw_path.split('/').last().unwrap()
+        return self.raw_path.split('/').last().unwrap()
     }
 }
 impl core::fmt::Display for FilePath {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str(self.path().to_string().as_str())
+        return f.write_str(self.path().to_string().as_str())
     }
 }

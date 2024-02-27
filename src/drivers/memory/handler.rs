@@ -17,7 +17,7 @@ use super::{active_level_4_table, frame_allocator::BootInfoFrameAllocator};
 pub fn init() {
     let off = unsafe { boot_info!() }.physical_memory_offset;
     let mem_handler = MemoryHandler::new(off, &unsafe { boot_info!() }.memory_map);
-    unsafe { crate::state::MEM_HANDLER.replace(mem_handler) };
+    unsafe { crate::state::MEM_HANDLER.replace(mem_handler); }
 }
 
 #[derive(Debug)]
@@ -41,7 +41,7 @@ impl MemoryHandler {
         crate::drivers::memory::allocator::init_heap(&mut _self)
             .expect("heap initialization failed"); // Initialize the heap allocator
         trace!("Finished initializing heap, can now begin tracing !");
-        _self
+        return _self
     }
     /// # Safety
     /// Mapping can cause all sorts of panics, set OffsetPageTable
@@ -56,7 +56,7 @@ impl MemoryHandler {
         }
         let frame = frame.unwrap();
         unsafe { self.map_frame(page, frame, flags)? }
-        Ok(frame.start_address())
+        return Ok(frame.start_address())
     }
     /// # Safety
     /// Mapping can cause all sorts of panics, set OffsetPageTable
@@ -64,7 +64,7 @@ impl MemoryHandler {
         &mut self,
         page: Page<Size4KiB>,
     ) -> Result<(PhysFrame, MapperFlush<Size4KiB>), UnmapError> {
-        unsafe { self.mapper.unmap(page) }
+        unsafe { return self.mapper.unmap(page) }
     }
 
     /// # Safety
@@ -78,23 +78,23 @@ impl MemoryHandler {
         unsafe {
             self.mapper
                 .map_to(page, frame, flags, &mut self.frame_allocator)
-                .map_err(|err| MapFrameError::CantAllocateFrame)?
+                .map_err(|err| return MapFrameError::CantAllocateFrame)?
                 .flush()
         }
-        Ok(())
+        return Ok(())
     }
     pub fn malloc(&mut self, flags: PageTableFlags) -> Option<VirtAddr> {
         let frame = self.frame_allocator.allocate_frame()?;
         let virt_addr = VirtAddr::new(frame.start_address().as_u64());
         let page = Page::from_start_address(virt_addr).ok()?;
         unsafe { self.map_frame(page, frame, flags) }.ok()?;
-        Some(virt_addr)
+        return Some(virt_addr)
     }
 }
 /// Unsafe not set for ease of use... Maybe change that
 /// TODO Do we want to keep this function not unsafe even though it is ?
 pub fn map(page: Page<Size4KiB>, flags: PageTableFlags) -> PhysAddr {
-    unsafe { mem_handler!().map(page, flags) }.unwrap()
+    return unsafe { mem_handler!().map(page, flags) }.unwrap()
 }
 pub fn map_frame(page: Page<Size4KiB>, frame: PhysFrame, flags: PageTableFlags) {
     unsafe { mem_handler!().map_frame(page, frame, flags) }.unwrap()

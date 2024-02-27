@@ -55,7 +55,7 @@ impl DiskManager {
         match self.disks.get(loc).ok_or(DiskError::NotFound)?.drv {
             DiskDriverEnum::Ata => {
                 let mut ata_drv = unsafe { ATA_DRIVER.as_mut().unwrap().write_with_timeout() };
-                ata_drv.read(loc, start_sector, sector_count)
+                return ata_drv.read(loc, start_sector, sector_count)
             }
             DiskDriverEnum::NVMe => {
                 todo!()
@@ -71,7 +71,7 @@ impl DiskManager {
         match self.disks.get(loc).ok_or(DiskError::NotFound)?.drv {
             DiskDriverEnum::Ata => {
                 let mut ata_drv = unsafe { ATA_DRIVER.as_mut().unwrap().write_with_timeout() };
-                ata_drv.write(loc, start_sector, content)
+                return ata_drv.write(loc, start_sector, content)
             }
             DiskDriverEnum::NVMe => {
                 todo!()
@@ -85,7 +85,7 @@ pub fn read_from_disk(
     start_sector: u64,
     sector_count: u64,
 ) -> Result<Vec<u8>, DiskError> {
-    disk_manager!().read_disk(addr, start_sector, sector_count)
+    return disk_manager!().read_disk(addr, start_sector, sector_count)
 }
 #[cfg(feature = "fs")]
 use crate::fs::partition::Partition;
@@ -101,10 +101,10 @@ pub fn read_from_partition(
         (start_sector + sector_count) < partition.1 + partition.2,
         "Trying to read outside of partition"
     );
-    read_from_disk(&partition.0, start_sector, sector_count)
+    return read_from_disk(&partition.0, start_sector, sector_count)
 }
 pub fn write_to_disk(addr: &DiskLoc, start_sector: u64, content: &[u8]) -> Result<(), DiskError> {
-    disk_manager!().write_disk(addr, start_sector, content)
+    return disk_manager!().write_disk(addr, start_sector, content)
 }
 #[cfg(feature = "fs")]
 pub fn write_to_partition(
@@ -117,7 +117,7 @@ pub fn write_to_partition(
         (start_sector + content.len() as u64) < partition.1 + partition.2,
         "Trying to write outside of partition"
     );
-    disk_manager!().write_disk(&partition.0, start_sector, content)
+    return disk_manager!().write_disk(&partition.0, start_sector, content)
 }
 
 pub trait DiskDriver: Debug {

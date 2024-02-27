@@ -7,7 +7,7 @@ pub struct AtaDriver {
 }
 impl AtaDriver {
     pub fn new(disks: [Option<AtaDisk>; 4]) -> Self {
-        Self {
+        return Self {
             selected_disk: 0,
             disks,
         }
@@ -21,7 +21,7 @@ impl super::DiskDriver for AtaDriver {
         sector_count: u64,
     ) -> Result<Vec<u8>, DiskError> {
         self.select_disk(loc);
-        self.disks[loc.as_index()]
+        return self.disks[loc.as_index()]
             .as_mut()
             .ok_or(DiskError::NotFound)?
             .read_sectors(start_sector, sector_count.try_into().unwrap())
@@ -43,6 +43,6 @@ impl super::DiskDriver for AtaDriver {
 }
 impl AtaDriver {
     pub fn selected_disk(&self) -> DiskLoc {
-        DiskLoc::from_idx(self.selected_disk).unwrap()
+        return DiskLoc::from_idx(self.selected_disk).unwrap()
     }
 }

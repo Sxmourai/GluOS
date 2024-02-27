@@ -27,14 +27,14 @@ pub trait FsDriver: core::fmt::Debug + FsDriverInitialiser {
     fn read(&self, path: &FilePath) -> Result<Entry, FsReadError>;
     fn read_file(&self, filepath: &FilePath) -> Result<File, FsReadError> {
         match self.read(filepath)? {
-            Entry::File(f) => Ok(f),
-            Entry::Dir(d) => Err(FsReadError::EntryNotFound),
+            Entry::File(f) => return Ok(f),
+            Entry::Dir(d) => return Err(FsReadError::EntryNotFound),
         }
     }
     fn read_dir(&self, dirpath: &FilePath) -> Result<Dir, FsReadError> {
         match self.read(dirpath)? {
-            Entry::File(f) => Err(FsReadError::EntryNotFound),
-            Entry::Dir(d) => Ok(d),
+            Entry::File(f) => return Err(FsReadError::EntryNotFound),
+            Entry::Dir(d) => return Ok(d),
         }
     }
     //TODO fn write(&self, path: &FilePath) -> Result<Entry, FsWriteError>;
@@ -98,7 +98,7 @@ impl core::fmt::Display for FsDriverEnum {
             Self::BTRFS => "Btrfs",
             Self::TFS => "Tfs (redox)",
         };
-        f.write_str(repr)
+        return f.write_str(repr)
     }
 }
 #[derive(Debug)]

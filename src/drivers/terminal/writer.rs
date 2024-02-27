@@ -40,10 +40,10 @@ pub struct ColorCode(pub u8);
 
 impl ColorCode {
     pub const fn new(foreground: Color, background: Color) -> ColorCode {
-        ColorCode((background as u8) << 4 | (foreground as u8))
+        return ColorCode((background as u8) << 4 | (foreground as u8))
     }
     pub const fn newb(foreground: u8, background: u8) -> ColorCode {
-        ColorCode(background << 4 | foreground)
+        return ColorCode(background << 4 | foreground)
     }
 }
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Hash)]
@@ -74,9 +74,9 @@ impl Writer {
             );
         }
         unsafe {
-            PortWrite::write_to_port(0x3D4, 0x0Fu8);
+            PortWrite::write_to_port(0x3D4, 0x0F_u8);
             PortWrite::write_to_port(0x3D5, pos);
-            PortWrite::write_to_port(0x3D4, 0x0Eu8);
+            PortWrite::write_to_port(0x3D4, 0x0E_u8);
             PortWrite::write_to_port(0x3D5, (pos >> 8));
         }
     }
@@ -195,7 +195,7 @@ impl Writer {
             self.write_char_at(ScreenPos(x, y), c);
             x += 1;
         }
-        (x, y)
+        return (x, y)
     }
     // Prints characters at desired position, with color of self.color_code and returns the end index
     pub fn write_string_at(&mut self, x: u8, y: u8, s: &str) -> (u8, u8) {
@@ -207,10 +207,10 @@ impl Writer {
             })
         }
 
-        self.write_screenchars_at(x, y, screenchars)
+        return self.write_screenchars_at(x, y, screenchars)
     }
     pub fn write_string_atp(&mut self, pos: &ScreenPos, s: &str) -> (u8, u8) {
-        self.write_string_at(pos.0, pos.1, s)
+        return self.write_string_at(pos.0, pos.1, s)
     }
 
     pub fn write_string(&mut self, s: &str) {
@@ -231,7 +231,7 @@ impl Writer {
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         self.write_string(s);
-        Ok(())
+        return Ok(())
     }
 }
 
@@ -268,7 +268,7 @@ pub fn _print(args: fmt::Arguments) {
 }
 
 pub fn print_at(x: u8, y: u8, s: &str) -> (u8, u8) {
-    x86_64::instructions::interrupts::without_interrupts(|| WRITER.lock().write_string_at(x, y, s))
+    return x86_64::instructions::interrupts::without_interrupts(|| return WRITER.lock().write_string_at(x, y, s))
 }
 
 pub fn print_char_at(x: u8, y: u8, c: char) {
@@ -303,7 +303,7 @@ pub fn print_screenchars_atp(pos: &ScreenPos, s: impl IntoIterator<Item = Screen
 }
 
 pub fn calculate_end(start: &ScreenPos, len: usize) -> ScreenPos {
-    ScreenPos(
+    return ScreenPos(
         start.0 + (len % SBUFFER_WIDTH) as u8,
         start.1 + ((len + start.0 as usize) / SBUFFER_WIDTH) as u8,
     )
