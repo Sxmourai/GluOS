@@ -1,6 +1,4 @@
-use alloc::string::ToString;
-use log::info;
-use spin::Mutex;
+use alloc::string::ToString as _;
 
 use crate::{
     get_drivers,

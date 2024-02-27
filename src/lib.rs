@@ -19,6 +19,7 @@ pub mod drivers;
 pub mod state;
 pub mod test;
 pub mod user;
+pub mod sync;
 
 pub use drivers::*;
 pub use user::*;
@@ -36,6 +37,6 @@ extern crate hashbrown;
 extern crate lazy_static; // Useful to declare some static without using only 'const fn ...'
 extern crate pc_keyboard; // Transforms keyboard scancode (i.e. 158) to letters, provides some keyboard like US, French...
 extern crate pic8259; //TODO: Switch from PIC (Programmable interupt controller) to APIC (Advanced PIC)
-extern crate spin; // Mutex and lock
+extern crate spin; // Mutex, other sync primitives...
 extern crate uart_16550; // Helps us to talk to QEMU (serial print and shutdown)
 extern crate x86_64; // A lot of asm macros, and useful for paging... Everything far and near CPU related // Reimplementation of HashMap and HashSet from stdlib
