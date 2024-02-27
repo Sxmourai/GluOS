@@ -59,24 +59,28 @@ run-args = [
     "stdio",
     # DISKFLAG for build script (see build/disk_create.py)
 "-drive", "file=build/fat32-gpt.img,format=raw",
+"-drive", "file=build/ext2-gpt.img,format=raw",
     # ENDDISKFLAG
-    "-drive",
-    "file=build/ext2-gpt.img,format=raw,if=none,id=nvm",
-    "-device",
-    "nvme,serial=deadbeef,drive=nvm",
+    # NVMe
+    # "-drive",
+    # "file=build/ext2-gpt.img,format=raw,if=none,id=nvm",
+    # "-device",
+    # "nvme,serial=deadbeef,drive=nvm",
+    # Network
     # "-net",
     # "nic,macaddr=00:11:22:33:44:55,model=e1000",
     # "-net","user",
     # "-net",
     # "dump,file=out.pcap",
-    "-netdev",
-    "user,id=u1",
-    "-device",
-    "e1000,netdev=u1",
-    "-object",
-    "filter-dump,id=f1,netdev=u1,file=dump.pcap",
+    # "-netdev",
+    # "user,id=u1",
+    # "-device",
+    # "e1000,netdev=u1",
+    # "-object",
+    # "filter-dump,id=f1,netdev=u1,file=dump.pcap",
     # "-netdev", "tap,id=mynet0,ifname=tap0,script=no,downscript=no", "-device", "e1000,netdev=mynet0",
     # If working on APIC and IPI/SMP: (sets amount of cores to 4)
+    # Multiprocessing
     #TODO When APIC feature automatically set -smp 4
     "-smp",
     "4",

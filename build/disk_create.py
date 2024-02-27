@@ -86,9 +86,9 @@ def main(args):
         f.writelines(lines)
     
 DISKS = [
-    "fatgpt 25M -format fat32",
-    "ext2gpt 30M -format ext2",
-    "ntfs 100M -format NTFS",
+    "25M fat32",
+    "30M ext2",
+    # "100M NTFS",
 ]
 
 if __name__ == "__main__":

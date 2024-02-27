@@ -21,7 +21,7 @@ pub fn execute(content: &[u8]) -> Result<(), ElfError> {
     for i in 0..elf.end.program_header_entries_count {
         //TODO Should we make a mut offset and then increment it on each iteration ?
         let offset = elf.middle.start_program_header_ptr()
-            + (i * elf.end.program_header_table_entry_size) as u64;
+            + u64::from(i * elf.end.program_header_table_entry_size);
         let program_header = ElfProgramHeader::new(&bytes[offset as usize..], format)
             .ok_or(ElfError::InvalidEntry)?;
         program_headers.push(program_header);
@@ -41,6 +41,7 @@ pub fn execute(content: &[u8]) -> Result<(), ElfError> {
                     .get_bit(ElfDependantFlags::Executable as usize - 1)
                 {
                     //TODO Loop to map if size > 4096 - Map all pages
+                    if ph.size_img()>0x1000 {todo!()}
                     dbg!(ph.virt_addr(), ph.phys_addr());
                     let page = Page::containing_address(VirtAddr::new(ph.virt_addr()));
                     let frame = PhysFrame::containing_address(PhysAddr::new(ph.phys_addr()));
@@ -60,12 +61,12 @@ pub fn execute(content: &[u8]) -> Result<(), ElfError> {
                             part.as_ptr(),
                             ph.virt_addr() as *mut u8,
                             ph.size_mem() as usize,
-                        )
+                        );
                     };
                 }
             }
             ElfSegmentType::DYNAMIC => {
-                todo!()
+                // todo!()
             }
             _ => {}
         }

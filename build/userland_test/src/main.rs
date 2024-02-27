@@ -3,7 +3,7 @@
 
 #[no_mangle]
 fn _start() {
-    unsafe {*(0xb8000 as *mut u8) = 'g' as u8};
+    unsafe {*(0xb8000 as *mut u8) = 'r' as u8};
     loop {}
 }
 

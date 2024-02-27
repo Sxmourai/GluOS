@@ -104,8 +104,8 @@ pub fn map_frame(page: Page<Size4KiB>, frame: PhysFrame, flags: PageTableFlags) 
             MapToError::FrameAllocationFailed => todo!(),
             MapToError::ParentEntryHugePage => todo!(),
             MapToError::PageAlreadyMapped(already_frame) => {
-                log::error!("Tried to map page at {:#x} -> {:#x}({:?}) but it's already mapped to {:#x}", page.start_address(), frame.start_address(), flags, already_frame.start_address());
-                unsafe{mem_handler!().unmap(page).unwrap()};
+                log::trace!("Tried to map page at {:#x} -> {:#x}({:?}) but it's already mapped to {:#x}", page.start_address(), frame.start_address(), flags, already_frame.start_address());
+                unsafe{mem_handler!().unmap(page).unwrap()}; // Could use update_flags ?
                 unsafe { mem_handler!().map_frame(page, frame, flags) }.unwrap();
             }, // If the page is already mapped, it like nothing happened, so we don't need to panic
         },
