@@ -43,6 +43,13 @@ impl MemoryHandler {
         trace!("Finished initializing heap, can now begin tracing !");
         _self
     }
+    /// Safe ? Wrapper around allocating frames and mapping them
+    pub fn alloc(&mut self, flags: PageTableFlags) -> Result<PhysFrame, MapToError<Size4KiB>> {
+        let frame = self.frame_allocator.allocate_frame().ok_or(MapToError::FrameAllocationFailed)?;
+        let page = Page::from_start_address(VirtAddr::new(frame.start_address().as_u64())).unwrap();
+        unsafe{self.map_frame(page, frame, flags)?};
+        Ok(frame)
+    }
     /// # Safety
     /// Mapping can cause all sorts of panics, set `OffsetPageTable`
     pub unsafe fn map(
