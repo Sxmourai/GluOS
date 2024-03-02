@@ -72,6 +72,7 @@ pub fn execute(content: &[u8]) -> Result<(), ElfError> {
     }
     let entry_point_addr = elf.middle.entry();
     crate::println!("Jumping to {:#x}", entry_point_addr);
+    //TODO Return from userland, need syscalls & userland, because rn we execute the program in kernel mode
     unsafe {
         core::arch::asm!("
     jmp {:r}

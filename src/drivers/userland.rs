@@ -45,11 +45,11 @@ pub fn go_ring3() {
     push rdx   // code segment
     push rdi   // ret to virtual addr
     iretq",
-    in("rdi") addr, in("rsi") 0x800000, in("dx") cs.0, in("ax") ds.0
-    )}
+    in("rdi") addr, in("rsi") 0x0080_0000, in("dx") cs.0, in("ax") ds.0
+    );}
 }
 #[inline(always)]
-pub fn get_usermode_segs(gdt_segs: &Selectors) -> (u16, u16) {
+#[must_use] pub fn get_usermode_segs(gdt_segs: &Selectors) -> (u16, u16) {
     // set ds and tss, return cs and ds
     let (mut cs, mut ds) = (gdt_segs.user_code_segment, gdt_segs.user_data_segment);
     cs.0 |= x86_64::PrivilegeLevel::Ring3 as u16;
@@ -78,7 +78,7 @@ fn setup_separate_page_table() {
     let program_addr = PhysAddr::new(userspace_prog_1 as *const () as u64);
     let page_phys_start = *program_addr.as_u64().set_bits(0..12, 0); // zero out page offset to get which page we should map
     let fn_page_offset = program_addr.as_u64() - page_phys_start; // offset of function from page start
-    let userspace_fn_virt_base = 0x400000; // target virtual address of page
+    let userspace_fn_virt_base = 0x0040_0000; // target virtual address of page
     let userspace_fn_virt = userspace_fn_virt_base + fn_page_offset; // target virtual address of function
     todo!()
 }

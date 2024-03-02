@@ -82,7 +82,7 @@ impl FADT {
         }
         #[cfg(not(debug_assertions))]
         // On QEMU, we don't need to wait for much time to go to acpi mode
-        crate::time::sdelay(1).await;
+        crate::time::sdelay(1);
         // Polling port
         while unsafe {
             <u16 as PortRead>::read_from_port(self.pm1a_control_block.try_into().unwrap())

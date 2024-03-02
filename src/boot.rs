@@ -14,9 +14,7 @@ use crate::{
     for drv in get_drivers() {
         executor.spawn(drv.task);
     }
-    executor.spawn(Task::new(
-        Shell::default().run_with_command("exec 10/userland".to_string()),
-    ));
+    executor.spawn(Task::new(async {log::info!("Done booting !")}));
     executor
 }
 

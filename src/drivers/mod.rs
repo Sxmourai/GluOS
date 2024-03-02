@@ -36,7 +36,11 @@ fn display_driver(driver: Driver) -> alloc::string::String {
 #[macro_export]
 macro_rules! make_driver {
     ($name: ident, $func: expr, requires=[$($requires:ident),*]) => {{
-        Driver{name:DriverId::$name, task: Task::new($func), requires: alloc::vec![$(DriverId::$requires,)*]}
+        let func = async{
+            log::info!("Initializing {}", DriverId::$name.name());
+            $func.await;
+        };
+        Driver{name:DriverId::$name, task: Task::new(func), requires: alloc::vec![$(DriverId::$requires,)*]}
     }};
     ($name: ident, $func: expr) => {{
         make_driver!($name, $func, requires=[Logger])
@@ -60,6 +64,7 @@ pub enum DriverId {
     Random,
     APIC,
     Userland,
+    Shell,
 }
 impl DriverId {
     #[must_use]
@@ -80,6 +85,7 @@ impl DriverId {
             Self::Random => "Random",
             Self::APIC => "APIC",
             Self::Userland => "Userland, ring 3",
+            Self::Shell => "Shell",
         }
     }
 }
@@ -99,9 +105,11 @@ impl Driver {
 ////////// The best would be a vec/slice, but no vec because we don't have heap allocation and no slice because we can't use static because impl Future isn't sized !
 #[must_use]
 pub fn get_drivers() -> Vec<Driver> {
+    Task::new(async {async{async{crate::fs::init()}};});
     alloc::vec![
         // By default require logger, overwrite that.
         make_driver!(Logger, async { crate::user::log::init() }, requires = []),
+        make_driver!(Logger, async { crate::println!("Welcome User69420 !") }, requires = []),
         // make_driver!(Heap, crate::drivers::memory::init()), manually called in boot, to have executor
         make_driver!(Gdt, async { crate::drivers::gdt::init() }),
         make_driver!(
@@ -130,6 +138,8 @@ pub fn get_drivers() -> Vec<Driver> {
         // #[cfg(feature = "smp")]
         // ("multiprocessing (SMP)", super::smp::init),
         make_driver!(Userland, async { super::userland::go_ring3() }),
+        make_driver!(Shell, crate::shell::Shell::default().run_with_command("help".to_string()))
+        // make_driver!(Shell, crate::shell::Shell::default().run_with_command("exec 10/userland".to_string()))
         // make_driver!(Random, async{super::rand::init()}),
         // ("Network", super::network::init),
         // Don't need to init mouse driver cuz we don't have a use for it currently

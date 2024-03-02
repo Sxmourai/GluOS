@@ -31,7 +31,7 @@ pub fn init() {
                 user_code_segment,
                 user_data_segment,
             },
-        )))
+        )));
     };
     let gdt = unsafe { GDT.get_mut().as_mut().unwrap_unchecked() };
     unsafe { gdt.0.load() };

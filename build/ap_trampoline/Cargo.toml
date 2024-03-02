@@ -3,7 +3,7 @@ name = "ap_trampoline"
 version = "0.1.0"
 edition = "2021"
 # To build: cargo b --release --target x86_64-unknown-none 
-# && llvm-objcopy target/x86_64-unknown-none/release/ap_trampoline ./ap_trampoline.bin
+# && objcopy -O binary -j .text target/x86_64-unknown-none/release/ap_trampoline ./ap_trampoline.bin
 # Without this the binary is 1.7M 😂
 [profile.dev]
 debug = false

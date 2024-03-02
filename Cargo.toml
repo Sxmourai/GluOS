@@ -84,6 +84,7 @@ run-args = [
     #TODO When APIC feature automatically set -smp 4
     "-smp",
     "4",
+    "-vga", "std"
 ]
 test-args = ["-display", "none"]
 test-success-exit-code = 33

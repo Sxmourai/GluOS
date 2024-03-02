@@ -3,7 +3,7 @@ use x86_64::structures::{
     paging::{FrameAllocator, Page, PageTableFlags},
 };
 
-use crate::{mem_handler, memory::handler::map, println};
+use crate::{mem_handler, memory::handler::map, println, time::sdelay};
 use log::error;
 
 pub extern "x86-interrupt" fn alignment_check(stack_frame: InterruptStackFrame, error_code: u64) {
@@ -32,6 +32,9 @@ pub extern "x86-interrupt" fn bound_range_exceeded(stack_frame: InterruptStackFr
 }
 pub extern "x86-interrupt" fn invalid_opcode(stack_frame: InterruptStackFrame) {
     error!("EXCEPTION: invalid_opcode\n{:#?}", stack_frame);
+    // Wait 1 second if debug mode, so that it doesn't spam asf
+    #[cfg(debug_assertions)]
+    for i in 0..1_000_000 {core::hint::spin_loop()}
 }
 pub extern "x86-interrupt" fn overflow(stack_frame: InterruptStackFrame) {
     error!("EXCEPTION: overflow\n{:#?}", stack_frame);

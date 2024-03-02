@@ -71,12 +71,12 @@ impl Apic {
         let high = self.read(Offset::InterruptCommandHigh);
         let low = self.read(Offset::InterruptCommandLow);
         let mut cmd = ipi::InterruptCommand(0);
-        cmd.set_upper(high as u64);
-        cmd.set_lower(low as u64);
+        cmd.set_upper(u64::from(high));
+        cmd.set_lower(u64::from(low));
         cmd
     }
 
-    pub fn read(&self, offset: Offset) -> u32 {
+    #[must_use] pub fn read(&self, offset: Offset) -> u32 {
         unsafe { ptr::read_volatile(self.offset(offset)) }
     }
 
@@ -94,7 +94,7 @@ impl Apic {
 pub mod ipi {
     use super::bitfield;
 
-    pub fn create_send_init_cmd() -> InterruptCommand {
+    #[must_use] pub fn create_send_init_cmd() -> InterruptCommand {
         let mut ic = InterruptCommand(0);
         ic.set_interupt_vector(0);
         ic.set_delivery_mode(5);
@@ -107,9 +107,9 @@ pub mod ipi {
         ic
     }
 
-    pub fn create_startup_cmd(vector: u8) -> InterruptCommand {
+    #[must_use] pub fn create_startup_cmd(vector: u8) -> InterruptCommand {
         let mut ic = InterruptCommand(0);
-        ic.set_interupt_vector(vector as u64);
+        ic.set_interupt_vector(u64::from(vector));
         ic.set_delivery_mode(6);
         ic.set_destination_mode_logical(false);
         ic.set_de_assert(false);
@@ -174,7 +174,7 @@ pub enum Offset {
 static LOCAL_APIC_PTR: spin::Once<Apic> = spin::Once::new();
 
 #[inline]
-pub fn get() -> Apic {
+#[must_use] pub fn get() -> Apic {
     try_get().expect("APIC not initialized")
 }
 
@@ -198,7 +198,8 @@ pub fn init() {
     interrupts::without_interrupts(|| {
         get().init();
     });
-    super::multiprocessor::init_other_units();
+    let cores_running = super::multiprocessor::init_other_units();
+    crate::dbg!(cores_running);
     // let io_apics = descriptor_tables!()
     //     .madt
     //     .fields
@@ -238,8 +239,8 @@ impl IOApic {
         unsafe {
             mem_handler!().map_frame(
                 // Use map ?
-                Page::containing_address(VirtAddr::new(self.record.io_apic_address as u64)),
-                PhysFrame::containing_address(PhysAddr::new(self.record.io_apic_address as u64)),
+                Page::containing_address(VirtAddr::new(u64::from(self.record.io_apic_address))),
+                PhysFrame::containing_address(PhysAddr::new(u64::from(self.record.io_apic_address))),
                 PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::NO_CACHE,
             );
         }
@@ -260,16 +261,16 @@ impl IOApic {
     pub fn read_irq(&self, irq_number: u8) -> IoIrq {
         let irq_lo = self.read(IoOffset::RegisterLo(irq_number));
         let irq_hi = self.read(IoOffset::RegisterHi(irq_number));
-        IoIrq(irq_lo as u64 | (irq_hi as u64) << 32)
+        IoIrq(u64::from(irq_lo) | u64::from(irq_hi) << 32)
     }
     pub fn write_irq(&mut self, irq_number: u8, irq: IoIrq) {
         self.write(
             IoOffset::RegisterLo(irq_number),
-            (irq.0 & u32::MAX as u64) as u32,
+            (irq.0 & u64::from(u32::MAX)) as u32,
         );
         self.write(
             IoOffset::RegisterHi(irq_number),
-            ((irq.0 & ((u32::MAX as u64) << 32)) >> 32) as u32,
+            ((irq.0 & (u64::from(u32::MAX) << 32)) >> 32) as u32,
         );
     }
     pub fn select(&self, offset: IoOffset) {
